@@ -1,0 +1,110 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "mysql"
+}
+
+model clientes {
+  id                 Int          @id @default(autoincrement())
+  cpf_cnpj           String?      @db.VarChar(20)
+  inscricao_estadual String?      @db.VarChar(30)
+  nome               String       @db.VarChar(100)
+  telefone_1         String?      @db.VarChar(20)
+  telefone_2         String?      @db.VarChar(20)
+  cep                String?      @db.VarChar(10)
+  logradouro         String?      @db.VarChar(150)
+  numero             String?      @db.VarChar(20)
+  bairro             String?      @db.VarChar(100)
+  cidade             String?      @db.VarChar(100)
+  estado             String?      @default("PA") @db.VarChar(2)
+  ativo              Boolean?     @default(true)
+  criado_em          DateTime?    @default(now()) @db.Timestamp(0)
+  encomendas         encomendas[]
+}
+
+model encomendas {
+  id               Int               @id @default(autoincrement())
+  cliente_id       Int?
+  data_encomenda   DateTime?         @db.Date
+  valor_total      Decimal?          @db.Decimal(10, 2)
+  status_geral     String?           @default("Ativa") @db.VarChar(30)
+  status_pagamento String?           @default("Pendente") @db.VarChar(30)
+  status_entrega   String?           @default("Pendente") @db.VarChar(30)
+  observacoes      String?           @db.Text
+  criado_em        DateTime?         @default(now()) @db.Timestamp(0)
+  clientes         clientes?         @relation(fields: [cliente_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "encomendas_ibfk_1")
+  entregas         entregas[]
+  itens_encomenda  itens_encomenda[]
+  pagamentos       pagamentos[]
+
+  @@index([cliente_id], map: "cliente_id")
+}
+
+model entregas {
+  id             Int             @id @default(autoincrement())
+  encomenda_id   Int
+  data_entrega   DateTime?       @db.Date
+  local_saida    String?         @db.VarChar(50)
+  motorista      String?         @db.VarChar(100)
+  placa_veiculo  String?         @db.VarChar(20)
+  status_entrega String?         @default("Realizada") @db.VarChar(30)
+  criado_em      DateTime?       @default(now()) @db.Timestamp(0)
+  encomendas     encomendas      @relation(fields: [encomenda_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "entregas_ibfk_1")
+  itens_entrega  itens_entrega[]
+
+  @@index([encomenda_id], map: "encomenda_id")
+}
+
+model itens_encomenda {
+  id             Int         @id @default(autoincrement())
+  encomenda_id   Int?
+  variedade_id   Int?
+  quantidade     Int
+  valor_unitario Decimal?    @db.Decimal(10, 2)
+  encomendas     encomendas? @relation(fields: [encomenda_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "itens_encomenda_ibfk_1")
+  variedades     variedades? @relation(fields: [variedade_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "itens_encomenda_ibfk_2")
+
+  @@index([encomenda_id], map: "encomenda_id")
+  @@index([variedade_id], map: "variedade_id")
+}
+
+model itens_entrega {
+  id           Int        @id @default(autoincrement())
+  entrega_id   Int
+  variedade_id Int
+  quantidade   Int
+  entregas     entregas   @relation(fields: [entrega_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "itens_entrega_ibfk_1")
+  variedades   variedades @relation(fields: [variedade_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "itens_entrega_ibfk_2")
+
+  @@index([entrega_id], map: "entrega_id")
+  @@index([variedade_id], map: "variedade_id")
+}
+
+model pagamentos {
+  id                Int         @id @default(autoincrement())
+  encomenda_id      Int?
+  valor_pago        Decimal     @db.Decimal(10, 2)
+  data_pagamento    DateTime?   @db.Date
+  forma_pagamento   String?     @db.VarChar(50)
+  recebedor         String?     @db.VarChar(50)
+  nome_pagador      String?     @db.VarChar(100)
+  cpf_cnpj_pagador  String?     @db.VarChar(20)
+  status_nota       String?     @default("Pendente") @db.VarChar(30)
+  numero_nota       String?     @db.VarChar(50)
+  data_emissao_nota DateTime?   @db.Date
+  criado_em         DateTime?   @default(now()) @db.Timestamp(0)
+  encomendas        encomendas? @relation(fields: [encomenda_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "pagamentos_ibfk_1")
+
+  @@index([encomenda_id], map: "encomenda_id")
+}
+
+model variedades {
+  id              Int               @id @default(autoincrement())
+  nome            String            @db.VarChar(50)
+  ativo           Boolean?          @default(true)
+  itens_encomenda itens_encomenda[]
+  itens_entrega   itens_entrega[]
+}
