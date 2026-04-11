@@ -1,4 +1,4 @@
-const clienteService = require('@prisma/client');
+const clienteService = require('../services/clienteService');
 
 const criarCliente = async (req, res) => {
     try {

@@ -1,5 +1,4 @@
-const { PrismaClient } = require('../generated/prisma');
-const prisma = new PrismaClient();
+const prisma = require('../config/database');
 
 const criarCliente = async (dadosCliente) => {
     const novoCliente = await prisma.clientes.create({
