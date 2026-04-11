@@ -4,6 +4,7 @@ require('dotenv').config(); // Puxa as variáveis do arquivo .env
 
 const clienteRoutes = require('./routes/clienteRoutes');
 const variedadeRoutes = require('./routes/variedadeRoutes');
+const encomendaRoutes = require('./routes/encomendaRoutes');
 
 const prismaTest = require('./config/database');
 console.log("Prisma carregado com sucesso:", !!prismaTest);
@@ -17,6 +18,7 @@ app.use(express.json());
 // Toda vez que alguém acessar /api/clientes, o Express joga para o arquivo de rotas
 app.use('/api/clientes', clienteRoutes);
 app.use('/api/variedades', variedadeRoutes);
+app.use('/api/encomendas', encomendaRoutes);
 
 // Inicia o servidor na porta 6072
 const PORT = process.env.PORT || 6072;
