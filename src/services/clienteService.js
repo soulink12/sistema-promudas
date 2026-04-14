@@ -15,7 +15,23 @@ const listarClientes = async () => {
     return clientes;
 };
 
+const atualizarCliente = async (id, dados) => {
+  return await prisma.clientes.update({
+    where: { id: parseInt(id) },
+    data: dados,
+  });
+};
+
+const eliminarCliente = async (id) => {
+  return await prisma.clientes.update({
+    where: { id: parseInt(id) },
+    data: {ativo: false}
+  });
+};
+
 module.exports = {
     criarCliente,
-    listarClientes
+    listarClientes,
+    atualizarCliente,
+    eliminarCliente
 };

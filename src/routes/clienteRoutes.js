@@ -8,4 +8,7 @@ router.post('/', clienteController.criarCliente);
 // Rota para listar os clientes (GET)
 router.get('/', clienteController.listarClientes);
 
+router.put('/:id', clienteController.atualizarCliente); // UPDATE
+router.delete('/:id', clienteController.eliminarCliente); // DELETE
+
 module.exports = router;

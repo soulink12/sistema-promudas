@@ -28,7 +28,27 @@ const listarClientes = async (req, res) => {
     }
 };
 
+const atualizarCliente = async (req, res) => {
+  try {
+    const cliente = await clienteService.atualizarCliente(req.params.id, req.body);
+    res.json(cliente);
+  } catch (error) {
+    res.status(500).json({ error: "Erro ao atualizar cliente" });
+  }
+};
+
+const eliminarCliente = async (req, res) => {
+  try {
+    await clienteService.eliminarCliente(req.params.id);
+    res.status(204).send();
+  } catch (error) {
+    res.status(500).json({ error: "Erro ao eliminar cliente" });
+  }
+};
+
 module.exports = {
     criarCliente,
-    listarClientes
+    listarClientes,
+    atualizarCliente,
+    eliminarCliente
 };

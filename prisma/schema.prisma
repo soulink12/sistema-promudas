@@ -27,6 +27,7 @@ model clientes {
 model encomendas {
   id               Int               @id @default(autoincrement())
   cliente_id       Int?
+  ativo            Boolean?          @default(true)
   data_encomenda   DateTime?         @db.Date
   valor_total      Decimal?          @db.Decimal(10, 2)
   status_geral     String?           @default("Ativa") @db.VarChar(30)
