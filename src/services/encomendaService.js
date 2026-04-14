@@ -1,50 +1,43 @@
 const prisma = require('../config/database');
 
 const criarEncomenda = async (dados) => {
-    // Usamos o 'clientes' (nome do objeto no seu schema) para conectar o ID
-    // E 'itens_encomenda' para criar o registro da muda/quantidade simultaneamente
-    const novaEncomenda = await prisma.encomendas.create({
-        data: {
-            valor_total: dados.valor_total,
-            status_geral: dados.status_geral || "Ativa",
-            status_pagamento: "Pendente",
-            status_entrega: "Pendente",
-            
-            // CONEXÃO COM CLIENTE (O Prisma exige o nome da relação 'clientes')
-            clientes: {
-                connect: { id: parseInt(dados.cliente_id) }
-            },
-
-            // CRIAÇÃO DO ITEM (Onde realmente fica a quantidade e a muda no seu schema)
-            itens_encomenda: {
-                create: [
-                  {
-                    quantidade: parseInt(dados.quantidade),
-                    variedades: {
-                      connect: { id: parseInt(dados.variedade_id) }
-                    }
-                  }
-                ]
-            }
-        }
-    });
-    
-    return novaEncomenda.id;
+  return await prisma.encomendas.create({
+    data: {
+      // Conecta com o cliente existente
+      clientes: {
+        connect: { id: parseInt(dados.cliente_id) }
+      },
+      valor_total: dados.valor_total,
+      observacoes: dados.observacoes,
+      status_geral: "Ativa",
+      ativo: true,
+      
+      // Cria os itens automaticamente na tabela itens_encomenda
+      itens_encomenda: {
+        create: dados.itens.map(item => ({
+          variedade_id: parseInt(item.variedade_id),
+          quantidade: parseInt(item.quantidade),
+          valor_unitario: item.valor_unitario
+        }))
+      }
+    },
+    // Isso faz com que o retorno já venha com os itens incluídos para conferência
+    include: {
+      itens_encomenda: true
+    }
+  });
 };
 
 const listarEncomendas = async () => {
-    // Retorna a encomenda com os dados do cliente e os itens inclusos
-    return await prisma.encomendas.findMany({
-        where: { ativo: true },
-        include: {
-            clientes: true,
-            itens_encomenda: {
-                include: {
-                    variedades: true
-                }
-            }
-        }
-    });
+  return await prisma.encomendas.findMany({
+    where: { ativo: true },
+    include: {
+      clientes: { select: { nome: true } },
+      itens_encomenda: {
+        include: { variedades: { select: { nome: true } } }
+      }
+    }
+  });
 };
 
 const atualizarEncomenda = async (id, dados) => {

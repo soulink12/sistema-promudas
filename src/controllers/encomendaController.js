@@ -4,17 +4,22 @@ const criarEncomenda = async (req, res) => {
     try {
         const dados = req.body;
         
-        // Validação básica: precisamos saber pelo menos QUEM pediu e O QUE pediu
-        if (!dados.cliente_id || !dados.variedade_id) {
-            return res.status(400).json({ erro: 'Os IDs do cliente e da variedade são obrigatórios.' });
+        // Validação: precisa do cliente e de pelo menos um item na lista
+        if (!dados.cliente_id || !dados.itens || !Array.isArray(dados.itens) || dados.itens.length === 0) {
+            return res.status(400).json({ 
+                erro: 'O ID do cliente e a lista de itens (com variedade e quantidade) são obrigatórios.' 
+            });
         }
 
-        const novoId = await encomendaService.criarEncomenda(dados);
-        return res.status(201).json({ mensagem: 'Encomenda registrada com sucesso!', id: novoId });
+        const novaEncomenda = await encomendaService.criarEncomenda(dados);
+        return res.status(201).json({ 
+            mensagem: 'Encomenda e itens registrados com sucesso!', 
+            data: novaEncomenda 
+        });
         
     } catch (error) {
         console.error('Erro ao criar encomenda:', error);
-        return res.status(500).json({ erro: 'Erro interno do servidor ao registrar encomenda.' });
+        return res.status(500).json({ erro: 'Erro interno ao registrar encomenda.' });
     }
 };
 
