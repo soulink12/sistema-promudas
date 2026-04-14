@@ -35,6 +35,7 @@ const criarEncomenda = async (dados) => {
 const listarEncomendas = async () => {
     // Retorna a encomenda com os dados do cliente e os itens inclusos
     return await prisma.encomendas.findMany({
+        where: { ativo: true },
         include: {
             clientes: true,
             itens_encomenda: {
@@ -46,7 +47,24 @@ const listarEncomendas = async () => {
     });
 };
 
+const atualizarEncomenda = async (id, dados) => {
+  return await prisma.encomendas.update({
+    where: { id: parseInt(id) },
+    data: dados,
+  });
+};
+
+const eliminarEncomenda = async (id) => {
+  // O Prisma apagará os itens se estiver configurado o CASCADE no banco
+  return await prisma.encomendas.update({
+    where: { id: parseInt(id) },
+    data: {ativo: false}
+  });
+};
+
 module.exports = {
     criarEncomenda,
-    listarEncomendas
+    listarEncomendas,
+    atualizarEncomenda,
+    eliminarEncomenda
 };

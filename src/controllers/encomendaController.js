@@ -28,7 +28,27 @@ const listarEncomendas = async (req, res) => {
     }
 };
 
+const atualizarEncomenda = async (req, res) => {
+  try {
+    const encomenda = await encomendaService.atualizarEncomenda(req.params.id, req.body);
+    res.json(encomenda);
+  } catch (error) {
+    res.status(500).json({ error: "Erro ao atualizar encomenda" });
+  }
+};
+
+const eliminarEncomenda = async (req, res) => {
+  try {
+    await encomendaService.eliminarEncomenda(req.params.id);
+    res.status(204).send();
+  } catch (error) {
+    res.status(500).json({ error: "Erro ao eliminar encomenda" });
+  }
+};
+
 module.exports = {
     criarEncomenda,
-    listarEncomendas
+    listarEncomendas,
+    atualizarEncomenda,
+    eliminarEncomenda
 };

@@ -14,7 +14,23 @@ const listarVariedades = async () => {
     return variedades;
 };
 
+const atualizarVariedade = async (id, dados) => {
+  return await prisma.variedades.update({
+    where: { id: parseInt(id) },
+    data: dados,
+  });
+};
+
+const eliminarVariedade = async (id) => {
+  return await prisma.variedades.update({
+    where: { id: parseInt(id) },
+    data: {ativo: false}
+  });
+};
+
 module.exports = {
     criarVariedade,
-    listarVariedades
+    listarVariedades,
+    atualizarVariedade,
+    eliminarVariedade
 };

@@ -27,7 +27,27 @@ const listarVariedades = async (req, res) => {
     }
 };
 
+const atualizarVariedade = async (req, res) => {
+  try {
+    const variedade = await variedadeService.atualizarVariedade(req.params.id, req.body);
+    res.json(variedade);
+  } catch (error) {
+    res.status(500).json({ error: "Erro ao atualizar variedade" });
+  }
+};
+
+const eliminarVariedade = async (req, res) => {
+  try {
+    await variedadeService.eliminarVariedade(req.params.id);
+    res.status(204).send();
+  } catch (error) {
+    res.status(500).json({ error: "Erro ao eliminar variedade" });
+  }
+};
+
 module.exports = {
     criarVariedade,
-    listarVariedades
+    listarVariedades,
+    atualizarVariedade,
+    eliminarVariedade
 };
