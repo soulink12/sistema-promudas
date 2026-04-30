@@ -52,10 +52,21 @@ const criarPagamento = async (dadosPagamento) => {
 };
 
 const listarPagamentos = async () => {
-    // Como não tem campo "ativo", listamos todos (ou podemos filtrar por encomenda no futuro)
+    // Agora filtramos para listar apenas pagamentos de encomendas que estão ATIVAS
     const pagamentos = await prisma.pagamentos.findMany({
+        where: {
+            encomendas: {
+                ativo: true
+            }
+        },
         include: {
-            encomendas: true // Traz os dados da encomenda vinculada (opcional, mas muito útil)
+            encomendas: {
+                select: {
+                    id: true,
+                    status_geral: true,
+                    valor_total: true
+                }
+            }
         }
     });
     return pagamentos;
