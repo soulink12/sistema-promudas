@@ -6,6 +6,7 @@ const clienteRoutes = require('./routes/clienteRoutes');
 const variedadeRoutes = require('./routes/variedadeRoutes');
 const encomendaRoutes = require('./routes/encomendaRoutes');
 const pagamentoRoutes = require('./routes/pagamentoRoutes');
+const entregaRoutes = require('./routes/entregaRoutes');
 
 const prismaTest = require('./config/database');
 console.log("Prisma carregado com sucesso:", !!prismaTest);
@@ -21,6 +22,7 @@ app.use('/api/clientes', clienteRoutes);
 app.use('/api/variedades', variedadeRoutes);
 app.use('/api/encomendas', encomendaRoutes);
 app.use('/api/pagamentos', pagamentoRoutes);
+app.use('/api/entregas', entregaRoutes);
 
 // Inicia o servidor na porta 6072
 const PORT = process.env.PORT || 6072;
