@@ -102,13 +102,50 @@ const listarPagamentos = async () => {
 };
 
 const atualizarPagamento = async (id, dados) => {
-    // 1. Atualiza o pagamento
+    // 1. Busca o pagamento atual junto com os dados da encomenda e todos os pagamentos dela
+    const pagamentoAtual = await prisma.pagamentos.findUnique({
+        where: { id: parseInt(id) },
+        include: {
+            encomendas: {
+                include: { pagamentos: true }
+            }
+        }
+    });
+
+    if (!pagamentoAtual) {
+        throw new Error('Pagamento não encontrado.');
+    }
+
+    // 2. Se o utilizador enviou um novo "valor_pago", fazemos a validação de segurança
+    if (dados.valor_pago !== undefined) {
+        const encomenda = pagamentoAtual.encomendas;
+        const novoValorPago = parseFloat(dados.valor_pago);
+
+        // Soma os OUTROS pagamentos da mesma encomenda (ignorando o valor antigo deste pagamento que estamos editando)
+        const totalPagoOutros = encomenda.pagamentos.reduce((soma, p) => {
+            if (p.id === parseInt(id)) {
+                return soma; // Pula o pagamento atual
+            }
+            return soma + parseFloat(p.valor_pago);
+        }, 0);
+
+        const valorTotalEncomenda = parseFloat(encomenda.valor_total);
+        
+        // O máximo que este pagamento pode ter é o Valor Total da Encomenda menos o que já foi pago nos OUTROS recibos
+        const saldoPermitido = valorTotalEncomenda - totalPagoOutros;
+
+        if (novoValorPago > (saldoPermitido + 0.01)) {
+            throw new Error(`Valor excede o saldo devedor. O máximo permitido para esta edição é R$ ${saldoPermitido.toFixed(2)}.`);
+        }
+    }
+
+    // 3. Passou na validação (ou não editou o valor), então atualiza no banco
     const pagamentoAtualizado = await prisma.pagamentos.update({
         where: { id: parseInt(id) },
         data: dados,
     });
 
-    // 2. AUTOMAÇÃO: Dispara o recálculo pois o valor mudou
+    // 4. AUTOMAÇÃO: Dispara o recálculo pois o valor mudou com sucesso
     await recalcularStatusEncomenda(pagamentoAtualizado.encomenda_id);
 
     return pagamentoAtualizado;
