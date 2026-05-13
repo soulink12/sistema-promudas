@@ -146,19 +146,73 @@ const listarEntregas = async () => {
 };
 
 const atualizarEntrega = async (id, dados) => {
-  // 1. Extraímos os 'itens' e guardamos o resto (motorista, status) em 'dadosPrincipais'
-  const entrega = await prisma.entregas.findUnique({
-      where: { id: parseInt(id) }
+  const entregaId = parseInt(id);
+
+  // 1. Busca a entrega original para pegar a encomenda vinculada
+  const entregaOriginal = await prisma.entregas.findUnique({
+    where: { id: entregaId },
+    select: { encomenda_id: true }
   });
+
+  if (!entregaOriginal) {
+    throw new Error("Entrega não encontrada.");
+  }
+
   const { itens, ...dadosPrincipais } = dados;
 
-  // 2. Preparamos o objeto base que vai atualizar a tabela 'entregas'
+  // 2. Se a requisição incluir itens, fazemos a validação de Saldo de Mudas
+  if (itens && Array.isArray(itens)) {
+    // A. Busca o que o cliente comprou na encomenda
+    const encomenda = await prisma.encomendas.findUnique({
+      where: { id: entregaOriginal.encomenda_id },
+      include: { itens_encomenda: true }
+    });
+
+    // B. Busca as OUTRAS entregas já feitas para esta encomenda (ignorando a atual)
+    const outrasEntregas = await prisma.entregas.findMany({
+      where: {
+        encomenda_id: entregaOriginal.encomenda_id,
+        id: { not: entregaId } // <- O Segredo: Ignora a entrega que estamos a editar
+      },
+      include: { itens_entrega: true }
+    });
+
+    // C. Calcula o total já entregue (somente pelas OUTRAS entregas)
+    const jaEntregue = {};
+    outrasEntregas.forEach(ent => {
+      ent.itens_entrega.forEach(item => {
+        jaEntregue[item.variedade_id] = (jaEntregue[item.variedade_id] || 0) + item.quantidade;
+      });
+    });
+
+    // D. Valida cada novo item que queremos guardar nesta entrega
+    for (const novoItem of itens) {
+      // Quanto ele comprou no total desta variedade?
+      const itemComprado = encomenda.itens_encomenda.find(i => i.variedade_id === novoItem.variedade_id);
+      const totalComprado = itemComprado ? itemComprado.quantidade : 0;
+
+      if (totalComprado === 0) {
+        throw new Error(`A variedade ID ${novoItem.variedade_id} não faz parte desta encomenda.`);
+      }
+
+      // Qual o saldo restante (sem contar a entrega atual)?
+      const totalOutrasEntregas = jaEntregue[novoItem.variedade_id] || 0;
+      const saldoDisponivel = totalComprado - totalOutrasEntregas;
+
+      // Se a quantidade enviada for maior que o saldo, bloqueia a edição
+      if (novoItem.quantidade > saldoDisponivel) {
+        throw new Error(`Atenção: Saldo insuficiente para a variedade ID ${novoItem.variedade_id}. O valor máximo dessa entrega deve ser ${saldoDisponivel}.`);
+      }
+    }
+  }
+
+  // 3. Preparamos o objeto base que vai atualizar a tabela 'entregas'
   let dataParaAtualizar = { ...dadosPrincipais };
 
-  // 3. Se a requisição incluir novos itens, preparamos a transação aninhada
+  // 4. Se passou na validação, prepara a transação aninhada do Prisma
   if (itens && Array.isArray(itens)) {
     dataParaAtualizar.itens_entrega = {
-      deleteMany: {}, // Apaga todos os registros antigos DESTA entrega na tabela itens_entrega
+      deleteMany: {}, // Apaga todos os registros antigos DESTA entrega
       create: itens.map(item => ({ // Recria os novos itens recebidos no body
         variedade_id: item.variedade_id,
         quantidade: item.quantidade
@@ -166,15 +220,16 @@ const atualizarEntrega = async (id, dados) => {
     };
   }
 
-  // 4. Salva no banco de dados
+  // 5. Salva no banco de dados
   const entregaAtualizada = await prisma.entregas.update({
     where: {
-      id: parseInt(id) // Garante que o ID seja numérico
+      id: entregaId
     },
     data: dataParaAtualizar
   });
 
-  await recalcularStatusEntrega(entrega.encomenda_id);
+  // 6. Recalcula o status geral da entrega para a Encomenda
+  await recalcularStatusEntrega(entregaOriginal.encomenda_id);
 
   return entregaAtualizada;
 };
