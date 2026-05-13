@@ -1,5 +1,58 @@
-node_modules
-# Keep environment variables out of version control
+# ==========================================
+# BACKEND (Node.js & Prisma)
+# ==========================================
+node_modules/
 .env
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
 
 /generated/prisma
+
+# ==========================================
+# FRONTEND (Flutter Web/App)
+# ==========================================
+# Miscellaneous
+*.class
+*.log
+*.pyc
+*.swp
+.DS_Store
+.atom/
+.build/
+.buildlog/
+.history
+.svn/
+.swiftpm/
+migrate_working_dir/
+
+# IntelliJ related
+*.iml
+*.ipr
+*.iws
+.idea/
+
+# Flutter/Dart/Pub related
+**/doc/api/
+**/ios/Flutter/.last_build_id
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+.pub-cache/
+.pub/
+
+# Note que tiramos a '/' do começo para que ele ignore a pasta build 
+# de dentro do seu subdiretório do flutter
+build/
+coverage/
+
+# Symbolication related
+app.*.symbols
+
+# Obfuscation related
+app.*.map.json
+
+# Android Studio will place build artifacts here
+android/app/debug
+android/app/profile
+android/app/release
