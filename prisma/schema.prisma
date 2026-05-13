@@ -108,3 +108,12 @@ model variedades {
   itens_encomenda itens_encomenda[]
   itens_entrega   itens_entrega[]
 }
+
+model usuarios {
+  id         Int      @id @default(autoincrement())
+  nome       String
+  email      String   @unique
+  senha_hash String   // Aqui guardaremos a senha criptografada
+  ativo      Boolean  @default(true)
+  criado_em  DateTime @default(now())
+}

@@ -7,6 +7,9 @@ const variedadeRoutes = require('./routes/variedadeRoutes');
 const encomendaRoutes = require('./routes/encomendaRoutes');
 const pagamentoRoutes = require('./routes/pagamentoRoutes');
 const entregaRoutes = require('./routes/entregaRoutes');
+const authRoutes = require('./routes/authRoutes.js');
+
+const { verificarToken } = require('./middlewares/authMiddleware.js');
 
 const prismaTest = require('./config/database');
 console.log("Prisma carregado com sucesso:", !!prismaTest);
@@ -17,12 +20,14 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
+app.use('/api/auth', authRoutes);
+
 // Toda vez que alguém acessar /api/clientes, o Express joga para o arquivo de rotas
-app.use('/api/clientes', clienteRoutes);
-app.use('/api/variedades', variedadeRoutes);
-app.use('/api/encomendas', encomendaRoutes);
-app.use('/api/pagamentos', pagamentoRoutes);
-app.use('/api/entregas', entregaRoutes);
+app.use('/api/clientes', verificarToken, clienteRoutes);
+app.use('/api/variedades', verificarToken, variedadeRoutes);
+app.use('/api/encomendas', verificarToken, encomendaRoutes);
+app.use('/api/pagamentos', verificarToken, pagamentoRoutes);
+app.use('/api/entregas', verificarToken, entregaRoutes);
 
 // Inicia o servidor na porta 6072
 const PORT = process.env.PORT || 6072;
