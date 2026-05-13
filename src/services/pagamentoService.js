@@ -46,6 +46,12 @@ const criarPagamento = async (dadosPagamento) => {
             where: { id: parseInt(encomenda_id) },
             data: { status_pagamento: 'Pago' }
         });
+    } else {
+        // Se pagou algo, mas não quitou, vira Parcial
+        await prisma.encomendas.update({
+            where: { id: parseInt(encomenda_id) },
+            data: { status_pagamento: 'Parcial' }
+        });
     }
 
     return novoPagamento.id;
