@@ -1,47 +1,47 @@
 import 'package:flutter/material.dart';
-import 'package:dio/dio.dart';
 
 class TelaListaClientes extends StatefulWidget {
-  final String token;
-  const TelaListaClientes({super.key, required this.token});
+  // Removemos a exigência do token
+  const TelaListaClientes({super.key});
 
   @override
   State<TelaListaClientes> createState() => _TelaListaClientesState();
 }
 
 class _TelaListaClientesState extends State<TelaListaClientes> {
-  late Dio _dio;
+  // Mais tarde, esta lista virá do seu banco de dados local (SQLite)
   List<dynamic> _clientes = [];
   bool _carregando = true;
 
   @override
   void initState() {
     super.initState();
-    _dio = Dio(
-      BaseOptions(
-        baseUrl: 'https://api2.viveiropromudas.com.br/api',
-        headers: {'Authorization': 'Bearer ${widget.token}'},
-      ),
-    );
-    _buscarClientes();
+    _buscarClientesLocais();
   }
 
-  Future<void> _buscarClientes() async {
-    try {
-      final response = await _dio.get('/clientes');
-      setState(() {
-        _clientes = response.data;
-        _carregando = false;
-      });
-    } catch (e) {
-      print("Erro: $e");
-      setState(() => _carregando = false);
-    }
+  // Função que simula a busca no banco offline
+  Future<void> _buscarClientesLocais() async {
+    // Simulando o tempo de leitura de um banco de dados local
+    await Future.delayed(const Duration(milliseconds: 500));
+    
+    setState(() {
+      _clientes = [
+        {'id': 1, 'nome': 'Consumidor Padrão', 'telefone': 'Não informado'},
+        {'id': 3, 'nome': 'João Silva', 'telefone': '(11) 99999-1111'},
+        {'id': 4, 'nome': 'Maria Oliveira', 'telefone': '(22) 98888-2222'},
+      ];
+      _carregando = false;
+    });
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      appBar: AppBar(
+        title: const Text('Meus Clientes'),
+        backgroundColor: Colors.green,
+        foregroundColor: Colors.white,
+      ),
       body: _carregando
           ? const Center(child: CircularProgressIndicator())
           : ListView.builder(
@@ -55,16 +55,21 @@ class _TelaListaClientesState extends State<TelaListaClientes> {
                   leading: const CircleAvatar(
                     backgroundColor: Colors.green,
                     child: Icon(
-                      Icons.shopping_cart,
+                      Icons.person,
                       color: Colors.white,
-                    ), // Mudei o ícone para um carrinho
+                    ), 
                   ),
-                  // --- ABRE O ECRÃ DE VENDA AO CLICAR ---
-                  onTap: () {
-                  },
                 );
               },
             ),
+      // Botão preparado para abrir a futura tela de cadastro offline
+      floatingActionButton: FloatingActionButton(
+        onPressed: () {
+          // Futuramente: Navigator.push(context, MaterialPageRoute(builder: (_) => CadastroClienteScreen()));
+        },
+        backgroundColor: Colors.green,
+        child: const Icon(Icons.add, color: Colors.white),
+      ),
     );
   }
 }

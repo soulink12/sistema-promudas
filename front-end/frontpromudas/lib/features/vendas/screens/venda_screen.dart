@@ -13,17 +13,32 @@ class _TelaVendaState extends State<TelaVenda> {
     'id': 1,
     'nome': 'Consumidor',
     'cpf': 'Não informado',
-    'telefone': 'Não informado'
+    'telefone': 'Não informado',
   };
 
   // Variável que controla qual cliente está ativo na venda atual
   Map<String, dynamic>? _clienteSelecionado;
 
   // Lista simulada de clientes para quando o usuário quiser trocar e pesquisar
-final List<Map<String, dynamic>> _clientesMock = [
-    {'id': 1, 'nome': 'Consumidor', 'cpf': 'Não informado', 'telefone': 'Não informado'},
-    {'id': 3, 'nome': 'João Silva', 'cpf': '111.111.111-11', 'telefone': '(11) 99999-1111'},
-    {'id': 4, 'nome': 'Maria Oliveira', 'cpf': '222.222.222-22', 'telefone': '(22) 98888-2222'},
+  final List<Map<String, dynamic>> _clientesMock = [
+    {
+      'id': 1,
+      'nome': 'Consumidor',
+      'cpf': 'Não informado',
+      'telefone': 'Não informado',
+    },
+    {
+      'id': 3,
+      'nome': 'João Silva',
+      'cpf': '111.111.111-11',
+      'telefone': '(11) 99999-1111',
+    },
+    {
+      'id': 4,
+      'nome': 'Maria Oliveira',
+      'cpf': '222.222.222-22',
+      'telefone': '(22) 98888-2222',
+    },
   ];
 
   @override
@@ -40,53 +55,58 @@ final List<Map<String, dynamic>> _clientesMock = [
         backgroundColor: Colors.green[100],
         titleSpacing: 16,
         title: _construirDetalhesAppBar(),
-        actions: [
-          // Botão para trocar de cliente ou voltar para o padrão
-          IconButton(
-            icon: Icon(
-              _clienteSelecionado!['id'] == 1 ? Icons.person_search : Icons.clear, 
-              color: Colors.black87
-            ),
-            tooltip: _clienteSelecionado!['id'] == 1 ? 'Mudar Cliente' : 'Voltar para Consumidor',
-            onPressed: () {
-              if (_clienteSelecionado!['id'] == 1) {
-                // Se está no padrão, abre uma janela/modal de busca para escolher outro
-                _mostrarBuscaClienteModal(context);
-              } else {
-                // Se está em outro cliente, o botão "X" retorna instantaneamente para o padrão
-                setState(() {
-                  _clienteSelecionado = _consumidorPadrao;
-                });
-              }
-            },
-          )
-        ],
       ),
       body: Padding(
         padding: const EdgeInsets.all(16.0),
         // A tela de venda está sempre pronta e visível aqui
-        child: _construirFormularioVenda(),
+        child: Column(
+          children: <Widget>[Expanded(child: _construirFormularioVenda()),
+          Expanded(child: _construirRodape())],
+        ),
       ),
     );
   }
 
-  // 1. Monta o cabeçalho dinâmico na AppBar
   Widget _construirDetalhesAppBar() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          _clienteSelecionado!['nome'],
-          style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+    return InkWell(
+      // Aqui está a mudança principal: chamamos o modal ao clicar!
+      onTap: () {
+        _mostrarBuscaClienteModal(context);
+      },
+      borderRadius: BorderRadius.circular(8),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 4.0),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  _clienteSelecionado!['nome'],
+                  style: const TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  _clienteSelecionado!['id'] == 1
+                      ? 'Venda Direta / Balcão'
+                      : 'ID: ${_clienteSelecionado!['id']} • CPF: ${_clienteSelecionado!['cpf']} • Tel: ${_clienteSelecionado!['telefone']}',
+                  style: const TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.normal,
+                    color: Colors.black87,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(width: 12),
+            const Icon(Icons.search, size: 22, color: Colors.black87),
+          ],
         ),
-        const SizedBox(height: 2),
-        Text(
-          _clienteSelecionado!['id'] == 1
-              ? 'Venda Direta / Balcão'
-              :'ID: ${_clienteSelecionado!['id']} • CPF: ${_clienteSelecionado!['cpf']} • Tel: ${_clienteSelecionado!['telefone']}',
-          style: const TextStyle(fontSize: 13, fontWeight: FontWeight.normal, color: Colors.black87),
-        ),
-      ],
+      ),
     );
   }
 
@@ -101,11 +121,11 @@ final List<Map<String, dynamic>> _clientesMock = [
             const Text(
               'Itens da Venda',
               style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-            )
+            ),
           ],
         ),
         const Divider(),
-        
+
         // Espaço reservado para a inserção das mudas, quantidades e cálculos
         Expanded(
           child: Center(
@@ -117,6 +137,19 @@ final List<Map<String, dynamic>> _clientesMock = [
           ),
         ),
       ],
+    );
+  }
+
+  Widget _construirRodape() {
+    return Container(
+      width: double.infinity,
+      color: Colors.green[100],
+      child: const Row(
+        children: [
+          Text('Teste'),
+          Text('Teste2')
+        ],
+      ),
     );
   }
 
@@ -142,7 +175,7 @@ final List<Map<String, dynamic>> _clientesMock = [
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               const Text(
-                'Selecionar Cliente Especial',
+                'Selecionar Cliente',
                 style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
               ),
               const SizedBox(height: 16),
@@ -156,7 +189,9 @@ final List<Map<String, dynamic>> _clientesMock = [
                     final nome = cliente['nome'].toString().toLowerCase();
                     final cpf = cliente['cpf'].toString().toLowerCase();
                     final tel = cliente['telefone'].toString().toLowerCase();
-                    return nome.contains(busca) || cpf.contains(busca) || tel.contains(busca);
+                    return nome.contains(busca) ||
+                        cpf.contains(busca) ||
+                        tel.contains(busca);
                   });
                 },
                 displayStringForOption: (Map<String, dynamic> c) => c['nome'],
@@ -166,18 +201,19 @@ final List<Map<String, dynamic>> _clientesMock = [
                   });
                   Navigator.pop(context); // Fecha o modal após selecionar
                 },
-                fieldViewBuilder: (context, controller, focusNode, onEditingComplete) {
-                  return TextField(
-                    controller: controller,
-                    focusNode: focusNode,
-                    autofocus: true,
-                    decoration: const InputDecoration(
-                      labelText: 'Digite Nome, CPF ou Telefone',
-                      border: OutlineInputBorder(),
-                      prefixIcon: Icon(Icons.search),
-                    ),
-                  );
-                },
+                fieldViewBuilder:
+                    (context, controller, focusNode, onEditingComplete) {
+                      return TextField(
+                        controller: controller,
+                        focusNode: focusNode,
+                        autofocus: true,
+                        decoration: const InputDecoration(
+                          labelText: 'Digite Nome, CPF ou Telefone',
+                          border: OutlineInputBorder(),
+                          prefixIcon: Icon(Icons.search),
+                        ),
+                      );
+                    },
               ),
             ],
           ),
