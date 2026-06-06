@@ -19,6 +19,12 @@ class _TelaVendaState extends State<TelaVenda> {
   // Variável que controla qual cliente está ativo na venda atual
   Map<String, dynamic>? _clienteSelecionado;
 
+  // Lista que vai alimentar a sua tabela de vendas
+  List<Map<String, dynamic>> _carrinho = [];
+
+  // Controller para limparmos o campo de busca após adicionar um item
+  late TextEditingController _pesquisaProdutoController;
+
   // Lista simulada de clientes para quando o usuário quiser trocar e pesquisar
   final List<Map<String, dynamic>> _clientesMock = [
     {
@@ -122,34 +128,82 @@ class _TelaVendaState extends State<TelaVenda> {
   }
 
   // 2. O formulário de venda propriamente dito (Sempre ativo no body)
-  Widget _construirFormularioVenda() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            const Text(
-              'Itens da Venda',
-              style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-            ),
-          ],
-        ),
-        const Divider(),
+Widget _construirFormularioVenda() {
+  return Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          const Text(
+            'Itens da Venda',
+            style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+          ),
+        ],
+      ),
+      const Divider(),
 
-        // Espaço reservado para a inserção das mudas, quantidades e cálculos
+      // Se o carrinho estiver vazio, mostra uma mensagem amigável
+      if (_carrinho.isEmpty)
         Expanded(
           child: Center(
             child: Text(
-              'O formulário de venda está pronto para uso.\nFaturamento atual para: ${_clienteSelecionado!['nome']}.',
+              'Nenhum produto adicionado ainda.\nUtilize a barra de pesquisa no rodapé.',
               textAlign: TextAlign.center,
               style: const TextStyle(color: Colors.grey, fontSize: 16),
             ),
           ),
+        )
+      else
+        // Se houver itens, desenha a tabela dinâmica
+        Expanded(
+          child: SingleChildScrollView(
+            scrollDirection: Axis.vertical,
+            child: SizedBox(
+              width: double.infinity,
+              child: DataTable(
+                headingRowColor: WidgetStateProperty.all(Colors.grey[200]),
+                columns: const [
+                  DataColumn(label: Text('Código', style: TextStyle(fontWeight: FontWeight.bold))),
+                  DataColumn(label: Text('Variedade / Produto', style: TextStyle(fontWeight: FontWeight.bold))),
+                  DataColumn(label: Text('Qtd.', style: TextStyle(fontWeight: FontWeight.bold))),
+                  DataColumn(label: Text('Preço Unit.', style: TextStyle(fontWeight: FontWeight.bold))),
+                  DataColumn(label: Text('Total', style: TextStyle(fontWeight: FontWeight.bold))),
+                  DataColumn(label: Text('Ações', style: TextStyle(fontWeight: FontWeight.bold))),
+                ],
+                rows: _carrinho.map((item) {
+                  return DataRow(
+                    cells: [
+                      DataCell(Text('#${item['id']}')),
+                      DataCell(Text('${item['nome']}')),
+                      DataCell(Text('${item['quantidade']}')),
+                      DataCell(Text('R\$ ${item['preco'].toStringAsFixed(2)}')),
+                      DataCell(Text(
+                        'R\$ ${item['total'].toStringAsFixed(2)}',
+                        style: const TextStyle(fontWeight: FontWeight.w500),
+                      )),
+                      DataCell(
+                        IconButton(
+                          icon: const Icon(Icons.delete_outline, color: Colors.redAccent),
+                          tooltip: 'Remover item',
+                          onPressed: () {
+                            // Lógica para remover o item do carrinho
+                            setState(() {
+                              _carrinho.removeWhere((prod) => prod['id'] == item['id']);
+                            });
+                          },
+                        ),
+                      ),
+                    ],
+                  );
+                }).toList(),
+              ),
+            ),
+          ),
         ),
-      ],
-    );
-  }
+    ],
+  );
+}
 
   Widget _construirRodape() {
     return Container(
@@ -169,33 +223,37 @@ class _TelaVendaState extends State<TelaVenda> {
                 return _produtosMock.where((produto) {
                   final nome = produto['nome'].toString().toLowerCase();
                   final id = produto['id'].toString().toLowerCase();
-                  // Permite pesquisar tanto pelo nome da muda quanto pelo código (ID)
                   return nome.contains(busca) || id.contains(busca);
                 });
               },
-              // O que aparece na lista suspensa e na caixa após selecionar
               displayStringForOption: (Map<String, dynamic> p) => p['nome'],
+
               onSelected: (Map<String, dynamic> produtoEscolhido) {
-                // TODO: Lógica para adicionar o produto na tabela/carrinho
-                print(
-                  'Produto adicionado: ${produtoEscolhido['nome']} - R\$ ${produtoEscolhido['preco']}',
-                );
+                _adicionarAoCarrinho(produtoEscolhido);
+
+                // Limpa o campo de texto para o caixa poder bipar/pesquisar o próximo item
+                _pesquisaProdutoController.clear();
               },
+
               fieldViewBuilder:
                   (context, controller, focusNode, onEditingComplete) {
+                    // --- 2. SALVAMOS O CONTROLLER AQUI ---
+                    _pesquisaProdutoController = controller;
+
                     return TextField(
                       controller: controller,
                       focusNode: focusNode,
                       decoration: const InputDecoration(
-                        labelText: 'Pesquisar Produto (Nome ou Cód.)',
+                        isDense: true,
+                        contentPadding: EdgeInsets.symmetric(
+                          vertical: 8,
+                          horizontal: 8,
+                        ),
+                        hintText: 'Pesquisar Produto (Nome ou Cód.)',
                         border: OutlineInputBorder(),
                         prefixIcon: Icon(Icons.search),
                         filled: true,
-                        fillColor: Colors
-                            .white, // Deixa a caixa branca contra o fundo verde
-                        contentPadding: EdgeInsets.symmetric(
-                          vertical: 0,
-                        ), // Deixa a caixa mais fina
+                        fillColor: Colors.white,
                       ),
                       onEditingComplete: onEditingComplete,
                     );
@@ -281,5 +339,29 @@ class _TelaVendaState extends State<TelaVenda> {
         );
       },
     );
+  }
+
+  void _adicionarAoCarrinho(Map<String, dynamic> produto) {
+    setState(() {
+      // Procura se o produto já está no carrinho
+      final index = _carrinho.indexWhere((item) => item['id'] == produto['id']);
+
+      if (index != -1) {
+        // Se o produto já existe, aumenta a quantidade e atualiza o total
+        _carrinho[index]['quantidade']++;
+        _carrinho[index]['total'] =
+            _carrinho[index]['quantidade'] * _carrinho[index]['preco'];
+      } else {
+        // Se é a primeira vez, adiciona na lista com quantidade 1
+        _carrinho.add({
+          'id': produto['id'],
+          'nome': produto['nome'],
+          'preco': produto['preco'],
+          'quantidade': 1,
+          'total':
+              produto['preco'], // O total inicial é o próprio preço unitário
+        });
+      }
+    });
   }
 }
