@@ -41,6 +41,15 @@ class _TelaVendaState extends State<TelaVenda> {
     },
   ];
 
+  final List<Map<String, dynamic>> _produtosMock = [
+    {'id': 1, 'nome': 'Muda de Açaí BRS', 'preco': 2.50},
+    {'id': 2, 'nome': 'Muda de Cacau Clone', 'preco': 4.00},
+    {'id': 3, 'nome': 'Muda de Cupuaçu', 'preco': 3.50},
+    {'id': 4, 'nome': 'Semente de Andiroba', 'preco': 1.20},
+    {'id': 5, 'nome': 'Muda de Banana Prata', 'preco': 5.00},
+    {'id': 6, 'nome': 'Adubo Orgânico 1kg', 'preco': 15.00},
+  ];
+
   @override
   void initState() {
     super.initState();
@@ -60,8 +69,10 @@ class _TelaVendaState extends State<TelaVenda> {
         padding: const EdgeInsets.all(16.0),
         // A tela de venda está sempre pronta e visível aqui
         child: Column(
-          children: <Widget>[Expanded(child: _construirFormularioVenda()),
-          Expanded(child: _construirRodape())],
+          children: <Widget>[
+            Expanded(child: _construirFormularioVenda()),
+            _construirRodape(),
+          ],
         ),
       ),
     );
@@ -144,10 +155,60 @@ class _TelaVendaState extends State<TelaVenda> {
     return Container(
       width: double.infinity,
       color: Colors.green[100],
-      child: const Row(
+      padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+      child: Row(
         children: [
-          Text('Teste'),
-          Text('Teste2')
+          // Envolvemos no Expanded para o TextField não quebrar a tela na horizontal
+          Expanded(
+            child: Autocomplete<Map<String, dynamic>>(
+              optionsBuilder: (TextEditingValue valorDigitado) {
+                if (valorDigitado.text.isEmpty) {
+                  return const Iterable<Map<String, dynamic>>.empty();
+                }
+                final busca = valorDigitado.text.toLowerCase();
+                return _produtosMock.where((produto) {
+                  final nome = produto['nome'].toString().toLowerCase();
+                  final id = produto['id'].toString().toLowerCase();
+                  // Permite pesquisar tanto pelo nome da muda quanto pelo código (ID)
+                  return nome.contains(busca) || id.contains(busca);
+                });
+              },
+              // O que aparece na lista suspensa e na caixa após selecionar
+              displayStringForOption: (Map<String, dynamic> p) => p['nome'],
+              onSelected: (Map<String, dynamic> produtoEscolhido) {
+                // TODO: Lógica para adicionar o produto na tabela/carrinho
+                print(
+                  'Produto adicionado: ${produtoEscolhido['nome']} - R\$ ${produtoEscolhido['preco']}',
+                );
+              },
+              fieldViewBuilder:
+                  (context, controller, focusNode, onEditingComplete) {
+                    return TextField(
+                      controller: controller,
+                      focusNode: focusNode,
+                      decoration: const InputDecoration(
+                        labelText: 'Pesquisar Produto (Nome ou Cód.)',
+                        border: OutlineInputBorder(),
+                        prefixIcon: Icon(Icons.search),
+                        filled: true,
+                        fillColor: Colors
+                            .white, // Deixa a caixa branca contra o fundo verde
+                        contentPadding: EdgeInsets.symmetric(
+                          vertical: 0,
+                        ), // Deixa a caixa mais fina
+                      ),
+                      onEditingComplete: onEditingComplete,
+                    );
+                  },
+            ),
+          ),
+          const SizedBox(
+            width: 16,
+          ), // Dá um espaço entre a barra de pesquisa e o texto 2
+          const Text(
+            'F12 Finalizar', // Substituindo o Teste2
+            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+          ),
         ],
       ),
     );
