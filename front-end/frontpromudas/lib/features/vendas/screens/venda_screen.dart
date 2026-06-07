@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../core/services/carrinho_service.dart';
 import 'widgets/detalhes_app_bar.dart';
 import 'widgets/modal_busca_cliente.dart';
 import 'widgets/formulario_venda.dart';
@@ -27,8 +28,8 @@ class _TelaVendaState extends State<TelaVenda> {
   // Variável que controla qual cliente está ativo na venda atual
   Map<String, dynamic>? _clienteSelecionado;
 
-  // Lista que vai alimentar a sua tabela de vendas
-  List<Map<String, dynamic>> _carrinho = [];
+  // Serviço que gerencia os itens do carrinho
+  final _carrinhoService = CarrinhoService();
 
   /// Inicializa a tela com o consumidor padrão já selecionado automaticamente.
   @override
@@ -61,12 +62,10 @@ class _TelaVendaState extends State<TelaVenda> {
           children: <Widget>[
             Expanded(
               child: FormularioVendaWidget(
-                carrinho: _carrinho,
+                carrinho: _carrinhoService.itens,
                 onRemoverItem: (itemParaRemover) {
                   setState(() {
-                    _carrinho.removeWhere(
-                      (prod) => prod['id'] == itemParaRemover['id'],
-                    );
+                    _carrinhoService.removerItem(itemParaRemover['id']);
                   });
                 },
               ),
@@ -103,29 +102,10 @@ class _TelaVendaState extends State<TelaVenda> {
     );
   }
 
-  /// Adiciona um produto ao carrinho. Se o produto já existir, incrementa a quantidade
-  /// e recalcula o total. Caso contrário, insere o item com quantidade 1.
+  /// Delega a adição do produto ao [CarrinhoService] e solicita rebuild da tela.
   void _adicionarAoCarrinho(Map<String, dynamic> produto) {
     setState(() {
-      // Procura se o produto já está no carrinho
-      final index = _carrinho.indexWhere((item) => item['id'] == produto['id']);
-
-      if (index != -1) {
-        // Se o produto já existe, aumenta a quantidade e atualiza o total
-        _carrinho[index]['quantidade']++;
-        _carrinho[index]['total'] =
-            _carrinho[index]['quantidade'] * _carrinho[index]['preco'];
-      } else {
-        // Se é a primeira vez, adiciona na lista com quantidade 1
-        _carrinho.add({
-          'id': produto['id'],
-          'nome': produto['nome'],
-          'preco': produto['preco'],
-          'quantidade': 1,
-          'total':
-              produto['preco'], // O total inicial é o próprio preço unitário
-        });
-      }
+      _carrinhoService.adicionarItem(produto);
     });
   }
 }
