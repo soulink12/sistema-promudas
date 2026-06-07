@@ -82,6 +82,8 @@ class _TelaVendaState extends State<TelaVenda> {
                 carrinho: _carrinhoService.itens,
                 ajuste: _carrinhoService.ajuste,
                 descricaoAjuste: _carrinhoService.descricaoAjuste,
+                ehPercentualAjuste: _carrinhoService.ehPercentualAjuste,
+                percentualAjuste: _carrinhoService.percentualAjuste,
                 onRemoverItem: (itemParaRemover) {
                   setState(() {
                     _carrinhoService.removerItem(itemParaRemover['id']);
@@ -98,9 +100,10 @@ class _TelaVendaState extends State<TelaVenda> {
                   });
                 },
                 onFinalizarPedido: _finalizarPedido,
-                onAplicarAjuste: (valor, descricao) {
+                onAplicarAjuste: (valor, descricao, {ehPercentual = false}) {
                   setState(() {
-                    _carrinhoService.aplicarAjuste(valor, descricao);
+                    _carrinhoService.aplicarAjuste(valor, descricao,
+                        ehPercentual: ehPercentual);
                   });
                 },
                 onRemoverAjuste: () {

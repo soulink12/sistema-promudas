@@ -76,6 +76,7 @@ class _RodapeVendaState extends State<RodapeVenda> {
           // Envolvemos no Expanded para o TextField não quebrar a tela na horizontal
           Expanded(
             child: Autocomplete<Map<String, dynamic>>(
+              optionsViewOpenDirection: OptionsViewOpenDirection.up,
               optionsBuilder: (TextEditingValue valorDigitado) {
                 if (valorDigitado.text.isEmpty) {
                   return const Iterable<Map<String, dynamic>>.empty();

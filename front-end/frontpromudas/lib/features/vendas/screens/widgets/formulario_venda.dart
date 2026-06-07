@@ -18,8 +18,12 @@ class FormularioVendaWidget extends StatefulWidget {
   final double ajuste;
   // Descrição exibida na tela (ex: "Desconto 10%")
   final String? descricaoAjuste;
+  // Indica se o ajuste atual é percentual (para pré-preencher o diálogo corretamente)
+  final bool ehPercentualAjuste;
+  // Percentual com sinal armazenado no serviço (usado apenas quando ehPercentualAjuste = true)
+  final double percentualAjuste;
   // Callback para aplicar um ajuste ao pedido
-  final Function(double valor, String descricao) onAplicarAjuste;
+  final Function(double valor, String descricao, {bool ehPercentual}) onAplicarAjuste;
   // Callback para remover o ajuste atual
   final VoidCallback onRemoverAjuste;
 
@@ -32,6 +36,8 @@ class FormularioVendaWidget extends StatefulWidget {
     required this.onFinalizarPedido,
     this.ajuste = 0.0,
     this.descricaoAjuste,
+    this.ehPercentualAjuste = false,
+    this.percentualAjuste = 0.0,
     required this.onAplicarAjuste,
     required this.onRemoverAjuste,
   });
@@ -403,6 +409,8 @@ class _FormularioVendaWidgetState extends State<FormularioVendaWidget> {
       builder: (_) => _DialogAjuste(
         subtotal: subtotal,
         ajusteAtual: widget.ajuste,
+        ehPercentualAtual: widget.ehPercentualAjuste,
+        percentualAtual: widget.percentualAjuste,
         onAplicar: widget.onAplicarAjuste,
         onRemover: widget.onRemoverAjuste,
       ),
@@ -438,12 +446,16 @@ class _FormularioVendaWidgetState extends State<FormularioVendaWidget> {
 class _DialogAjuste extends StatefulWidget {
   final double subtotal;
   final double ajusteAtual;
-  final Function(double valor, String descricao) onAplicar;
+  final bool ehPercentualAtual;
+  final double percentualAtual;
+  final Function(double valor, String descricao, {bool ehPercentual}) onAplicar;
   final VoidCallback onRemover;
 
   const _DialogAjuste({
     required this.subtotal,
     required this.ajusteAtual,
+    required this.ehPercentualAtual,
+    required this.percentualAtual,
     required this.onAplicar,
     required this.onRemover,
   });
@@ -461,11 +473,20 @@ class _DialogAjusteState extends State<_DialogAjuste> {
   void initState() {
     super.initState();
     _ehDesconto = widget.ajusteAtual <= 0;
-    _ctrl = TextEditingController(
-      text: widget.ajusteAtual != 0.0
-          ? widget.ajusteAtual.abs().toStringAsFixed(2)
-          : '',
-    );
+    _ehPercentual = widget.ehPercentualAtual;
+    // Pré-preenche com o percentual bruto (ex: "10.0") quando for ajuste percentual,
+    // ou com o valor em R$ absoluto quando for ajuste fixo
+    if (widget.ehPercentualAtual && widget.percentualAtual != 0.0) {
+      _ctrl = TextEditingController(
+        text: widget.percentualAtual.abs().toStringAsFixed(1),
+      );
+    } else {
+      _ctrl = TextEditingController(
+        text: widget.ajusteAtual != 0.0
+            ? widget.ajusteAtual.abs().toStringAsFixed(2)
+            : '',
+      );
+    }
   }
 
   @override
@@ -621,11 +642,15 @@ class _DialogAjusteState extends State<_DialogAjuste> {
             final valor =
                 double.tryParse(_ctrl.text.replaceAll(',', '.')) ?? 0;
             if (valor > 0) {
-              final ajuste = _calcularAjuste();
+              // Para percentual: envia o % com sinal; o serviço recalcula em R$
+              // dinamicamente quando os itens mudarem.
+              // Para fixo: envia o R$ com sinal diretamente.
+              final sinalizado = valor * (_ehDesconto ? -1 : 1);
               final descricao = _ehPercentual
                   ? '${_ehDesconto ? 'Desconto' : 'Acréscimo'} ${valor.toStringAsFixed(1)}%'
                   : '${_ehDesconto ? 'Desconto' : 'Acréscimo'} R\$ ${valor.toStringAsFixed(2)}';
-              widget.onAplicar(ajuste, descricao);
+              widget.onAplicar(sinalizado, descricao,
+                  ehPercentual: _ehPercentual);
             }
             Navigator.pop(context);
           },

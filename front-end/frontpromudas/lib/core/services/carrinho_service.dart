@@ -5,22 +5,35 @@ class CarrinhoService {
   // Lista interna de itens da venda em andamento
   final List<Map<String, dynamic>> _itens = [];
 
-  // Ajuste do pedido em R$ (negativo = desconto, positivo = acréscimo)
-  double _ajuste = 0.0;
+  // Ajuste fixo em R$ com sinal — usado quando não é percentual
+  double _ajusteFixo = 0.0;
+  // Percentual com sinal (negativo = desconto, positivo = acréscimo)
+  double _percentual = 0.0;
+  bool _ehPercentual = false;
   String? _descricaoAjuste;
 
   /// Retorna os itens atuais do carrinho (somente leitura).
   List<Map<String, dynamic>> get itens => List.unmodifiable(_itens);
 
-  double get ajuste => _ajuste;
+  /// Valor do ajuste em R$. Para ajuste percentual, recalcula sobre o subtotal
+  /// atual, de modo que mudanças nos itens se reflitam automaticamente.
+  double get ajuste {
+    if (_ehPercentual && _percentual != 0.0) {
+      return subtotal * (_percentual / 100);
+    }
+    return _ajusteFixo;
+  }
+
   String? get descricaoAjuste => _descricaoAjuste;
+  bool get ehPercentualAjuste => _ehPercentual;
+  double get percentualAjuste => _percentual;
 
   /// Soma dos totais dos itens, sem ajuste.
   double get subtotal =>
       _itens.fold(0, (s, i) => s + (i['total'] as double));
 
   /// Total final após aplicar desconto ou acréscimo.
-  double get totalComAjuste => subtotal + _ajuste;
+  double get totalComAjuste => subtotal + ajuste;
 
   /// Adiciona um produto ao carrinho com a [quantidade] informada (padrão: 1).
   /// Se o produto já existir (mesmo id), soma a quantidade e recalcula o total.
@@ -68,15 +81,27 @@ class CarrinhoService {
     _itens.removeWhere((item) => item['id'] == id);
   }
 
-  /// Aplica um desconto (valor negativo) ou acréscimo (valor positivo) ao pedido.
-  void aplicarAjuste(double valor, String descricao) {
-    _ajuste = valor;
+  /// Aplica desconto ou acréscimo ao pedido.
+  /// Quando [ehPercentual] = true, [valor] é o percentual com sinal e o ajuste
+  /// em R$ é recalculado automaticamente sempre que os itens mudarem.
+  void aplicarAjuste(double valor, String descricao,
+      {bool ehPercentual = false}) {
+    _ehPercentual = ehPercentual;
     _descricaoAjuste = descricao;
+    if (ehPercentual) {
+      _percentual = valor;
+      _ajusteFixo = 0.0;
+    } else {
+      _ajusteFixo = valor;
+      _percentual = 0.0;
+    }
   }
 
   /// Remove o ajuste do pedido.
   void removerAjuste() {
-    _ajuste = 0.0;
+    _ajusteFixo = 0.0;
+    _percentual = 0.0;
+    _ehPercentual = false;
     _descricaoAjuste = null;
   }
 }
