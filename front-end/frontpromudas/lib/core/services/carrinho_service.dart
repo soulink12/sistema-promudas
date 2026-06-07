@@ -5,8 +5,22 @@ class CarrinhoService {
   // Lista interna de itens da venda em andamento
   final List<Map<String, dynamic>> _itens = [];
 
+  // Ajuste do pedido em R$ (negativo = desconto, positivo = acréscimo)
+  double _ajuste = 0.0;
+  String? _descricaoAjuste;
+
   /// Retorna os itens atuais do carrinho (somente leitura).
   List<Map<String, dynamic>> get itens => List.unmodifiable(_itens);
+
+  double get ajuste => _ajuste;
+  String? get descricaoAjuste => _descricaoAjuste;
+
+  /// Soma dos totais dos itens, sem ajuste.
+  double get subtotal =>
+      _itens.fold(0, (s, i) => s + (i['total'] as double));
+
+  /// Total final após aplicar desconto ou acréscimo.
+  double get totalComAjuste => subtotal + _ajuste;
 
   /// Adiciona um produto ao carrinho com a [quantidade] informada (padrão: 1).
   /// Se o produto já existir (mesmo id), soma a quantidade e recalcula o total.
@@ -52,5 +66,17 @@ class CarrinhoService {
   /// Remove um item do carrinho pelo seu id.
   void removerItem(dynamic id) {
     _itens.removeWhere((item) => item['id'] == id);
+  }
+
+  /// Aplica um desconto (valor negativo) ou acréscimo (valor positivo) ao pedido.
+  void aplicarAjuste(double valor, String descricao) {
+    _ajuste = valor;
+    _descricaoAjuste = descricao;
+  }
+
+  /// Remove o ajuste do pedido.
+  void removerAjuste() {
+    _ajuste = 0.0;
+    _descricaoAjuste = null;
   }
 }

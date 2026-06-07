@@ -14,6 +14,14 @@ class FormularioVendaWidget extends StatefulWidget {
   final Function(Map<String, dynamic>, double novoPreco) onAlterarPreco;
   // Callback acionado ao pressionar o botão ou F12 para finalizar o pedido
   final VoidCallback onFinalizarPedido;
+  // Valor do ajuste em R$ (negativo = desconto, positivo = acréscimo)
+  final double ajuste;
+  // Descrição exibida na tela (ex: "Desconto 10%")
+  final String? descricaoAjuste;
+  // Callback para aplicar um ajuste ao pedido
+  final Function(double valor, String descricao) onAplicarAjuste;
+  // Callback para remover o ajuste atual
+  final VoidCallback onRemoverAjuste;
 
   const FormularioVendaWidget({
     super.key,
@@ -22,6 +30,10 @@ class FormularioVendaWidget extends StatefulWidget {
     required this.onAlterarQuantidade,
     required this.onAlterarPreco,
     required this.onFinalizarPedido,
+    this.ajuste = 0.0,
+    this.descricaoAjuste,
+    required this.onAplicarAjuste,
+    required this.onRemoverAjuste,
   });
 
   @override
@@ -276,12 +288,15 @@ class _FormularioVendaWidgetState extends State<FormularioVendaWidget> {
     );
   }
 
-  /// Soma os totais de todos os itens e exibe no canto inferior direito.
+  /// Exibe subtotal, ajuste (quando aplicado) e total final.
+  /// Toque para abrir o diálogo de desconto/acréscimo.
   Widget _rodapeTotalPedido() {
-    final totalPedido = widget.carrinho.fold<double>(
+    final subtotal = widget.carrinho.fold<double>(
       0,
       (soma, item) => soma + (item['total'] as double),
     );
+    final totalFinal = subtotal + widget.ajuste;
+    final temAjuste = widget.ajuste != 0.0;
 
     return Container(
       width: double.infinity,
@@ -290,23 +305,106 @@ class _FormularioVendaWidgetState extends State<FormularioVendaWidget> {
         color: Colors.green[50],
         border: Border(top: BorderSide(color: Colors.green.shade200)),
       ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.end,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.end,
         children: [
-          const Text(
-            'Total do Pedido:',
-            style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
-          ),
-          const SizedBox(width: 12),
-          Text(
-            'R\$ ${totalPedido.toStringAsFixed(2)}',
-            style: TextStyle(
-              fontSize: 20,
-              fontWeight: FontWeight.bold,
-              color: Colors.green[800],
+          // Linha de subtotal — exibida apenas quando há ajuste
+          if (temAjuste) ...[
+            Row(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                Text('Subtotal:',
+                    style: TextStyle(fontSize: 14, color: Colors.grey[600])),
+                const SizedBox(width: 8),
+                Text('R\$ ${subtotal.toStringAsFixed(2)}',
+                    style: TextStyle(fontSize: 14, color: Colors.grey[600])),
+              ],
+            ),
+            const SizedBox(height: 2),
+            // Linha do ajuste com ícone e cor indicativa
+            Row(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                Icon(
+                  widget.ajuste < 0
+                      ? Icons.arrow_downward_rounded
+                      : Icons.arrow_upward_rounded,
+                  size: 13,
+                  color: widget.ajuste < 0
+                      ? Colors.blue[700]
+                      : Colors.orange[800],
+                ),
+                const SizedBox(width: 4),
+                Text(
+                  widget.descricaoAjuste ?? '',
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: widget.ajuste < 0
+                        ? Colors.blue[700]
+                        : Colors.orange[800],
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  '${widget.ajuste < 0 ? '-' : '+'}R\$ ${widget.ajuste.abs().toStringAsFixed(2)}',
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.bold,
+                    color: widget.ajuste < 0
+                        ? Colors.blue[700]
+                        : Colors.orange[800],
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 6),
+          ],
+          // Total final — apenas este trecho é clicável
+          Tooltip(
+            message: 'Clique para adicionar desconto ou acréscimo',
+            child: InkWell(
+              onTap: () => _abrirDialogAjuste(subtotal),
+              borderRadius: BorderRadius.circular(4),
+              hoverColor: Colors.green.withAlpha(30),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 2, horizontal: 4),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Text(
+                      'Total do Pedido:',
+                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+                    ),
+                    const SizedBox(width: 12),
+                    Text(
+                      'R\$ ${totalFinal.toStringAsFixed(2)}',
+                      style: TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.green[800],
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    Icon(Icons.edit_outlined, size: 15, color: Colors.grey[500]),
+                  ],
+                ),
+              ),
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  /// Abre o diálogo para configurar desconto ou acréscimo sobre o [subtotal].
+  void _abrirDialogAjuste(double subtotal) {
+    showDialog<void>(
+      context: context,
+      builder: (_) => _DialogAjuste(
+        subtotal: subtotal,
+        ajusteAtual: widget.ajuste,
+        onAplicar: widget.onAplicarAjuste,
+        onRemover: widget.onRemoverAjuste,
       ),
     );
   }
@@ -331,6 +429,210 @@ class _FormularioVendaWidgetState extends State<FormularioVendaWidget> {
           ),
         ),
       ),
+    );
+  }
+}
+
+// Diálogo privado para configurar desconto ou acréscimo no pedido.
+// Mantido no mesmo arquivo pois é exclusivo de _FormularioVendaWidgetState.
+class _DialogAjuste extends StatefulWidget {
+  final double subtotal;
+  final double ajusteAtual;
+  final Function(double valor, String descricao) onAplicar;
+  final VoidCallback onRemover;
+
+  const _DialogAjuste({
+    required this.subtotal,
+    required this.ajusteAtual,
+    required this.onAplicar,
+    required this.onRemover,
+  });
+
+  @override
+  State<_DialogAjuste> createState() => _DialogAjusteState();
+}
+
+class _DialogAjusteState extends State<_DialogAjuste> {
+  late bool _ehDesconto;
+  bool _ehPercentual = false;
+  late TextEditingController _ctrl;
+
+  @override
+  void initState() {
+    super.initState();
+    _ehDesconto = widget.ajusteAtual <= 0;
+    _ctrl = TextEditingController(
+      text: widget.ajusteAtual != 0.0
+          ? widget.ajusteAtual.abs().toStringAsFixed(2)
+          : '',
+    );
+  }
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  double _calcularAjuste() {
+    final valor = double.tryParse(_ctrl.text.replaceAll(',', '.')) ?? 0;
+    if (valor <= 0) return 0;
+    if (_ehPercentual) {
+      return widget.subtotal * valor / 100 * (_ehDesconto ? -1 : 1);
+    }
+    return valor * (_ehDesconto ? -1 : 1);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final ajustePreview = _calcularAjuste();
+    final totalPreview = widget.subtotal + ajustePreview;
+
+    return AlertDialog(
+      title: const Text('Ajuste do Pedido'),
+      content: SizedBox(
+        width: 360,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Seletor Desconto / Acréscimo
+            SegmentedButton<bool>(
+              segments: const [
+                ButtonSegment(
+                  value: true,
+                  label: Text('Desconto'),
+                  icon: Icon(Icons.arrow_downward_rounded),
+                ),
+                ButtonSegment(
+                  value: false,
+                  label: Text('Acréscimo'),
+                  icon: Icon(Icons.arrow_upward_rounded),
+                ),
+              ],
+              selected: {_ehDesconto},
+              onSelectionChanged: (v) =>
+                  setState(() => _ehDesconto = v.first),
+            ),
+            const SizedBox(height: 12),
+            // Seletor R$ / %
+            SegmentedButton<bool>(
+              segments: const [
+                ButtonSegment(value: false, label: Text('R\$')),
+                ButtonSegment(value: true, label: Text('%')),
+              ],
+              selected: {_ehPercentual},
+              onSelectionChanged: (v) =>
+                  setState(() => _ehPercentual = v.first),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: _ctrl,
+              autofocus: true,
+              keyboardType:
+                  const TextInputType.numberWithOptions(decimal: true),
+              decoration: InputDecoration(
+                labelText: 'Valor',
+                border: const OutlineInputBorder(),
+                prefixText: _ehPercentual ? null : 'R\$ ',
+                suffixText: _ehPercentual ? '%' : null,
+              ),
+              onChanged: (_) => setState(() {}),
+            ),
+            const SizedBox(height: 16),
+            // Preview em tempo real do total após o ajuste
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.grey[100],
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Column(
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Text('Subtotal:'),
+                      Text('R\$ ${widget.subtotal.toStringAsFixed(2)}'),
+                    ],
+                  ),
+                  if (ajustePreview != 0) ...[
+                    const SizedBox(height: 4),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          _ehDesconto ? 'Desconto:' : 'Acréscimo:',
+                          style: TextStyle(
+                            color: _ehDesconto
+                                ? Colors.blue[700]
+                                : Colors.orange[800],
+                          ),
+                        ),
+                        Text(
+                          '${ajustePreview < 0 ? '-' : '+'}R\$ ${ajustePreview.abs().toStringAsFixed(2)}',
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            color: _ehDesconto
+                                ? Colors.blue[700]
+                                : Colors.orange[800],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                  const Divider(height: 12),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Text('Total:',
+                          style: TextStyle(fontWeight: FontWeight.bold)),
+                      Text(
+                        'R\$ ${totalPreview.toStringAsFixed(2)}',
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          color: Colors.green[800],
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+      actions: [
+        // Remove qualquer ajuste existente
+        TextButton(
+          onPressed: () {
+            widget.onRemover();
+            Navigator.pop(context);
+          },
+          child: Text('Limpar', style: TextStyle(color: Colors.grey[600])),
+        ),
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('Cancelar'),
+        ),
+        FilledButton(
+          onPressed: () {
+            final valor =
+                double.tryParse(_ctrl.text.replaceAll(',', '.')) ?? 0;
+            if (valor > 0) {
+              final ajuste = _calcularAjuste();
+              final descricao = _ehPercentual
+                  ? '${_ehDesconto ? 'Desconto' : 'Acréscimo'} ${valor.toStringAsFixed(1)}%'
+                  : '${_ehDesconto ? 'Desconto' : 'Acréscimo'} R\$ ${valor.toStringAsFixed(2)}';
+              widget.onAplicar(ajuste, descricao);
+            }
+            Navigator.pop(context);
+          },
+          style: FilledButton.styleFrom(backgroundColor: Colors.green[700]),
+          child: const Text('Aplicar'),
+        ),
+      ],
     );
   }
 }

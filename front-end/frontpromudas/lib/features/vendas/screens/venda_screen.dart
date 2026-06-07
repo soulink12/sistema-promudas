@@ -80,6 +80,8 @@ class _TelaVendaState extends State<TelaVenda> {
             Expanded(
               child: FormularioVendaWidget(
                 carrinho: _carrinhoService.itens,
+                ajuste: _carrinhoService.ajuste,
+                descricaoAjuste: _carrinhoService.descricaoAjuste,
                 onRemoverItem: (itemParaRemover) {
                   setState(() {
                     _carrinhoService.removerItem(itemParaRemover['id']);
@@ -96,6 +98,16 @@ class _TelaVendaState extends State<TelaVenda> {
                   });
                 },
                 onFinalizarPedido: _finalizarPedido,
+                onAplicarAjuste: (valor, descricao) {
+                  setState(() {
+                    _carrinhoService.aplicarAjuste(valor, descricao);
+                  });
+                },
+                onRemoverAjuste: () {
+                  setState(() {
+                    _carrinhoService.removerAjuste();
+                  });
+                },
               ),
             ),
             RodapeVenda(onProdutoSelecionado: _adicionarAoCarrinho),
@@ -144,8 +156,6 @@ class _TelaVendaState extends State<TelaVenda> {
 
     final itens = _carrinhoService.itens;
     final cliente = _clienteSelecionado!;
-    final totalPedido = itens.fold<double>(
-      0, (soma, item) => soma + (item['total'] as double));
 
     debugPrint('╔══════════════════════════════════════');
     debugPrint('║  PEDIDO FINALIZADO');
@@ -163,7 +173,11 @@ class _TelaVendaState extends State<TelaVenda> {
       debugPrint('║         ${item['quantidade']} × R\$ $preco = R\$ $total');
     }
     debugPrint('╠══════════════════════════════════════');
-    debugPrint('║  TOTAL: R\$ ${totalPedido.toStringAsFixed(2)}');
+    if (_carrinhoService.ajuste != 0.0) {
+      debugPrint('║  SUBTOTAL: R\$ ${_carrinhoService.subtotal.toStringAsFixed(2)}');
+      debugPrint('║  ${_carrinhoService.descricaoAjuste}: R\$ ${_carrinhoService.ajuste.toStringAsFixed(2)}');
+    }
+    debugPrint('║  TOTAL: R\$ ${_carrinhoService.totalComAjuste.toStringAsFixed(2)}');
     debugPrint('╚══════════════════════════════════════');
   }
 }
