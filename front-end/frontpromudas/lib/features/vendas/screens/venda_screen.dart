@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
-import '../../../core/mock/dados_mock.dart';
 import 'widgets/detalhes_app_bar.dart';
 import 'widgets/modal_busca_cliente.dart';
 import 'widgets/formulario_venda.dart';
+import 'widgets/rodape_venda.dart';
 
 /// Tela principal de registro de venda (PDV).
 /// Gerencia o estado do carrinho de compras e do cliente selecionado.
@@ -29,9 +29,6 @@ class _TelaVendaState extends State<TelaVenda> {
 
   // Lista que vai alimentar a sua tabela de vendas
   List<Map<String, dynamic>> _carrinho = [];
-
-  // Controller para limparmos o campo de busca após adicionar um item
-  late TextEditingController _pesquisaProdutoController;
 
   /// Inicializa a tela com o consumidor padrão já selecionado automaticamente.
   @override
@@ -74,87 +71,12 @@ class _TelaVendaState extends State<TelaVenda> {
                 },
               ),
             ),
-            _construirRodape(),
+            RodapeVenda(onProdutoSelecionado: _adicionarAoCarrinho),
           ],
         ),
       ),
     );
   }
-
-  /// Constrói o rodapé fixo com a barra de pesquisa de produtos (Autocomplete)
-  /// e o atalho de teclado para finalizar a venda.
-  /// O Autocomplete filtra os dados mock por nome ou código do produto.
-  // TODO: substituir por SQLite — trocar DadosMock().produtosMock por consulta ao banco
-  Widget _construirRodape() {
-    return Container(
-      width: double.infinity,
-      color: Colors.green[100],
-      padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
-      child: Row(
-        children: [
-          // Envolvemos no Expanded para o TextField não quebrar a tela na horizontal
-          Expanded(
-            child: Autocomplete<Map<String, dynamic>>(
-              optionsBuilder: (TextEditingValue valorDigitado) {
-                if (valorDigitado.text.isEmpty) {
-                  return const Iterable<Map<String, dynamic>>.empty();
-                }
-                final busca = valorDigitado.text.toLowerCase();
-                // TODO: substituir por SQLite — buscar produtos do banco em vez do mock
-                return DadosMock().produtosMock.where((produto) {
-                  final nome = produto['nome'].toString().toLowerCase();
-                  final id = produto['id'].toString().toLowerCase();
-                  return nome.contains(busca) || id.contains(busca);
-                });
-              },
-              displayStringForOption: (Map<String, dynamic> p) => p['nome'],
-
-              onSelected: (Map<String, dynamic> produtoEscolhido) {
-                _adicionarAoCarrinho(produtoEscolhido);
-
-                // Limpa o campo de texto para o caixa poder bipar/pesquisar o próximo item
-                _pesquisaProdutoController.clear();
-              },
-
-              fieldViewBuilder:
-                  (context, controller, focusNode, onEditingComplete) {
-                    // Salva o controller para poder limpá-lo após a seleção do produto
-                    _pesquisaProdutoController = controller;
-
-                    return TextField(
-                      controller: controller,
-                      focusNode: focusNode,
-                      decoration: const InputDecoration(
-                        isDense: true,
-                        contentPadding: EdgeInsets.symmetric(
-                          vertical: 8,
-                          horizontal: 8,
-                        ),
-                        hintText: 'Pesquisar Produto (Nome ou Cód.)',
-                        border: OutlineInputBorder(),
-                        prefixIcon: Icon(Icons.search),
-                        filled: true,
-                        fillColor: Colors.white,
-                      ),
-                      onEditingComplete: onEditingComplete,
-                    );
-                  },
-            ),
-          ),
-          const SizedBox(
-            width: 16,
-          ), // Dá um espaço entre a barra de pesquisa e o texto 2
-          const Text(
-            'F12 Finalizar', // Substituindo o Teste2
-            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-          ),
-        ],
-      ),
-    );
-  }
-
-  // No topo do arquivo da sua tela, importe o novo widget:
-  // import 'widgets/busca_cliente_modal.dart';
 
   /// Exibe o modal (bottom sheet) para pesquisar e trocar o cliente da venda.
   /// Ao confirmar a seleção, atualiza [_clienteSelecionado] no estado da tela.
