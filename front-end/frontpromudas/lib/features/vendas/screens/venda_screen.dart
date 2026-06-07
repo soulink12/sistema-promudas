@@ -46,10 +46,14 @@ class _TelaVendaState extends State<TelaVenda> {
     super.dispose();
   }
 
-  /// Intercepta F12 globalmente na tela, independente de qual campo tem foco.
+  /// Intercepta F5 e F12 globalmente na tela, independente de qual campo tem foco.
   bool _onTecla(KeyEvent event) {
-    if (event is KeyDownEvent &&
-        event.logicalKey == LogicalKeyboardKey.f12) {
+    if (event is! KeyDownEvent) return false;
+    if (event.logicalKey == LogicalKeyboardKey.f5) {
+      _mostrarBuscaClienteModal(context);
+      return true;
+    }
+    if (event.logicalKey == LogicalKeyboardKey.f12) {
       _finalizarPedido();
       return true;
     }
@@ -120,28 +124,36 @@ class _TelaVendaState extends State<TelaVenda> {
     );
   }
 
-  /// Exibe o modal (bottom sheet) para pesquisar e trocar o cliente da venda.
+  /// Exibe o popup de busca de clientes ancorado abaixo da AppBar, alinhado à esquerda.
   /// Ao confirmar a seleção, atualiza [_clienteSelecionado] no estado da tela.
   void _mostrarBuscaClienteModal(BuildContext context) {
-    showModalBottomSheet(
+    showDialog<void>(
       context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.white,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      barrierColor: Colors.black26,
+      builder: (context) => Align(
+        alignment: Alignment.topLeft,
+        child: Padding(
+          padding: EdgeInsets.only(
+            // Posiciona logo abaixo da AppBar, respeitando a status bar
+            top: MediaQuery.of(context).padding.top + kToolbarHeight + 8,
+            left: 8,
+          ),
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 440),
+            child: Material(
+              elevation: 8,
+              borderRadius: BorderRadius.circular(12),
+              child: BuscaClienteModal(
+                onClienteSelecionado: (clienteEscolhido) {
+                  setState(() {
+                    _clienteSelecionado = clienteEscolhido;
+                  });
+                },
+              ),
+            ),
+          ),
+        ),
       ),
-      builder: (context) {
-        // Usamos o widget extraído aqui!
-        return BuscaClienteModal(
-          onClienteSelecionado: (clienteEscolhido) {
-            // Quando o modal avisar que o cliente foi selecionado,
-            // atualizamos o estado da tela principal.
-            setState(() {
-              _clienteSelecionado = clienteEscolhido;
-            });
-          },
-        );
-      },
     );
   }
 

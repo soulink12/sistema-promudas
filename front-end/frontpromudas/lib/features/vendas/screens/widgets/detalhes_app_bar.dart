@@ -32,30 +32,38 @@ class DetalhesAppBar extends StatelessWidget {
       borderRadius: BorderRadius.circular(8),
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 4.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+        child: Row(
           mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.center,
           children: [
-            // Nome do cliente em destaque
-            Text(
-              clienteSelecionado!['nome'] ?? '',
-              style: const TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-              ),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // Nome do cliente em destaque
+                Text(
+                  clienteSelecionado!['nome'] ?? '',
+                  style: const TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                // Linha secundária: "Venda Direta" para consumidor padrão ou ID/CPF/Tel para clientes cadastrados
+                Text(
+                  isVendaDireta
+                      ? 'Venda Direta / Balcão'
+                      : 'ID: ${clienteSelecionado!['id']} • CPF: ${clienteSelecionado!['cpf']} • Tel: ${clienteSelecionado!['telefone']}',
+                  style: const TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.normal,
+                    color: Colors.black87,
+                  ),
+                ),
+              ],
             ),
-            const SizedBox(height: 2),
-            // Linha secundária: "Venda Direta" para consumidor padrão ou ID/CPF/Tel para clientes cadastrados
-            Text(
-              isVendaDireta
-                  ? 'Venda Direta / Balcão'
-                  : 'ID: ${clienteSelecionado!['id']} • CPF: ${clienteSelecionado!['cpf']} • Tel: ${clienteSelecionado!['telefone']}',
-              style: const TextStyle(
-                fontSize: 13,
-                fontWeight: FontWeight.normal,
-                color: Colors.black87,
-              ),
-            ),
+            const SizedBox(width: 10),
+            Icon(Icons.search, size: 20, color: Colors.black54),
           ],
         ),
       ),
