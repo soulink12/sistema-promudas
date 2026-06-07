@@ -98,8 +98,7 @@ class _RodapeVendaState extends State<RodapeVenda> {
                       produtoEscolhido['id'].toString();
                   _pesquisaProdutoController.selection =
                       TextSelection.fromPosition(
-                    TextPosition(
-                        offset: _pesquisaProdutoController.text.length),
+                    const TextPosition(offset: 0),
                   );
                 });
               },
@@ -131,12 +130,7 @@ class _RodapeVendaState extends State<RodapeVenda> {
                     );
                   },
             ),
-          ),
-          const SizedBox(width: 16), // Dá um espaço entre a barra de pesquisa e o texto
-          const Text(
-            'F12 Finalizar',
-            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-          ),
+          ) // Dá um espaço entre a barra de pesquisa e o texto
         ],
       ),
     );
