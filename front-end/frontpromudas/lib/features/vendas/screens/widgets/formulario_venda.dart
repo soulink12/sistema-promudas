@@ -315,15 +315,15 @@ class _FormularioVendaWidgetState extends State<FormularioVendaWidget> {
   Widget _botaoFinalizar() {
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 4, 16, 12),
-      child: SizedBox(
-        width: double.infinity,
+      child: Align(
+        alignment: Alignment.centerRight,
         child: FilledButton.icon(
           onPressed: widget.onFinalizarPedido,
           icon: const Icon(Icons.check_circle_outline),
           label: const Text('Finalizar Pedido  •  F12'),
           style: FilledButton.styleFrom(
             backgroundColor: Colors.green[700],
-            padding: const EdgeInsets.symmetric(vertical: 14),
+            padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 24),
             textStyle: const TextStyle(
               fontSize: 16,
               fontWeight: FontWeight.bold,
