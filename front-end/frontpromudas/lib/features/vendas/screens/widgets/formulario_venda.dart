@@ -265,7 +265,45 @@ class _FormularioVendaWidgetState extends State<FormularioVendaWidget> {
               ),
             ),
           ),
+
+        // Total geral do pedido — exibido apenas quando há itens no carrinho
+        if (widget.carrinho.isNotEmpty) _rodapeTotalPedido(),
       ],
+    );
+  }
+
+  /// Soma os totais de todos os itens e exibe no canto inferior direito.
+  Widget _rodapeTotalPedido() {
+    final totalPedido = widget.carrinho.fold<double>(
+      0,
+      (soma, item) => soma + (item['total'] as double),
+    );
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+      decoration: BoxDecoration(
+        color: Colors.green[50],
+        border: Border(top: BorderSide(color: Colors.green.shade200)),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.end,
+        children: [
+          const Text(
+            'Total do Pedido:',
+            style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+          ),
+          const SizedBox(width: 12),
+          Text(
+            'R\$ ${totalPedido.toStringAsFixed(2)}',
+            style: TextStyle(
+              fontSize: 20,
+              fontWeight: FontWeight.bold,
+              color: Colors.green[800],
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
