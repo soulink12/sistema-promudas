@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import '../../../core/services/carrinho_service.dart';
 import 'widgets/detalhes_app_bar.dart';
 import 'widgets/modal_busca_cliente.dart';
@@ -31,12 +32,28 @@ class _TelaVendaState extends State<TelaVenda> {
   // Serviço que gerencia os itens do carrinho
   final _carrinhoService = CarrinhoService();
 
-  /// Inicializa a tela com o consumidor padrão já selecionado automaticamente.
+  /// Inicializa a tela com o consumidor padrão e registra o handler de F12.
   @override
   void initState() {
     super.initState();
-    // Assim que a tela abre, o cliente padrão já é selecionado automaticamente
     _clienteSelecionado = _consumidorPadrao;
+    HardwareKeyboard.instance.addHandler(_onTecla);
+  }
+
+  @override
+  void dispose() {
+    HardwareKeyboard.instance.removeHandler(_onTecla);
+    super.dispose();
+  }
+
+  /// Intercepta F12 globalmente na tela, independente de qual campo tem foco.
+  bool _onTecla(KeyEvent event) {
+    if (event is KeyDownEvent &&
+        event.logicalKey == LogicalKeyboardKey.f12) {
+      _finalizarPedido();
+      return true;
+    }
+    return false;
   }
 
   /// Constrói a estrutura principal da tela: AppBar com dados do cliente,
@@ -78,6 +95,7 @@ class _TelaVendaState extends State<TelaVenda> {
                     _carrinhoService.alterarPreco(item['id'], novoPreco);
                   });
                 },
+                onFinalizarPedido: _finalizarPedido,
               ),
             ),
             RodapeVenda(onProdutoSelecionado: _adicionarAoCarrinho),
@@ -117,5 +135,35 @@ class _TelaVendaState extends State<TelaVenda> {
     setState(() {
       _carrinhoService.adicionarItem(produto, quantidade: quantidade);
     });
+  }
+
+  /// Imprime no console os dados do cliente e do pedido.
+  /// TODO: substituir pelo fluxo real de persistência da venda no SQLite
+  void _finalizarPedido() {
+    if (_carrinhoService.itens.isEmpty) return;
+
+    final itens = _carrinhoService.itens;
+    final cliente = _clienteSelecionado!;
+    final totalPedido = itens.fold<double>(
+      0, (soma, item) => soma + (item['total'] as double));
+
+    debugPrint('╔══════════════════════════════════════');
+    debugPrint('║  PEDIDO FINALIZADO');
+    debugPrint('╠══════════════════════════════════════');
+    debugPrint('║  CLIENTE');
+    debugPrint('║    Nome:     ${cliente['nome']}');
+    debugPrint('║    CPF:      ${cliente['cpf']}');
+    debugPrint('║    Telefone: ${cliente['telefone']}');
+    debugPrint('╠══════════════════════════════════════');
+    debugPrint('║  ITENS');
+    for (final item in itens) {
+      final preco = (item['preco'] as double).toStringAsFixed(2);
+      final total = (item['total'] as double).toStringAsFixed(2);
+      debugPrint('║    [#${item['id']}] ${item['nome']}');
+      debugPrint('║         ${item['quantidade']} × R\$ $preco = R\$ $total');
+    }
+    debugPrint('╠══════════════════════════════════════');
+    debugPrint('║  TOTAL: R\$ ${totalPedido.toStringAsFixed(2)}');
+    debugPrint('╚══════════════════════════════════════');
   }
 }
