@@ -103,9 +103,9 @@ class _TelaVendaState extends State<TelaVenda> {
   }
 
   /// Delega a adição do produto ao [CarrinhoService] e solicita rebuild da tela.
-  void _adicionarAoCarrinho(Map<String, dynamic> produto) {
+  void _adicionarAoCarrinho(Map<String, dynamic> produto, int quantidade) {
     setState(() {
-      _carrinhoService.adicionarItem(produto);
+      _carrinhoService.adicionarItem(produto, quantidade: quantidade);
     });
   }
 }
