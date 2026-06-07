@@ -68,6 +68,16 @@ class _TelaVendaState extends State<TelaVenda> {
                     _carrinhoService.removerItem(itemParaRemover['id']);
                   });
                 },
+                onAlterarQuantidade: (item, novaQtd) {
+                  setState(() {
+                    _carrinhoService.alterarQuantidade(item['id'], novaQtd);
+                  });
+                },
+                onAlterarPreco: (item, novoPreco) {
+                  setState(() {
+                    _carrinhoService.alterarPreco(item['id'], novoPreco);
+                  });
+                },
               ),
             ),
             RodapeVenda(onProdutoSelecionado: _adicionarAoCarrinho),

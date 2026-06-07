@@ -15,6 +15,7 @@ class CarrinhoService {
     final index = _itens.indexWhere((item) => item['id'] == produto['id']);
 
     if (index != -1) {
+      // Só incrementa a quantidade; preço e precoOriginal não são alterados
       _itens[index]['quantidade'] += quantidade;
       _itens[index]['total'] =
           _itens[index]['quantidade'] * _itens[index]['preco'];
@@ -22,11 +23,30 @@ class CarrinhoService {
       _itens.add({
         'id': produto['id'],
         'nome': produto['nome'],
-        'preco': produto['preco'],
+        'preco': produto['preco'] as double,
+        // Referência imutável do preço cadastrado no sistema
+        'precoOriginal': produto['preco'] as double,
         'quantidade': quantidade,
         'total': produto['preco'] * quantidade,
       });
     }
+  }
+
+  /// Altera a quantidade de um item e recalcula o total.
+  void alterarQuantidade(dynamic id, int novaQtd) {
+    final index = _itens.indexWhere((item) => item['id'] == id);
+    if (index == -1 || novaQtd <= 0) return;
+    _itens[index]['quantidade'] = novaQtd;
+    _itens[index]['total'] = novaQtd * (_itens[index]['preco'] as double);
+  }
+
+  /// Altera o preço unitário de um item e recalcula o total.
+  /// [precoOriginal] não é modificado, permitindo comparação visual na tela.
+  void alterarPreco(dynamic id, double novoPreco) {
+    final index = _itens.indexWhere((item) => item['id'] == id);
+    if (index == -1 || novoPreco <= 0) return;
+    _itens[index]['preco'] = novoPreco;
+    _itens[index]['total'] = (_itens[index]['quantidade'] as int) * novoPreco;
   }
 
   /// Remove um item do carrinho pelo seu id.
