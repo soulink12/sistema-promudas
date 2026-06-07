@@ -1,0 +1,272 @@
+import 'package:flutter/material.dart';
+import '../../../../core/mock/dados_mock.dart';
+
+/// Modal de registro de pagamento do pedido.
+/// Suporta pagamento dividido em múltiplas formas.
+///
+/// Fluxo:
+///   1. Modal abre com "Dinheiro" selecionado e valor = total do pedido
+///   2. Operador ajusta valor e pressiona Enter ou clica em "Adicionar"
+///   3. Parcela é registrada; campo de valor é pré-preenchido com o restante
+///   4. Operador repete até zerar o restante
+///   5. Botão "Finalizar Pagamento" fica ativo quando restante ≤ 0
+class ModalPagamento extends StatefulWidget {
+  final double totalPedido;
+  // Callback chamado com a lista de pagamentos ao confirmar
+  final Function(List<Map<String, dynamic>> pagamentos) onConfirmar;
+
+  const ModalPagamento({
+    super.key,
+    required this.totalPedido,
+    required this.onConfirmar,
+  });
+
+  @override
+  State<ModalPagamento> createState() => _ModalPagamentoState();
+}
+
+class _ModalPagamentoState extends State<ModalPagamento> {
+  final List<Map<String, dynamic>> _pagamentos = [];
+  late String _formaSelecionada;
+  late TextEditingController _valorCtrl;
+  final FocusNode _valorFocusNode = FocusNode();
+
+  @override
+  void initState() {
+    super.initState();
+    _formaSelecionada = DadosMock.formasPagamentoMock.first;
+    _valorCtrl = TextEditingController(
+      text: widget.totalPedido.toStringAsFixed(2),
+    );
+  }
+
+  @override
+  void dispose() {
+    _valorCtrl.dispose();
+    _valorFocusNode.dispose();
+    super.dispose();
+  }
+
+  double get _totalPago =>
+      _pagamentos.fold(0.0, (s, p) => s + (p['valor'] as double));
+
+  double get _restante => widget.totalPedido - _totalPago;
+
+  // Tolerância para imprecisão de ponto flutuante
+  bool get _podeFinalizar => _restante < 0.005;
+
+  /// Registra a parcela atual e prepara o campo para a próxima entrada.
+  void _adicionarPagamento() {
+    final valor =
+        double.tryParse(_valorCtrl.text.trim().replaceAll(',', '.'));
+    if (valor == null || valor <= 0) return;
+
+    setState(() {
+      _pagamentos.add({'forma': _formaSelecionada, 'valor': valor});
+      final restante = _restante;
+      _valorCtrl.text =
+          restante > 0.005 ? restante.toStringAsFixed(2) : '';
+    });
+    _valorFocusNode.requestFocus();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final temTroco = _restante < -0.005;
+    final valorDestaque = temTroco ? _restante.abs() : _restante;
+    final corDestaque = (_podeFinalizar || temTroco)
+        ? Colors.green[700]!
+        : Colors.orange[800]!;
+    final corFundo = (_podeFinalizar || temTroco)
+        ? Colors.green[50]!
+        : Colors.orange[50]!;
+    final corBorda = (_podeFinalizar || temTroco)
+        ? Colors.green.shade300
+        : Colors.orange.shade300;
+
+    return Dialog(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      child: SizedBox(
+        width: 520,
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Cabeçalho
+              Row(
+                children: const [
+                  Icon(Icons.payments_outlined, size: 22),
+                  SizedBox(width: 8),
+                  Text(
+                    'Pagamento do Pedido',
+                    style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 4),
+              Text(
+                'Total: R\$ ${widget.totalPedido.toStringAsFixed(2)}',
+                style: TextStyle(fontSize: 14, color: Colors.grey[600]),
+              ),
+              const Divider(height: 24),
+
+              // Parcelas já registradas
+              if (_pagamentos.isNotEmpty) ...[
+                ..._pagamentos.asMap().entries.map((e) {
+                  final i = e.key;
+                  final p = e.value;
+                  return Padding(
+                    padding: const EdgeInsets.only(bottom: 6),
+                    child: Row(
+                      children: [
+                        Icon(Icons.check_circle_outline,
+                            size: 16, color: Colors.green[700]),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(p['forma'] as String,
+                              style: const TextStyle(fontSize: 14)),
+                        ),
+                        Text(
+                          'R\$ ${(p['valor'] as double).toStringAsFixed(2)}',
+                          style: const TextStyle(
+                              fontSize: 14, fontWeight: FontWeight.w600),
+                        ),
+                        const SizedBox(width: 4),
+                        InkWell(
+                          onTap: () =>
+                              setState(() => _pagamentos.removeAt(i)),
+                          borderRadius: BorderRadius.circular(12),
+                          child: const Padding(
+                            padding: EdgeInsets.all(4),
+                            child: Icon(Icons.close,
+                                size: 15, color: Colors.redAccent),
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                }),
+                const SizedBox(height: 8),
+
+                // Indicador de restante ou troco
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 12, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: corFundo,
+                    borderRadius: BorderRadius.circular(6),
+                    border: Border.all(color: corBorda),
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        temTroco ? 'Troco:' : 'Restante:',
+                        style: TextStyle(
+                            fontWeight: FontWeight.w600, color: corDestaque),
+                      ),
+                      Text(
+                        'R\$ ${valorDestaque.toStringAsFixed(2)}',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                          color: corDestaque,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 20),
+              ],
+
+              // Seletor de forma de pagamento
+              const Text('Forma de pagamento',
+                  style: TextStyle(
+                      fontSize: 13, fontWeight: FontWeight.w500)),
+              const SizedBox(height: 6),
+              SegmentedButton<String>(
+                segments: DadosMock.formasPagamentoMock
+                    .map((f) => ButtonSegment<String>(
+                        value: f, label: Text(f, style: const TextStyle(fontSize: 12))))
+                    .toList(),
+                selected: {_formaSelecionada},
+                onSelectionChanged: (v) {
+                  setState(() => _formaSelecionada = v.first);
+                  _valorFocusNode.requestFocus();
+                },
+              ),
+              const SizedBox(height: 12),
+
+              // Campo de valor + botão adicionar
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  Expanded(
+                    child: TextField(
+                      controller: _valorCtrl,
+                      focusNode: _valorFocusNode,
+                      autofocus: true,
+                      keyboardType: const TextInputType.numberWithOptions(
+                          decimal: true),
+                      decoration: const InputDecoration(
+                        labelText: 'Valor',
+                        prefixText: 'R\$ ',
+                        border: OutlineInputBorder(),
+                        isDense: true,
+                      ),
+                      // Enter registra a parcela
+                      onSubmitted: (_) => _adicionarPagamento(),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  FilledButton.icon(
+                    onPressed: _adicionarPagamento,
+                    icon: const Icon(Icons.add, size: 18),
+                    label: const Text('Adicionar'),
+                    style: FilledButton.styleFrom(
+                      backgroundColor: Colors.blueGrey[700],
+                      padding: const EdgeInsets.symmetric(
+                          vertical: 14, horizontal: 16),
+                    ),
+                  ),
+                ],
+              ),
+
+              const SizedBox(height: 20),
+
+              // Ações
+              Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  TextButton(
+                    onPressed: () => Navigator.pop(context),
+                    child: const Text('Cancelar'),
+                  ),
+                  const SizedBox(width: 8),
+                  FilledButton.icon(
+                    onPressed: _podeFinalizar
+                        ? () {
+                            Navigator.pop(context);
+                            widget.onConfirmar(List.from(_pagamentos));
+                          }
+                        : null,
+                    icon: const Icon(Icons.check_circle_outline, size: 18),
+                    label: const Text('Finalizar Pagamento'),
+                    style: FilledButton.styleFrom(
+                      backgroundColor: Colors.green[700],
+                      padding: const EdgeInsets.symmetric(
+                          vertical: 12, horizontal: 20),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}

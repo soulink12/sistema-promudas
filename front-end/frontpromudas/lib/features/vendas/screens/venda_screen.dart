@@ -5,6 +5,7 @@ import 'widgets/detalhes_app_bar.dart';
 import 'widgets/modal_busca_cliente.dart';
 import 'widgets/formulario_venda.dart';
 import 'widgets/rodape_venda.dart';
+import 'widgets/modal_pagamento.dart';
 
 /// Tela principal de registro de venda (PDV).
 /// Gerencia o estado do carrinho de compras e do cliente selecionado.
@@ -164,11 +165,22 @@ class _TelaVendaState extends State<TelaVenda> {
     });
   }
 
-  /// Imprime no console os dados do cliente e do pedido.
-  /// TODO: substituir pelo fluxo real de persistência da venda no SQLite
+  /// Abre o modal de pagamento. Só imprime/registra após o operador confirmar.
   void _finalizarPedido() {
     if (_carrinhoService.itens.isEmpty) return;
 
+    showDialog<void>(
+      context: context,
+      builder: (_) => ModalPagamento(
+        totalPedido: _carrinhoService.totalComAjuste,
+        onConfirmar: _registrarPedido,
+      ),
+    );
+  }
+
+  /// Imprime no console os dados completos do pedido após confirmação do pagamento.
+  /// TODO: substituir pelo fluxo real de persistência da venda no SQLite
+  void _registrarPedido(List<Map<String, dynamic>> pagamentos) {
     final itens = _carrinhoService.itens;
     final cliente = _clienteSelecionado!;
 
@@ -193,6 +205,11 @@ class _TelaVendaState extends State<TelaVenda> {
       debugPrint('║  ${_carrinhoService.descricaoAjuste}: R\$ ${_carrinhoService.ajuste.toStringAsFixed(2)}');
     }
     debugPrint('║  TOTAL: R\$ ${_carrinhoService.totalComAjuste.toStringAsFixed(2)}');
+    debugPrint('╠══════════════════════════════════════');
+    debugPrint('║  PAGAMENTOS');
+    for (final p in pagamentos) {
+      debugPrint('║    ${p['forma']}: R\$ ${(p['valor'] as double).toStringAsFixed(2)}');
+    }
     debugPrint('╚══════════════════════════════════════');
   }
 }
