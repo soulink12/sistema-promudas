@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+/// Widget que exibe a tabela de itens adicionados à venda (carrinho).
+/// É somente leitura — não altera o estado diretamente; delega remoções via [onRemoverItem].
 class FormularioVendaWidget extends StatelessWidget {
   // Recebe a lista de itens da tela principal
   final List<Map<String, dynamic>> carrinho;
@@ -12,11 +14,14 @@ class FormularioVendaWidget extends StatelessWidget {
     required this.onRemoverItem,
   });
 
+  /// Constrói a tabela de itens da venda ou uma mensagem de carrinho vazio.
+  /// Colunas: Código, Variedade/Produto, Qtd., Preço Unit., Total, Ações (remover).
   @override
   Widget build(BuildContext context) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        // Título da seção
         Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: const [
@@ -28,7 +33,7 @@ class FormularioVendaWidget extends StatelessWidget {
         ),
         const Divider(),
 
-        // Verifica a variável local "carrinho"
+        // Exibe mensagem de orientação quando o carrinho está vazio
         if (carrinho.isEmpty)
           const Expanded(
             child: Center(
@@ -40,6 +45,7 @@ class FormularioVendaWidget extends StatelessWidget {
             ),
           )
         else
+          // Tabela com scroll vertical para suportar muitos itens
           Expanded(
             child: SingleChildScrollView(
               scrollDirection: Axis.vertical,
@@ -55,7 +61,7 @@ class FormularioVendaWidget extends StatelessWidget {
                     DataColumn(label: Text('Total', style: TextStyle(fontWeight: FontWeight.bold))),
                     DataColumn(label: Text('Ações', style: TextStyle(fontWeight: FontWeight.bold))),
                   ],
-                  // Mapeia os itens recebidos pela tela principal
+                  // Gera uma linha na tabela para cada item do carrinho
                   rows: carrinho.map((item) {
                     return DataRow(
                       cells: [
@@ -77,8 +83,8 @@ class FormularioVendaWidget extends StatelessWidget {
                             ),
                             tooltip: 'Remover item',
                             onPressed: () {
-                              // Aqui está a mágica:
-                              // Em vez de dar setState aqui, ele "grita" pra tela principal
+                              // Delega a remoção para a tela principal via callback,
+                              // mantendo o estado centralizado em TelaVenda
                               onRemoverItem(item);
                             },
                           ),

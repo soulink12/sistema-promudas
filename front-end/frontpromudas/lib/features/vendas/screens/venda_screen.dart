@@ -4,6 +4,8 @@ import 'widgets/detalhes_app_bar.dart';
 import 'widgets/modal_busca_cliente.dart';
 import 'widgets/formulario_venda.dart';
 
+/// Tela principal de registro de venda (PDV).
+/// Gerencia o estado do carrinho de compras e do cliente selecionado.
 class TelaVenda extends StatefulWidget {
   const TelaVenda({super.key});
 
@@ -11,8 +13,10 @@ class TelaVenda extends StatefulWidget {
   State<TelaVenda> createState() => _TelaVendaState();
 }
 
+/// Estado da TelaVenda. Controla o cliente ativo, o carrinho e a pesquisa de produtos.
 class _TelaVendaState extends State<TelaVenda> {
   // Define a estrutura do seu Consumidor Padrão
+  // TODO: substituir por SQLite — buscar o cliente padrão (id=1) da tabela 'clientes'
   final Map<String, dynamic> _consumidorPadrao = {
     'id': 1,
     'nome': 'Consumidor',
@@ -29,6 +33,7 @@ class _TelaVendaState extends State<TelaVenda> {
   // Controller para limparmos o campo de busca após adicionar um item
   late TextEditingController _pesquisaProdutoController;
 
+  /// Inicializa a tela com o consumidor padrão já selecionado automaticamente.
   @override
   void initState() {
     super.initState();
@@ -36,6 +41,8 @@ class _TelaVendaState extends State<TelaVenda> {
     _clienteSelecionado = _consumidorPadrao;
   }
 
+  /// Constrói a estrutura principal da tela: AppBar com dados do cliente,
+  /// tabela de itens no corpo e rodapé com busca de produtos.
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -74,6 +81,10 @@ class _TelaVendaState extends State<TelaVenda> {
     );
   }
 
+  /// Constrói o rodapé fixo com a barra de pesquisa de produtos (Autocomplete)
+  /// e o atalho de teclado para finalizar a venda.
+  /// O Autocomplete filtra os dados mock por nome ou código do produto.
+  // TODO: substituir por SQLite — trocar DadosMock().produtosMock por consulta ao banco
   Widget _construirRodape() {
     return Container(
       width: double.infinity,
@@ -89,6 +100,7 @@ class _TelaVendaState extends State<TelaVenda> {
                   return const Iterable<Map<String, dynamic>>.empty();
                 }
                 final busca = valorDigitado.text.toLowerCase();
+                // TODO: substituir por SQLite — buscar produtos do banco em vez do mock
                 return DadosMock().produtosMock.where((produto) {
                   final nome = produto['nome'].toString().toLowerCase();
                   final id = produto['id'].toString().toLowerCase();
@@ -106,7 +118,7 @@ class _TelaVendaState extends State<TelaVenda> {
 
               fieldViewBuilder:
                   (context, controller, focusNode, onEditingComplete) {
-                    // --- 2. SALVAMOS O CONTROLLER AQUI ---
+                    // Salva o controller para poder limpá-lo após a seleção do produto
                     _pesquisaProdutoController = controller;
 
                     return TextField(
@@ -144,6 +156,8 @@ class _TelaVendaState extends State<TelaVenda> {
   // No topo do arquivo da sua tela, importe o novo widget:
   // import 'widgets/busca_cliente_modal.dart';
 
+  /// Exibe o modal (bottom sheet) para pesquisar e trocar o cliente da venda.
+  /// Ao confirmar a seleção, atualiza [_clienteSelecionado] no estado da tela.
   void _mostrarBuscaClienteModal(BuildContext context) {
     showModalBottomSheet(
       context: context,
@@ -167,6 +181,8 @@ class _TelaVendaState extends State<TelaVenda> {
     );
   }
 
+  /// Adiciona um produto ao carrinho. Se o produto já existir, incrementa a quantidade
+  /// e recalcula o total. Caso contrário, insere o item com quantidade 1.
   void _adicionarAoCarrinho(Map<String, dynamic> produto) {
     setState(() {
       // Procura se o produto já está no carrinho
