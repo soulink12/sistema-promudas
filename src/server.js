@@ -8,6 +8,7 @@ const encomendaRoutes = require('./routes/encomendaRoutes');
 const pagamentoRoutes = require('./routes/pagamentoRoutes');
 const entregaRoutes = require('./routes/entregaRoutes');
 const authRoutes = require('./routes/authRoutes.js');
+const formaPagamentoRoutes = require('./routes/formaPagamentoRoutes');
 
 const { verificarToken } = require('./middlewares/authMiddleware.js');
 
@@ -21,6 +22,8 @@ app.use(cors());
 app.use(express.json());
 
 app.use('/api/auth', authRoutes);
+// Rota pública — formas de pagamento não contêm dados sensíveis
+app.use('/api/formas-pagamento', formaPagamentoRoutes);
 
 // Toda vez que alguém acessar /api/clientes, o Express joga para o arquivo de rotas
 app.use('/api/clientes', verificarToken, clienteRoutes);

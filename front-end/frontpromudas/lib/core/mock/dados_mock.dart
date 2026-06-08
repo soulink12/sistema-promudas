@@ -2,15 +2,6 @@
 /// Substitui temporariamente o banco de dados enquanto o SQLite não está integrado.
 // TODO: substituir por SQLite — remover esta classe quando as consultas reais estiverem prontas
 class DadosMock {
-  // Lista de formas de pagamento disponíveis no sistema
-  // TODO: substituir por SQLite — buscar da tabela 'formas_pagamento' no banco
-  static const List<String> formasPagamentoMock = [
-    'Dinheiro',
-    'Cartão de Crédito',
-    'Cartão de Débito',
-    'PIX',
-  ];
-
   // Lista simulada de clientes para quando o usuário quiser trocar e pesquisar
   // TODO: substituir por SQLite — buscar da tabela 'clientes' no banco
   final List<Map<String, dynamic>> clientesMock = [

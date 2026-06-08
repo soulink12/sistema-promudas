@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
-import '../../../../core/mock/dados_mock.dart';
+import '../../../../core/services/forma_pagamento_service.dart';
 
 /// Modal de registro de pagamento do pedido.
 /// Suporta pagamento dividido em múltiplas formas.
 ///
 /// Fluxo:
-///   1. Modal abre com "Dinheiro" selecionado e valor = total do pedido
+///   1. Modal abre carregando as formas de pagamento da API
 ///   2. Operador ajusta valor e pressiona Enter ou clica em "Adicionar"
 ///   3. Parcela é registrada; campo de valor é pré-preenchido com o restante
 ///   4. Operador repete até zerar o restante
@@ -27,17 +27,36 @@ class ModalPagamento extends StatefulWidget {
 
 class _ModalPagamentoState extends State<ModalPagamento> {
   final List<Map<String, dynamic>> _pagamentos = [];
-  late String _formaSelecionada;
-  late TextEditingController _valorCtrl;
+  final TextEditingController _valorCtrl = TextEditingController();
   final FocusNode _valorFocusNode = FocusNode();
+
+  List<String> _formasPagamento = [];
+  String? _formaSelecionada;
+  bool _carregando = true;
+  String? _erroCarregamento;
 
   @override
   void initState() {
     super.initState();
-    _formaSelecionada = DadosMock.formasPagamentoMock.first;
-    _valorCtrl = TextEditingController(
-      text: widget.totalPedido.toStringAsFixed(2),
-    );
+    _carregarFormas();
+  }
+
+  Future<void> _carregarFormas() async {
+    try {
+      final formas = await FormaPagamentoService().listar();
+      setState(() {
+        _formasPagamento = formas;
+        _formaSelecionada = formas.isNotEmpty ? formas.first : null;
+        _valorCtrl.text = widget.totalPedido.toStringAsFixed(2);
+        _carregando = false;
+      });
+    } catch (_) {
+      setState(() {
+        _erroCarregamento = 'Não foi possível carregar as formas de pagamento.';
+        _carregando = false;
+      });
+    }
+    if (mounted) _valorFocusNode.requestFocus();
   }
 
   @override
@@ -57,6 +76,7 @@ class _ModalPagamentoState extends State<ModalPagamento> {
 
   /// Registra a parcela atual e prepara o campo para a próxima entrada.
   void _adicionarPagamento() {
+    if (_formaSelecionada == null) return;
     final valor =
         double.tryParse(_valorCtrl.text.trim().replaceAll(',', '.'));
     if (valor == null || valor <= 0) return;
@@ -183,22 +203,55 @@ class _ModalPagamentoState extends State<ModalPagamento> {
               ],
 
               // Seletor de forma de pagamento
-              DropdownButtonFormField<String>(
-                value: _formaSelecionada,
-                decoration: const InputDecoration(
-                  labelText: 'Forma de pagamento',
-                  border: OutlineInputBorder(),
-                  isDense: true,
+              if (_carregando)
+                const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 8),
+                  child: LinearProgressIndicator(),
+                )
+              else if (_erroCarregamento != null)
+                Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 8),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.error_outline,
+                          color: Colors.red, size: 18),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          _erroCarregamento!,
+                          style: const TextStyle(color: Colors.red, fontSize: 13),
+                        ),
+                      ),
+                      TextButton(
+                        onPressed: () {
+                          setState(() {
+                            _carregando = true;
+                            _erroCarregamento = null;
+                          });
+                          _carregarFormas();
+                        },
+                        child: const Text('Tentar novamente'),
+                      ),
+                    ],
+                  ),
+                )
+              else
+                DropdownButtonFormField<String>(
+                  value: _formaSelecionada,
+                  decoration: const InputDecoration(
+                    labelText: 'Forma de pagamento',
+                    border: OutlineInputBorder(),
+                    isDense: true,
+                  ),
+                  items: _formasPagamento
+                      .map((f) => DropdownMenuItem(value: f, child: Text(f)))
+                      .toList(),
+                  onChanged: (v) {
+                    if (v == null) return;
+                    setState(() => _formaSelecionada = v);
+                    _valorFocusNode.requestFocus();
+                  },
                 ),
-                items: DadosMock.formasPagamentoMock
-                    .map((f) => DropdownMenuItem(value: f, child: Text(f)))
-                    .toList(),
-                onChanged: (v) {
-                  if (v == null) return;
-                  setState(() => _formaSelecionada = v);
-                  _valorFocusNode.requestFocus();
-                },
-              ),
               const SizedBox(height: 12),
 
               // Campo de valor + botão adicionar
@@ -224,7 +277,9 @@ class _ModalPagamentoState extends State<ModalPagamento> {
                   ),
                   const SizedBox(width: 8),
                   FilledButton.icon(
-                    onPressed: _adicionarPagamento,
+                    onPressed: (!_carregando && _erroCarregamento == null)
+                        ? _adicionarPagamento
+                        : null,
                     icon: const Icon(Icons.add, size: 18),
                     label: const Text('Adicionar'),
                     style: FilledButton.styleFrom(

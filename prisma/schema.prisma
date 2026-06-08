@@ -119,3 +119,9 @@ model usuarios {
   ativo      Boolean  @default(true)
   criado_em  DateTime @default(now())
 }
+
+model formas_pagamento {
+  id   Int     @id @default(autoincrement())
+  nome String  @db.VarChar(50)
+  ativo Boolean @default(true)
+}
