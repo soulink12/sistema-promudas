@@ -183,18 +183,19 @@ class _ModalPagamentoState extends State<ModalPagamento> {
               ],
 
               // Seletor de forma de pagamento
-              const Text('Forma de pagamento',
-                  style: TextStyle(
-                      fontSize: 13, fontWeight: FontWeight.w500)),
-              const SizedBox(height: 6),
-              SegmentedButton<String>(
-                segments: DadosMock.formasPagamentoMock
-                    .map((f) => ButtonSegment<String>(
-                        value: f, label: Text(f, style: const TextStyle(fontSize: 12))))
+              DropdownButtonFormField<String>(
+                value: _formaSelecionada,
+                decoration: const InputDecoration(
+                  labelText: 'Forma de pagamento',
+                  border: OutlineInputBorder(),
+                  isDense: true,
+                ),
+                items: DadosMock.formasPagamentoMock
+                    .map((f) => DropdownMenuItem(value: f, child: Text(f)))
                     .toList(),
-                selected: {_formaSelecionada},
-                onSelectionChanged: (v) {
-                  setState(() => _formaSelecionada = v.first);
+                onChanged: (v) {
+                  if (v == null) return;
+                  setState(() => _formaSelecionada = v);
                   _valorFocusNode.requestFocus();
                 },
               ),
