@@ -4,6 +4,7 @@ require('dotenv').config(); // Puxa as variáveis do arquivo .env
 
 const clienteRoutes = require('./routes/clienteRoutes');
 const variedadeRoutes = require('./routes/variedadeRoutes');
+const variedadeController = require('./controllers/variedadeController');
 const encomendaRoutes = require('./routes/encomendaRoutes');
 const pagamentoRoutes = require('./routes/pagamentoRoutes');
 const entregaRoutes = require('./routes/entregaRoutes');
@@ -22,8 +23,9 @@ app.use(cors());
 app.use(express.json());
 
 app.use('/api/auth', authRoutes);
-// Rota pública — formas de pagamento não contêm dados sensíveis
+// Rotas públicas — não contêm dados sensíveis e são necessárias no PDV sem login
 app.use('/api/formas-pagamento', formaPagamentoRoutes);
+app.get('/api/produtos', variedadeController.listarProdutos);
 
 // Toda vez que alguém acessar /api/clientes, o Express joga para o arquivo de rotas
 app.use('/api/clientes', verificarToken, clienteRoutes);

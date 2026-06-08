@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import '../../../../core/mock/dados_mock.dart';
+import '../../../../core/services/produto_service.dart';
 
 /// Widget do rodapé da tela de venda.
 /// Exibe a barra de pesquisa de produtos (com autocomplete) e o atalho de finalização.
@@ -22,14 +22,42 @@ class RodapeVenda extends StatefulWidget {
   State<RodapeVenda> createState() => _RodapeVendaState();
 }
 
-/// Estado do RodapeVenda. Mantém o controller do campo de busca.
+/// Estado do RodapeVenda. Mantém o controller do campo de busca e a lista de produtos.
 class _RodapeVendaState extends State<RodapeVenda> {
   // Controller do campo de pesquisa; inicializado pelo fieldViewBuilder do Autocomplete
   late TextEditingController _pesquisaProdutoController;
 
+  List<Map<String, dynamic>> _produtos = [];
+  bool _carregando = true;
+  String? _erroCarregamento;
+
+  @override
+  void initState() {
+    super.initState();
+    _carregarProdutos();
+  }
+
+  Future<void> _carregarProdutos() async {
+    setState(() {
+      _carregando = true;
+      _erroCarregamento = null;
+    });
+    try {
+      final produtos = await ProdutoService().listar();
+      setState(() {
+        _produtos = produtos;
+        _carregando = false;
+      });
+    } catch (_) {
+      setState(() {
+        _erroCarregamento = 'Não foi possível carregar os produtos.';
+        _carregando = false;
+      });
+    }
+  }
+
   /// Interpreta o texto digitado no formato "QTDxID" ou apenas "ID".
-  /// Busca o produto pelo id, então chama o callback com produto e quantidade.
-  // TODO: substituir por SQLite — buscar produto por id no banco em vez do mock
+  /// Busca o produto pelo id na lista carregada da API.
   void _processarEntrada(String texto) {
     final trimmed = texto.trim();
     if (trimmed.isEmpty) return;
@@ -49,11 +77,9 @@ class _RodapeVendaState extends State<RodapeVenda> {
 
     if (id == -1 || quantidade <= 0) return;
 
-    // TODO: substituir por SQLite — buscar produto por id no banco
-    final lista = DadosMock().produtosMock;
-    final produto = lista.firstWhere(
+    final produto = _produtos.firstWhere(
       (p) => p['id'] == id,
-      orElse: () => {},
+      orElse: () => <String, dynamic>{},
     );
 
     if (produto.isEmpty) return;
@@ -62,76 +88,98 @@ class _RodapeVendaState extends State<RodapeVenda> {
     _pesquisaProdutoController.clear();
   }
 
-  /// Constrói o rodapé fixo com a barra de pesquisa de produtos (Autocomplete)
-  /// e o atalho de teclado para finalizar a venda.
-  // TODO: substituir por SQLite — trocar DadosMock().produtosMock por consulta ao banco
   @override
   Widget build(BuildContext context) {
     return Container(
       width: double.infinity,
       color: Colors.green[100],
       padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
-      child: Row(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
         children: [
-          // Envolvemos no Expanded para o TextField não quebrar a tela na horizontal
-          Expanded(
-            child: Autocomplete<Map<String, dynamic>>(
-              optionsViewOpenDirection: OptionsViewOpenDirection.up,
-              optionsBuilder: (TextEditingValue valorDigitado) {
-                if (valorDigitado.text.isEmpty) {
-                  return const Iterable<Map<String, dynamic>>.empty();
-                }
-                final busca = valorDigitado.text.toLowerCase();
-                // TODO: substituir por SQLite — buscar produtos do banco em vez do mock
-                return DadosMock().produtosMock.where((produto) {
-                  final nome = produto['nome'].toString().toLowerCase();
-                  final id = produto['id'].toString().toLowerCase();
-                  return nome.contains(busca) || id.contains(busca);
-                });
-              },
-              displayStringForOption: (Map<String, dynamic> p) => p['nome'],
-
-              onSelected: (Map<String, dynamic> produtoEscolhido) {
-                // Após o Autocomplete preencher o campo com o nome,
-                // sobrescrevemos com apenas o id para o operador informar a quantidade
-                WidgetsBinding.instance.addPostFrameCallback((_) {
-                  _pesquisaProdutoController.text =
-                      produtoEscolhido['id'].toString();
-                  _pesquisaProdutoController.selection =
-                      TextSelection.fromPosition(
-                    const TextPosition(offset: 0),
-                  );
-                });
-              },
-
-              fieldViewBuilder:
-                  (context, controller, focusNode, onEditingComplete) {
-                    // Salva o controller para manipulá-lo após a seleção
-                    _pesquisaProdutoController = controller;
-
-                    return TextField(
-                      controller: controller,
-                      focusNode: focusNode,
-                      decoration: const InputDecoration(
-                        isDense: true,
-                        contentPadding: EdgeInsets.symmetric(
-                          vertical: 8,
-                          horizontal: 8,
-                        ),
-                        hintText: 'Nome, Cód. ou QTDxID (ex: 10x1)',
-                        border: OutlineInputBorder(),
-                        prefixIcon: Icon(Icons.search),
-                        filled: true,
-                        fillColor: Colors.white,
-                      ),
-                      // onEditingComplete fecha o dropdown do Autocomplete
-                      onEditingComplete: onEditingComplete,
-                      // onSubmitted processa e adiciona ao carrinho
-                      onSubmitted: _processarEntrada,
-                    );
-                  },
+          if (_carregando)
+            const LinearProgressIndicator()
+          else if (_erroCarregamento != null)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 4),
+              child: Row(
+                children: [
+                  const Icon(Icons.error_outline, color: Colors.red, size: 16),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: Text(
+                      _erroCarregamento!,
+                      style: const TextStyle(color: Colors.red, fontSize: 12),
+                    ),
+                  ),
+                  TextButton(
+                    onPressed: _carregarProdutos,
+                    child: const Text('Tentar novamente'),
+                  ),
+                ],
+              ),
             ),
-          ) // Dá um espaço entre a barra de pesquisa e o texto
+          Row(
+            children: [
+              Expanded(
+                child: Autocomplete<Map<String, dynamic>>(
+                  optionsViewOpenDirection: OptionsViewOpenDirection.up,
+                  optionsBuilder: (TextEditingValue valorDigitado) {
+                    if (valorDigitado.text.isEmpty || _produtos.isEmpty) {
+                      return const Iterable<Map<String, dynamic>>.empty();
+                    }
+                    final busca = valorDigitado.text.toLowerCase();
+                    return _produtos.where((produto) {
+                      final nome = produto['nome'].toString().toLowerCase();
+                      final id = produto['id'].toString();
+                      return nome.contains(busca) || id.contains(busca);
+                    });
+                  },
+                  displayStringForOption: (Map<String, dynamic> p) => p['nome'],
+
+                  onSelected: (Map<String, dynamic> produtoEscolhido) {
+                    // Após o Autocomplete preencher o campo com o nome,
+                    // sobrescrevemos com apenas o id para o operador informar a quantidade
+                    WidgetsBinding.instance.addPostFrameCallback((_) {
+                      _pesquisaProdutoController.text =
+                          produtoEscolhido['id'].toString();
+                      _pesquisaProdutoController.selection =
+                          TextSelection.fromPosition(
+                        const TextPosition(offset: 0),
+                      );
+                    });
+                  },
+
+                  fieldViewBuilder:
+                      (context, controller, focusNode, onEditingComplete) {
+                        // Salva o controller para manipulá-lo após a seleção
+                        _pesquisaProdutoController = controller;
+
+                        return TextField(
+                          controller: controller,
+                          focusNode: focusNode,
+                          decoration: const InputDecoration(
+                            isDense: true,
+                            contentPadding: EdgeInsets.symmetric(
+                              vertical: 8,
+                              horizontal: 8,
+                            ),
+                            hintText: 'Nome, Cód. ou QTDxID (ex: 10x1)',
+                            border: OutlineInputBorder(),
+                            prefixIcon: Icon(Icons.search),
+                            filled: true,
+                            fillColor: Colors.white,
+                          ),
+                          // onEditingComplete fecha o dropdown do Autocomplete
+                          onEditingComplete: onEditingComplete,
+                          // onSubmitted processa e adiciona ao carrinho
+                          onSubmitted: _processarEntrada,
+                        );
+                      },
+                ),
+              ),
+            ],
+          ),
         ],
       ),
     );
