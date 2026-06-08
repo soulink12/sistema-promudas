@@ -104,4 +104,10 @@ class CarrinhoService {
     _ehPercentual = false;
     _descricaoAjuste = null;
   }
+
+  /// Limpa todos os itens e o ajuste, retornando o carrinho ao estado inicial.
+  void limpar() {
+    _itens.clear();
+    removerAjuste();
+  }
 }

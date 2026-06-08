@@ -211,5 +211,10 @@ class _TelaVendaState extends State<TelaVenda> {
       debugPrint('║    ${p['forma']}: R\$ ${(p['valor'] as double).toStringAsFixed(2)}');
     }
     debugPrint('╚══════════════════════════════════════');
+
+    setState(() {
+      _carrinhoService.limpar();
+      _clienteSelecionado = _consumidorPadrao;
+    });
   }
 }
