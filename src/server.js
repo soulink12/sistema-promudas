@@ -3,6 +3,7 @@ const cors = require('cors');
 require('dotenv').config(); // Puxa as variáveis do arquivo .env
 
 const clienteRoutes = require('./routes/clienteRoutes');
+const clienteController = require('./controllers/clienteController');
 const variedadeRoutes = require('./routes/variedadeRoutes');
 const variedadeController = require('./controllers/variedadeController');
 const encomendaRoutes = require('./routes/encomendaRoutes');
@@ -23,16 +24,17 @@ app.use(cors());
 app.use(express.json());
 
 app.use('/api/auth', authRoutes);
-// Rotas públicas — não contêm dados sensíveis e são necessárias no PDV sem login
+// Rotas públicas — necessárias no PDV antes de implementar o login
 app.use('/api/formas-pagamento', formaPagamentoRoutes);
 app.get('/api/produtos', variedadeController.listarProdutos);
+app.get('/api/clientes', clienteController.listarClientes);
 
 // Toda vez que alguém acessar /api/clientes, o Express joga para o arquivo de rotas
-app.use('/api/clientes', verificarToken, clienteRoutes);
-app.use('/api/produtos', verificarToken, variedadeRoutes);
-app.use('/api/pedidos', verificarToken, encomendaRoutes);
-app.use('/api/pagamentos', verificarToken, pagamentoRoutes);
-app.use('/api/retiradas', verificarToken, entregaRoutes);
+app.use('/api/clientes', clienteRoutes);
+app.use('/api/produtos', variedadeRoutes);
+app.use('/api/pedidos', encomendaRoutes);
+app.use('/api/pagamentos', pagamentoRoutes);
+app.use('/api/retiradas', entregaRoutes);
 
 // Inicia o servidor na porta 6072
 const PORT = process.env.PORT || 6072;
