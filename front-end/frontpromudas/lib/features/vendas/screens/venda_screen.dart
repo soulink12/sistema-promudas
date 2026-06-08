@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../../../core/services/api_service.dart';
+import '../../../core/services/auth_service.dart';
 import '../../../core/services/carrinho_service.dart';
+import '../../auth/screens/login_screen.dart';
+import '../../clientes/screens/clientes_screen.dart';
 import 'widgets/detalhes_app_bar.dart';
 import 'widgets/modal_busca_cliente.dart';
 import 'widgets/formulario_venda.dart';
@@ -65,12 +68,13 @@ class _TelaVendaState extends State<TelaVenda> {
     return Scaffold(
       appBar: AppBar(
         backgroundColor: Colors.green[100],
-        titleSpacing: 16,
+        titleSpacing: 8,
         title: DetalhesAppBar(
           clienteSelecionado: _clienteSelecionado,
           onTap: _salvando ? null : () => _mostrarBuscaClienteModal(context),
         ),
       ),
+      drawer: _buildDrawer(context),
       body: Stack(
         children: [
           Padding(
@@ -125,6 +129,77 @@ class _TelaVendaState extends State<TelaVenda> {
             const ModalBarrier(dismissible: false, color: Colors.black26),
             const Center(child: CircularProgressIndicator()),
           ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDrawer(BuildContext context) {
+    final nomeUsuario =
+        AuthService.usuario?['nome'] as String? ?? 'Usuário';
+
+    return Drawer(
+      child: Column(
+        children: [
+          DrawerHeader(
+            decoration: BoxDecoration(color: Colors.green[700]),
+            child: Align(
+              alignment: Alignment.bottomLeft,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(Icons.storefront, color: Colors.white, size: 36),
+                  const SizedBox(height: 8),
+                  const Text(
+                    'Sistema Promudas',
+                    style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    nomeUsuario,
+                    style: const TextStyle(color: Colors.white70, fontSize: 13),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          ListTile(
+            leading: const Icon(Icons.point_of_sale),
+            title: const Text('PDV'),
+            selected: true,
+            selectedColor: Colors.green[700],
+            onTap: () => Navigator.pop(context),
+          ),
+          ListTile(
+            leading: const Icon(Icons.people_outline),
+            title: const Text('Clientes'),
+            onTap: () {
+              Navigator.pop(context);
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                    builder: (_) => const TelaListaClientes()),
+              );
+            },
+          ),
+          const Spacer(),
+          const Divider(height: 1),
+          ListTile(
+            leading: const Icon(Icons.logout, color: Colors.red),
+            title: const Text('Sair', style: TextStyle(color: Colors.red)),
+            onTap: () {
+              AuthService.logout();
+              Navigator.pushAndRemoveUntil(
+                context,
+                MaterialPageRoute(builder: (_) => const TelaLogin()),
+                (_) => false,
+              );
+            },
+          ),
         ],
       ),
     );
