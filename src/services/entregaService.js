@@ -1,263 +1,218 @@
 const prisma = require('../config/database');
 
-/**
- * FUNÇÃO DE AUTOMAÇÃO (INTERNA)
- * Recalcula o status de entrega da encomenda comparando o total de mudas 
- * compradas com o total de mudas já entregues em todas as viagens.
- */
-const recalcularStatusEntrega = async (encomenda_id) => {
-    // 1. Busca a encomenda com todos os itens comprados e o histórico de entregas (e itens entregues)
-    const encomenda = await prisma.encomendas.findUnique({
-        where: { id: parseInt(encomenda_id) },
+// Recalcula o status de retirada do pedido comparando o total pedido com o total já retirado
+const recalcularStatusRetirada = async (pedido_id) => {
+    const pedido = await prisma.pedidos.findUnique({
+        where: { id: parseInt(pedido_id) },
         include: {
-            itens_encomenda: true,
-            entregas: {
-                include: {
-                    itens_entrega: true
-                }
+            itens_pedido: true,
+            retiradas: {
+                include: { itens_retirada: true }
             }
         }
     });
 
-    if (!encomenda) return;
+    if (!pedido) return;
 
-    // 2. Soma o total de mudas COMPRADAS (juntando todas as variedades)
-    const totalComprado = encomenda.itens_encomenda.reduce((soma, item) => {
-        return soma + item.quantidade;
-    }, 0);
+    const totalPedido = pedido.itens_pedido.reduce((soma, item) => soma + item.quantidade, 0);
 
-    // 3. Soma o total de mudas ENTREGUES (juntando todas as viagens e variedades)
-    let totalEntregue = 0;
-    encomenda.entregas.forEach(entrega => {
-        entrega.itens_entrega.forEach(item => {
-            totalEntregue += item.quantidade;
+    let totalRetirado = 0;
+    pedido.retiradas.forEach(retirada => {
+        retirada.itens_retirada.forEach(item => {
+            totalRetirado += item.quantidade;
         });
     });
 
-    // 4. Define o status logicamente
     let novoStatus = 'Pendente';
-
-    if (totalEntregue >= totalComprado) {
-        novoStatus = 'Entregue';
-    } else if (totalEntregue > 0) {
+    if (totalRetirado >= totalPedido) {
+        novoStatus = 'Retirado';
+    } else if (totalRetirado > 0) {
         novoStatus = 'Parcial';
     }
 
-    // 5. Sincroniza o novo status com a tabela de encomendas
-    await prisma.encomendas.update({
-        where: { id: parseInt(encomenda_id) },
-        data: { status_entrega: novoStatus }
+    await prisma.pedidos.update({
+        where: { id: parseInt(pedido_id) },
+        data: { status_retirada: novoStatus }
     });
 };
 
 // ============================================================
-// SERVIÇOS DE ENTREGA
-// ============================================================
 
-const criarEntrega = async (dadosEntrega) => {
-    const { itens, encomenda_id, ...dadosPrincipais } = dadosEntrega;
+const criarRetirada = async (dadosRetirada) => {
+    const { itens, pedido_id, ...dadosPrincipais } = dadosRetirada;
 
-    // 1. Busca a encomenda trazendo o que foi encomendado e o histórico de entregas
-    const encomenda = await prisma.encomendas.findUnique({
-        where: { id: parseInt(encomenda_id) },
+    const pedido = await prisma.pedidos.findUnique({
+        where: { id: parseInt(pedido_id) },
         include: {
-            itens_encomenda: true,
-            entregas: {
-                include: {
-                    itens_entrega: true
-                }
+            itens_pedido: true,
+            retiradas: {
+                include: { itens_retirada: true }
             }
         }
     });
 
-    if (!encomenda) {
-        throw new Error('Encomenda não encontrada.');
+    if (!pedido) {
+        throw new Error('Pedido não encontrado.');
     }
 
-    if (encomenda.ativo === false) {
-        throw new Error('Não é possível registar entregas para uma encomenda desativada ou cancelada.');
+    if (pedido.ativo === false) {
+        throw new Error('Não é possível registrar retiradas para um pedido desativado ou cancelado.');
     }
 
-    // 2. VALIDAÇÃO DE SALDO DE MUDAS
+    // Validação de saldo por produto
     for (const itemAtual of itens) {
-        const variedadeId = parseInt(itemAtual.variedade_id);
+        const produtoId = parseInt(itemAtual.produto_id);
         const qtdSaindoAgora = parseInt(itemAtual.quantidade);
 
-        const itemComprado = encomenda.itens_encomenda.find(i => i.variedade_id === variedadeId);
-        if (!itemComprado) {
-            throw new Error(`Operação bloqueada: A variedade ID ${variedadeId} não faz parte desta encomenda.`);
+        const itemPedido = pedido.itens_pedido.find(i => i.produto_id === produtoId);
+        if (!itemPedido) {
+            throw new Error(`Operação bloqueada: o produto ID ${produtoId} não faz parte deste pedido.`);
         }
 
-        const totalComprado = itemComprado.quantidade;
-
-        let totalJaEntregue = 0;
-        for (const entregaAntiga of encomenda.entregas) {
-            const itemEntregue = entregaAntiga.itens_entrega.find(i => i.variedade_id === variedadeId);
-            if (itemEntregue) {
-                totalJaEntregue += itemEntregue.quantidade;
-            }
+        let totalJaRetirado = 0;
+        for (const retiradaAnterior of pedido.retiradas) {
+            const itemRetirado = retiradaAnterior.itens_retirada.find(i => i.produto_id === produtoId);
+            if (itemRetirado) totalJaRetirado += itemRetirado.quantidade;
         }
 
-        const saldoRestante = totalComprado - totalJaEntregue;
+        const saldoRestante = itemPedido.quantidade - totalJaRetirado;
 
         if (qtdSaindoAgora > saldoRestante) {
-            throw new Error(`Atenção: Saldo insuficiente para a variedade ID ${variedadeId}. Restam apenas ${saldoRestante} mudas para entrega (Tentativa de enviar ${qtdSaindoAgora}).`);
+            throw new Error(`Saldo insuficiente para o produto ID ${produtoId}. Restam ${saldoRestante} unidades (tentativa: ${qtdSaindoAgora}).`);
         }
     }
 
-    // 3. Cria a entrega no banco
-    const novaEntrega = await prisma.entregas.create({
+    const novaRetirada = await prisma.retiradas.create({
         data: {
-            encomenda_id: parseInt(encomenda_id),
+            pedido_id: parseInt(pedido_id),
             ...dadosPrincipais,
-            itens_entrega: {
+            itens_retirada: {
                 create: itens.map(item => ({
-                    variedade_id: parseInt(item.variedade_id),
+                    produto_id: parseInt(item.produto_id),
                     quantidade: parseInt(item.quantidade)
                 }))
             }
         }
     });
 
-    // 4. AUTOMAÇÃO: Dispara o recálculo após criar a entrega
-    await recalcularStatusEntrega(encomenda_id);
+    await recalcularStatusRetirada(pedido_id);
 
-    return novaEntrega.id;
+    return novaRetirada.id;
 };
 
-const listarEntregas = async () => {
-    const entregas = await prisma.entregas.findMany({
+const listarRetiradas = async () => {
+    return await prisma.retiradas.findMany({
         where: {
-            encomendas: { ativo: true }
+            pedidos: { ativo: true }
         },
         include: {
-            itens_entrega: true,
-            encomendas: {
+            itens_retirada: true,
+            pedidos: {
                 select: {
                     id: true,
                     status_geral: true,
-                    status_entrega: true,
+                    status_retirada: true,
                     cliente_id: true
                 }
             }
         }
     });
-    return entregas;
 };
 
-const atualizarEntrega = async (id, dados) => {
-    const entregaId = parseInt(id);
+const atualizarRetirada = async (id, dados) => {
+    const retiradaId = parseInt(id);
 
-    // 1. Busca a entrega original para pegar a encomenda vinculada
-    const entregaOriginal = await prisma.entregas.findUnique({
-        where: { id: entregaId },
-        select: { encomenda_id: true }
+    const retiradaOriginal = await prisma.retiradas.findUnique({
+        where: { id: retiradaId },
+        select: { pedido_id: true }
     });
 
-    if (!entregaOriginal) {
-        throw new Error("Entrega não encontrada.");
+    if (!retiradaOriginal) {
+        throw new Error('Retirada não encontrada.');
     }
 
     const { itens, ...dadosPrincipais } = dados;
 
-    // 2. Se a requisição incluir itens, fazemos a validação de Saldo de Mudas
     if (itens && Array.isArray(itens)) {
-        // A. Busca o que o cliente comprou na encomenda
-        const encomenda = await prisma.encomendas.findUnique({
-            where: { id: entregaOriginal.encomenda_id },
-            include: { itens_encomenda: true }
+        const pedido = await prisma.pedidos.findUnique({
+            where: { id: retiradaOriginal.pedido_id },
+            include: { itens_pedido: true }
         });
 
-        // B. Busca as OUTRAS entregas já feitas para esta encomenda (ignorando a atual)
-        const outrasEntregas = await prisma.entregas.findMany({
+        const outrasRetiradas = await prisma.retiradas.findMany({
             where: {
-                encomenda_id: entregaOriginal.encomenda_id,
-                id: { not: entregaId } // <- O Segredo: Ignora a entrega que estamos a editar
+                pedido_id: retiradaOriginal.pedido_id,
+                id: { not: retiradaId }
             },
-            include: { itens_entrega: true }
+            include: { itens_retirada: true }
         });
 
-        // C. Calcula o total já entregue (somente pelas OUTRAS entregas)
-        const jaEntregue = {};
-        outrasEntregas.forEach(ent => {
-            ent.itens_entrega.forEach(item => {
-                jaEntregue[item.variedade_id] = (jaEntregue[item.variedade_id] || 0) + item.quantidade;
+        const jaRetirado = {};
+        outrasRetiradas.forEach(ret => {
+            ret.itens_retirada.forEach(item => {
+                jaRetirado[item.produto_id] = (jaRetirado[item.produto_id] || 0) + item.quantidade;
             });
         });
 
-        // D. Valida cada novo item que queremos guardar nesta entrega
         for (const novoItem of itens) {
-            // Quanto ele comprou no total desta variedade?
-            const itemComprado = encomenda.itens_encomenda.find(i => i.variedade_id === novoItem.variedade_id);
-            const totalComprado = itemComprado ? itemComprado.quantidade : 0;
+            const itemPedido = pedido.itens_pedido.find(i => i.produto_id === novoItem.produto_id);
+            const totalPedido = itemPedido ? itemPedido.quantidade : 0;
 
-            if (totalComprado === 0) {
-                throw new Error(`A variedade ID ${novoItem.variedade_id} não faz parte desta encomenda.`);
+            if (totalPedido === 0) {
+                throw new Error(`O produto ID ${novoItem.produto_id} não faz parte deste pedido.`);
             }
 
-            // Qual o saldo restante (sem contar a entrega atual)?
-            const totalOutrasEntregas = jaEntregue[novoItem.variedade_id] || 0;
-            const saldoDisponivel = totalComprado - totalOutrasEntregas;
+            const saldoDisponivel = totalPedido - (jaRetirado[novoItem.produto_id] || 0);
 
-            // Se a quantidade enviada for maior que o saldo, bloqueia a edição
             if (novoItem.quantidade > saldoDisponivel) {
-                throw new Error(`Atenção: Saldo insuficiente para a variedade ID ${novoItem.variedade_id}. O valor máximo dessa entrega deve ser ${saldoDisponivel}.`);
+                throw new Error(`Saldo insuficiente para o produto ID ${novoItem.produto_id}. Máximo permitido: ${saldoDisponivel}.`);
             }
         }
     }
 
-    // 3. Preparamos o objeto base que vai atualizar a tabela 'entregas'
     let dataParaAtualizar = { ...dadosPrincipais };
 
-    // 4. Se passou na validação, prepara a transação aninhada do Prisma
     if (itens && Array.isArray(itens)) {
-        dataParaAtualizar.itens_entrega = {
-            deleteMany: {}, // Apaga todos os registros antigos DESTA entrega
-            create: itens.map(item => ({ // Recria os novos itens recebidos no body
-                variedade_id: item.variedade_id,
+        dataParaAtualizar.itens_retirada = {
+            deleteMany: {},
+            create: itens.map(item => ({
+                produto_id: item.produto_id,
                 quantidade: item.quantidade
             }))
         };
     }
 
-    // 5. Salva no banco de dados
-    const entregaAtualizada = await prisma.entregas.update({
-        where: {
-            id: entregaId
-        },
+    const retiradaAtualizada = await prisma.retiradas.update({
+        where: { id: retiradaId },
         data: dataParaAtualizar
     });
 
-    // 6. Recalcula o status geral da entrega para a Encomenda
-    await recalcularStatusEntrega(entregaOriginal.encomenda_id);
+    await recalcularStatusRetirada(retiradaOriginal.pedido_id);
 
-    return entregaAtualizada;
+    return retiradaAtualizada;
 };
 
-const eliminarEntrega = async (id) => {
-    // 1. Localiza a entrega antes de apagar para saber qual encomenda recalcular
-    const entrega = await prisma.entregas.findUnique({
+const eliminarRetirada = async (id) => {
+    const retirada = await prisma.retiradas.findUnique({
         where: { id: parseInt(id) }
     });
 
-    if (!entrega) {
-        throw new Error('Entrega não encontrada.');
+    if (!retirada) {
+        throw new Error('Retirada não encontrada.');
     }
 
-    // 2. Apaga o registro (o Prisma deleta os itens vinculados em cascata)
-    const resultado = await prisma.entregas.delete({
+    const resultado = await prisma.retiradas.delete({
         where: { id: parseInt(id) }
     });
 
-    // 3. AUTOMAÇÃO: Recalcula. Se apagou uma entrega, a encomenda volta para "Parcial" ou "Pendente"
-    await recalcularStatusEntrega(entrega.encomenda_id);
+    await recalcularStatusRetirada(retirada.pedido_id);
 
     return resultado;
 };
 
 module.exports = {
-    criarEntrega,
-    listarEntregas,
-    atualizarEntrega,
-    eliminarEntrega
+    criarRetirada,
+    listarRetiradas,
+    atualizarRetirada,
+    eliminarRetirada
 };

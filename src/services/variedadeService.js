@@ -1,36 +1,35 @@
 const prisma = require('../config/database');
 
-const criarVariedade = async (dados) => {
-    const novaVariedade = await prisma.variedades.create({
+const criarProduto = async (dados) => {
+    const novoProduto = await prisma.produtos.create({
         data: dados
     });
-    return novaVariedade.id;
+    return novoProduto.id;
 };
 
-const listarVariedades = async () => {
-    const variedades = await prisma.variedades.findMany({
+const listarProdutos = async () => {
+    return await prisma.produtos.findMany({
         where: { ativo: true }
     });
-    return variedades;
 };
 
-const atualizarVariedade = async (id, dados) => {
-  return await prisma.variedades.update({
-    where: { id: parseInt(id) },
-    data: dados,
-  });
+const atualizarProduto = async (id, dados) => {
+    return await prisma.produtos.update({
+        where: { id: parseInt(id) },
+        data: dados,
+    });
 };
 
-const eliminarVariedade = async (id) => {
-  return await prisma.variedades.update({
-    where: { id: parseInt(id) },
-    data: {ativo: false}
-  });
+const eliminarProduto = async (id) => {
+    return await prisma.produtos.update({
+        where: { id: parseInt(id) },
+        data: { ativo: false }
+    });
 };
 
 module.exports = {
-    criarVariedade,
-    listarVariedades,
-    atualizarVariedade,
-    eliminarVariedade
+    criarProduto,
+    listarProdutos,
+    atualizarProduto,
+    eliminarProduto
 };

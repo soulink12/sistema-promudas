@@ -2,9 +2,9 @@ const express = require('express');
 const router = express.Router();
 const encomendaController = require('../controllers/encomendaController');
 
-router.post('/', encomendaController.criarEncomenda);
-router.get('/', encomendaController.listarEncomendas);
-router.put('/:id', encomendaController.atualizarEncomenda); // UPDATE
-router.delete('/:id', encomendaController.eliminarEncomenda); // DELETE
+router.post('/', encomendaController.criarPedido);
+router.get('/', encomendaController.listarPedidos);
+router.put('/:id', encomendaController.atualizarPedido);
+router.delete('/:id', encomendaController.eliminarPedido);
 
 module.exports = router;

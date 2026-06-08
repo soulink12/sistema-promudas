@@ -1,51 +1,50 @@
 const entregaService = require('../services/entregaService');
 
-const criarEntrega = async (req, res) => {
+const criarRetirada = async (req, res) => {
     try {
-        const id = await entregaService.criarEntrega(req.body);
-        res.status(201).json({ mensagem: 'Entrega criada com sucesso', id });
+        const id = await entregaService.criarRetirada(req.body);
+        res.status(201).json({ mensagem: 'Retirada criada com sucesso', id });
     } catch (erro) {
         console.error(erro);
-        res.status(500).json({ erro: 'Erro ao criar entrega', detalhe: erro.message });
+        res.status(500).json({ erro: 'Erro ao criar retirada', detalhe: erro.message });
     }
 };
 
-const listarEntregas = async (req, res) => {
+const listarRetiradas = async (req, res) => {
     try {
-        const entregas = await entregaService.listarEntregas();
-        res.status(200).json(entregas);
+        const retiradas = await entregaService.listarRetiradas();
+        res.status(200).json(retiradas);
     } catch (erro) {
         console.error(erro);
-        res.status(500).json({ erro: 'Erro ao listar entregas', detalhe: erro.message });
+        res.status(500).json({ erro: 'Erro ao listar retiradas', detalhe: erro.message });
     }
 };
 
-const atualizarEntrega = async (req, res) => {
+const atualizarRetirada = async (req, res) => {
     try {
         const { id } = req.params;
-        const dados = req.body;
-        await entregaService.atualizarEntrega(id, dados);
-        res.status(200).json({ mensagem: 'Entrega atualizada com sucesso' });
+        await entregaService.atualizarRetirada(id, req.body);
+        res.status(200).json({ mensagem: 'Retirada atualizada com sucesso' });
     } catch (erro) {
         console.error(erro);
-        res.status(500).json({ erro: 'Erro ao atualizar entrega', detalhe: erro.message });
+        res.status(500).json({ erro: 'Erro ao atualizar retirada', detalhe: erro.message });
     }
 };
 
-const eliminarEntrega = async (req, res) => {
+const eliminarRetirada = async (req, res) => {
     try {
         const { id } = req.params;
-        await entregaService.eliminarEntrega(id);
-        res.status(200).json({ mensagem: 'Entrega apagada com sucesso' });
+        await entregaService.eliminarRetirada(id);
+        res.status(200).json({ mensagem: 'Retirada apagada com sucesso' });
     } catch (erro) {
         console.error(erro);
-        res.status(500).json({ erro: 'Erro ao apagar entrega', detalhe: erro.message });
+        res.status(500).json({ erro: 'Erro ao apagar retirada', detalhe: erro.message });
     }
 };
 
 module.exports = {
-    criarEntrega,
-    listarEntregas,
-    atualizarEntrega,
-    eliminarEntrega
+    criarRetirada,
+    listarRetiradas,
+    atualizarRetirada,
+    eliminarRetirada
 };

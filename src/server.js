@@ -24,10 +24,10 @@ app.use('/api/auth', authRoutes);
 
 // Toda vez que alguém acessar /api/clientes, o Express joga para o arquivo de rotas
 app.use('/api/clientes', verificarToken, clienteRoutes);
-app.use('/api/variedades', verificarToken, variedadeRoutes);
-app.use('/api/encomendas', verificarToken, encomendaRoutes);
+app.use('/api/produtos', verificarToken, variedadeRoutes);
+app.use('/api/pedidos', verificarToken, encomendaRoutes);
 app.use('/api/pagamentos', verificarToken, pagamentoRoutes);
-app.use('/api/entregas', verificarToken, entregaRoutes);
+app.use('/api/retiradas', verificarToken, entregaRoutes);
 
 // Inicia o servidor na porta 6072
 const PORT = process.env.PORT || 6072;
