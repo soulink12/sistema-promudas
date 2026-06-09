@@ -9,6 +9,7 @@ const pedidoRoutes = require('./routes/pedidoRoutes');
 const pagamentoRoutes = require('./routes/pagamentoRoutes');
 const retiradaRoutes = require('./routes/retiradaRoutes');
 const formaPagamentoRoutes = require('./routes/formaPagamentoRoutes');
+const relatorioRoutes = require('./routes/relatorioRoutes');
 
 const { verificarToken } = require('./middlewares/authMiddleware.js');
 
@@ -27,6 +28,7 @@ app.use('/api/auth', authRoutes);
 app.use(verificarToken);
 
 app.use('/api/formas-pagamento', formaPagamentoRoutes);
+app.use('/api/relatorios', relatorioRoutes);
 app.use('/api/clientes', clienteRoutes);
 app.use('/api/produtos', produtoRoutes);
 app.use('/api/pedidos', pedidoRoutes);
