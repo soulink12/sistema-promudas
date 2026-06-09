@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../../core/services/api_service.dart';
+import '../../pedidos/screens/pedidos_screen.dart';
+import '../../pedidos/screens/widgets/lista_pedidos.dart' show ChipStatus;
 
 class TelaListaClientes extends StatefulWidget {
   const TelaListaClientes({super.key});
@@ -12,6 +14,9 @@ class _TelaListaClientesState extends State<TelaListaClientes> {
   List<Map<String, dynamic>> _clientes = [];
   bool _carregando = true;
   String? _erroCarregamento;
+
+  List<Map<String, dynamic>> _pedidosCliente = [];
+  bool _carregandoPedidos = false;
 
   final _buscaController = TextEditingController();
   String _textoBusca = '';
@@ -91,19 +96,41 @@ class _TelaListaClientesState extends State<TelaListaClientes> {
     setState(() {
       _clienteSelecionado = cliente;
       _editando = false;
+      _pedidosCliente = [];
       _buscaController.text = cliente['nome'] as String? ?? '';
       _textoBusca = '';
     });
     _atualizandoProgramaticamente = false;
+    _carregarPedidosCliente(cliente['nome'] as String? ?? '');
   }
 
   void _limparSelecao() {
     setState(() {
       _clienteSelecionado = null;
       _editando = false;
+      _pedidosCliente = [];
       _buscaController.clear();
       _textoBusca = '';
     });
+  }
+
+  Future<void> _carregarPedidosCliente(String nome) async {
+    setState(() => _carregandoPedidos = true);
+    try {
+      final response = await ApiService.dio.get(
+        '/pedidos',
+        queryParameters: {'cliente': nome},
+      );
+      final dados = response.data as List;
+      setState(() {
+        _pedidosCliente = dados
+            .map<Map<String, dynamic>>((e) => Map<String, dynamic>.from(e as Map))
+            .toList();
+        _carregandoPedidos = false;
+      });
+    } catch (_) {
+      setState(() => _carregandoPedidos = false);
+    }
   }
 
   void _iniciarEdicao() {
@@ -294,7 +321,7 @@ class _TelaListaClientesState extends State<TelaListaClientes> {
     }
     return ListView.separated(
       itemCount: lista.length,
-      separatorBuilder: (_, __) => const Divider(height: 1),
+      separatorBuilder: (context, i) => const Divider(height: 1),
       itemBuilder: (context, index) {
         final c = lista[index];
         final nome = c['nome'] as String? ?? '';
@@ -323,75 +350,227 @@ class _TelaListaClientesState extends State<TelaListaClientes> {
 
   Widget _buildDetalhes(Map<String, dynamic> c) {
     final nome = c['nome'] as String? ?? '';
+    final pendentes = _pedidosCliente
+        .where((p) {
+          final s = p['status_pagamento'] as String? ?? '';
+          return s == 'Pendente' || s == 'Parcial';
+        })
+        .toList();
 
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16),
-      child: Card(
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.center,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // ── Card do cliente ──────────────────────────────────────────────
+          Card(
+            child: Padding(
+              padding: const EdgeInsets.all(24),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  CircleAvatar(
-                    radius: 28,
-                    backgroundColor: Colors.green[100],
-                    child: Text(
-                      _iniciais(nome),
-                      style: TextStyle(
-                          fontSize: 20,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.green[800]),
-                    ),
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: [
+                      CircleAvatar(
+                        radius: 28,
+                        backgroundColor: Colors.green[100],
+                        child: Text(
+                          _iniciais(nome),
+                          style: TextStyle(
+                              fontSize: 20,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.green[800]),
+                        ),
+                      ),
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(nome,
+                                style: const TextStyle(
+                                    fontSize: 20, fontWeight: FontWeight.bold)),
+                            Text('ID: ${c['id']}',
+                                style: const TextStyle(
+                                    color: Colors.grey, fontSize: 13)),
+                          ],
+                        ),
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.edit_outlined),
+                        tooltip: 'Editar cliente',
+                        onPressed: _iniciarEdicao,
+                      ),
+                    ],
                   ),
-                  const SizedBox(width: 16),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(nome,
-                            style: const TextStyle(
-                                fontSize: 20, fontWeight: FontWeight.bold)),
-                        Text('ID: ${c['id']}',
-                            style: const TextStyle(
-                                color: Colors.grey, fontSize: 13)),
-                      ],
-                    ),
-                  ),
-                  IconButton(
-                    icon: const Icon(Icons.edit_outlined),
-                    tooltip: 'Editar cliente',
-                    onPressed: _iniciarEdicao,
-                  ),
+                  const Divider(height: 32),
+                  ...[
+                    _secao('Identificação', [
+                      ('CPF / CNPJ', c['cpf_cnpj']),
+                      ('Inscrição Estadual', c['inscricao_estadual']),
+                    ]),
+                    _secao('Contato', [
+                      ('Telefone', c['telefone_1']),
+                      ('Telefone 2', c['telefone_2']),
+                    ]),
+                    _secao('Endereço', [
+                      ('CEP', c['cep']),
+                      ('Logradouro', c['logradouro']),
+                      ('Número', c['numero']),
+                      ('Bairro', c['bairro']),
+                      ('Cidade', c['cidade']),
+                      ('Estado', c['estado']),
+                    ]),
+                    _secao('Sistema', [
+                      ('Cadastrado em', _formatarData(c['criado_em'])),
+                    ]),
+                  ].whereType<Widget>(),
                 ],
               ),
-              const Divider(height: 32),
-              ...[
-                _secao('Identificação', [
-                  ('CPF / CNPJ', c['cpf_cnpj']),
-                  ('Inscrição Estadual', c['inscricao_estadual']),
-                ]),
-                _secao('Contato', [
-                  ('Telefone', c['telefone_1']),
-                  ('Telefone 2', c['telefone_2']),
-                ]),
-                _secao('Endereço', [
-                  ('CEP', c['cep']),
-                  ('Logradouro', c['logradouro']),
-                  ('Número', c['numero']),
-                  ('Bairro', c['bairro']),
-                  ('Cidade', c['cidade']),
-                  ('Estado', c['estado']),
-                ]),
-                _secao('Sistema', [
-                  ('Cadastrado em', _formatarData(c['criado_em'])),
-                ]),
-              ].whereType<Widget>(),
+            ),
+          ),
+
+          // ── Seção de pedidos pendentes ───────────────────────────────────
+          const SizedBox(height: 20),
+          Row(
+            children: [
+              Text(
+                'PEDIDOS PENDENTES',
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.grey[600],
+                  letterSpacing: 0.8,
+                ),
+              ),
+              if (!_carregandoPedidos && pendentes.isNotEmpty) ...[
+                const SizedBox(width: 8),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: Colors.orange[100],
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: Colors.orange.shade300),
+                  ),
+                  child: Text(
+                    '${pendentes.length}',
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.orange[800],
+                    ),
+                  ),
+                ),
+              ],
             ],
           ),
-        ),
+          const SizedBox(height: 8),
+
+          if (_carregandoPedidos)
+            const Padding(
+              padding: EdgeInsets.symmetric(vertical: 16),
+              child: Center(child: CircularProgressIndicator()),
+            )
+          else if (pendentes.isEmpty)
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 12),
+              child: Text(
+                'Nenhum pedido com pagamento pendente.',
+                style: TextStyle(color: Colors.grey[500], fontSize: 13),
+              ),
+            )
+          else
+            Card(
+              child: Column(
+                children: pendentes.map((p) {
+                  final id = p['id'] as int;
+                  final total = _toDouble(p['valor_total']);
+                  final status = p['status_pagamento'] as String? ?? 'Pendente';
+                  final data = _formatarData(p['criado_em']) ?? '—';
+                  final pagamentos = (p['pagamentos'] as List? ?? []);
+                  final totalPagoReal = pagamentos.fold<double>(0.0, (soma, pag) {
+                    final isPosterior = (pag as Map)['pagamento_posterior'] == true;
+                    return isPosterior ? soma : soma + _toDouble(pag['valor_pago']);
+                  });
+                  final valorPendente = (total - totalPagoReal).clamp(0.0, total);
+
+                  return Column(
+                    children: [
+                      ListTile(
+                        dense: true,
+                        leading: Container(
+                          width: 40,
+                          height: 40,
+                          decoration: BoxDecoration(
+                            color: Colors.green[50],
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(color: Colors.green.shade200),
+                          ),
+                          child: Center(
+                            child: Text(
+                              '#$id',
+                              style: TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.green[800],
+                              ),
+                            ),
+                          ),
+                        ),
+                        title: Text(
+                          'Valor pendente do pedido #$id é R\$ ${valorPendente.toStringAsFixed(2)}',
+                          style: const TextStyle(fontWeight: FontWeight.w600),
+                        ),
+                        subtitle: Text(data,
+                            style: const TextStyle(fontSize: 12)),
+                        trailing: ChipStatus(status: status),
+                        onTap: () async {
+                          await Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => TelaPedidos(
+                                clienteInicial: c,
+                                pedidoInicial: p,
+                              ),
+                            ),
+                          );
+                          if (mounted && _clienteSelecionado != null) {
+                            _carregarPedidosCliente(
+                                _clienteSelecionado!['nome'] as String? ?? '');
+                          }
+                        },
+                      ),
+                      if (p != pendentes.last) const Divider(height: 1),
+                    ],
+                  );
+                }).toList(),
+              ),
+            ),
+
+          const SizedBox(height: 12),
+          SizedBox(
+            width: double.infinity,
+            child: OutlinedButton.icon(
+              onPressed: () async {
+                await Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => TelaPedidos(clienteInicial: c),
+                  ),
+                );
+                if (mounted && _clienteSelecionado != null) {
+                  _carregarPedidosCliente(
+                      _clienteSelecionado!['nome'] as String? ?? '');
+                }
+              },
+              icon: const Icon(Icons.receipt_long_outlined),
+              label: const Text('Ver todos os pedidos'),
+            ),
+          ),
+
+          const SizedBox(height: 24),
+        ],
       ),
     );
   }
@@ -539,6 +718,9 @@ class _TelaListaClientesState extends State<TelaListaClientes> {
       ),
     );
   }
+
+  double _toDouble(dynamic v) =>
+      v == null ? 0.0 : double.tryParse(v.toString()) ?? 0.0;
 
   String _iniciais(String nome) {
     final partes = nome.trim().split(' ').where((p) => p.isNotEmpty).toList();

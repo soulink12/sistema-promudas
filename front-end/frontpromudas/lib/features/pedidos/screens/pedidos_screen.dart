@@ -8,7 +8,10 @@ import '../../../core/services/pdf_download_service.dart';
 
 
 class TelaPedidos extends StatefulWidget {
-  const TelaPedidos({super.key});
+  final Map<String, dynamic>? clienteInicial;
+  final Map<String, dynamic>? pedidoInicial;
+
+  const TelaPedidos({super.key, this.clienteInicial, this.pedidoInicial});
 
   @override
   State<TelaPedidos> createState() => _TelaPedidosState();
@@ -26,7 +29,15 @@ class _TelaPedidosState extends State<TelaPedidos> {
   @override
   void initState() {
     super.initState();
-    _carregarPedidos();
+    if (widget.clienteInicial != null) {
+      _clienteFiltro = widget.clienteInicial;
+      _carregarPedidos(widget.clienteInicial!['nome'] as String?);
+    } else {
+      _carregarPedidos();
+    }
+    if (widget.pedidoInicial != null) {
+      _pedidoSelecionado = widget.pedidoInicial;
+    }
   }
 
   Future<void> _carregarPedidos([String? clienteNome]) async {
