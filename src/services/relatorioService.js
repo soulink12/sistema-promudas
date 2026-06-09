@@ -260,4 +260,51 @@ const gerarRelatorioPDF = async ({ de, ate, forma }) => {
     });
 };
 
-module.exports = { relatorioPagamentos, gerarRelatorioPDF };
+const relatorioPedidos = async ({ de, ate, statusPagamento, statusRetirada, clienteId }) => {
+    const where = {
+        ativo: true,
+        ...(de || ate ? {
+            criado_em: {
+                ...(de && { gte: new Date(de) }),
+                ...(ate && { lte: new Date(ate) }),
+            }
+        } : {}),
+        ...(statusPagamento ? { status_pagamento: statusPagamento } : {}),
+        ...(statusRetirada ? { status_retirada: statusRetirada } : {}),
+        ...(clienteId ? { cliente_id: parseInt(clienteId) } : {}),
+    };
+
+    const pedidos = await prisma.pedidos.findMany({
+        where,
+        select: {
+            id: true,
+            valor_total: true,
+            status_pagamento: true,
+            status_retirada: true,
+            criado_em: true,
+            clientes: { select: { nome: true } },
+            _count: { select: { itens_pedido: true } },
+        },
+        orderBy: { criado_em: 'desc' },
+    });
+
+    const valorTotal = pedidos.reduce((s, p) => s + parseFloat(p.valor_total), 0);
+
+    const porStatusPagamento = { Pago: 0, Parcial: 0, Pendente: 0 };
+    pedidos.forEach(p => { porStatusPagamento[p.status_pagamento]++; });
+
+    return {
+        resumo: { total: pedidos.length, valorTotal, porStatusPagamento },
+        lista: pedidos.map(p => ({
+            id: p.id,
+            cliente: p.clientes?.nome ?? '—',
+            criado_em: p.criado_em,
+            valor_total: parseFloat(p.valor_total),
+            status_pagamento: p.status_pagamento,
+            status_retirada: p.status_retirada,
+            qtd_itens: p._count.itens_pedido,
+        })),
+    };
+};
+
+module.exports = { relatorioPagamentos, gerarRelatorioPDF, relatorioPedidos };

@@ -6,7 +6,7 @@ import '../../../core/services/carrinho_service.dart';
 import '../../auth/screens/login_screen.dart';
 import '../../clientes/screens/clientes_screen.dart';
 import '../../configuracoes/screens/configuracoes_screen.dart';
-import '../../relatorios/screens/relatorios_screen.dart';
+import '../../relatorios/screens/relatorios_hub_screen.dart';
 import '../../pedidos/screens/pedidos_screen.dart';
 import 'widgets/detalhes_app_bar.dart';
 import 'widgets/modal_busca_cliente.dart';
@@ -208,7 +208,7 @@ class _TelaVendaState extends State<TelaVenda> {
               Navigator.push(
                 context,
                 MaterialPageRoute(
-                    builder: (_) => const TelaRelatorios()),
+                    builder: (_) => const TelaRelatoriosHub()),
               );
             },
           ),

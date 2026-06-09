@@ -4,5 +4,6 @@ const relatorioController = require('../controllers/relatorioController');
 
 router.get('/pagamentos', relatorioController.relatorioPagamentos);
 router.get('/pagamentos/pdf', relatorioController.relatorioPDF);
+router.get('/pedidos', relatorioController.relatorioPedidos);
 
 module.exports = router;
