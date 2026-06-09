@@ -43,6 +43,9 @@ class _TelaVendaState extends State<TelaVenda> {
   // Bloqueia interações enquanto o pedido está sendo enviado à API
   bool _salvando = false;
 
+  // Total pago em pagamentos reais antes da edição (somente modo edição)
+  double _totalPagoReal = 0.0;
+
   @override
   void initState() {
     super.initState();
@@ -87,6 +90,11 @@ class _TelaVendaState extends State<TelaVenda> {
         ajuste < 0 ? 'Desconto' : 'Acréscimo',
       );
     }
+
+    final pagamentos = (pedido['pagamentos'] as List? ?? []);
+    _totalPagoReal = pagamentos
+        .where((p) => (p as Map)['pagamento_posterior'] != true)
+        .fold(0.0, (s, p) => s + _toDouble((p as Map)['valor_pago']));
   }
 
   @override
@@ -134,6 +142,7 @@ class _TelaVendaState extends State<TelaVenda> {
             padding: const EdgeInsets.all(16.0),
             child: Column(
               children: <Widget>[
+                if (modoEdicao) _buildBannerPagamento(),
                 Expanded(
                   child: FormularioVendaWidget(
                     carrinho: _carrinhoService.itens,
@@ -182,6 +191,54 @@ class _TelaVendaState extends State<TelaVenda> {
             const ModalBarrier(dismissible: false, color: Colors.black26),
             const Center(child: CircularProgressIndicator()),
           ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildBannerPagamento() {
+    if (_totalPagoReal < 0.01) return const SizedBox.shrink();
+    final novoTotal = _carrinhoService.totalComAjuste;
+    final diferenca = novoTotal - _totalPagoReal;
+    final cs = Theme.of(context).colorScheme;
+
+    final String label;
+    final Color corFundo;
+    final Color corTexto;
+
+    if (diferenca > 0.01) {
+      label = 'A receber: R\$ ${diferenca.toStringAsFixed(2)}';
+      corFundo = cs.primaryContainer;
+      corTexto = cs.onPrimaryContainer;
+    } else if (diferenca < -0.01) {
+      label = 'Crédito: R\$ ${(-diferenca).toStringAsFixed(2)}';
+      corFundo = cs.errorContainer;
+      corTexto = cs.onErrorContainer;
+    } else {
+      label = 'Pedido quitado';
+      corFundo = cs.secondaryContainer;
+      corTexto = cs.onSecondaryContainer;
+    }
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(
+        color: corFundo,
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Row(
+        children: [
+          Text(
+            'Já pago: R\$ ${_totalPagoReal.toStringAsFixed(2)}',
+            style: TextStyle(fontSize: 13, color: cs.onSurfaceVariant),
+          ),
+          const Spacer(),
+          Text(
+            label,
+            style: TextStyle(
+                fontSize: 13, fontWeight: FontWeight.w600, color: corTexto),
+          ),
         ],
       ),
     );
@@ -374,7 +431,7 @@ class _TelaVendaState extends State<TelaVenda> {
     final ajuste = _carrinhoService.ajuste;
 
     try {
-      await ApiService.dio.put('/pedidos/$pedidoId', data: {
+      final response = await ApiService.dio.put('/pedidos/$pedidoId', data: {
         'itens': itens
             .map((item) => {
                   'produto_id': item['id'],
@@ -385,13 +442,18 @@ class _TelaVendaState extends State<TelaVenda> {
         'ajuste': ajuste != 0.0 ? ajuste : null,
       });
 
+      final creditoGerado = _toDouble(response.data['creditoGerado']);
       setState(() => _salvando = false);
 
       if (mounted) {
+        final mensagem = creditoGerado > 0.01
+            ? 'Pedido atualizado. Crédito de R\$ ${creditoGerado.toStringAsFixed(2)} adicionado ao cliente.'
+            : 'Pedido atualizado com sucesso!';
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Pedido atualizado com sucesso!'),
-            backgroundColor: Colors.green,
+          SnackBar(
+            content: Text(mensagem),
+            backgroundColor: creditoGerado > 0.01 ? Colors.orange[800] : Colors.green,
+            duration: Duration(seconds: creditoGerado > 0.01 ? 5 : 3),
           ),
         );
         Navigator.pop(context);

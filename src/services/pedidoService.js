@@ -85,10 +85,20 @@ const atualizarPedido = async (id, dados) => {
         });
     }
 
-    const pedidoAtual = await prisma.pedidos.findUnique({
-        where: { id: parseInt(id) },
-        select: { ajuste: true },
-    });
+    const [pedidoAtual, formasPosteriores] = await Promise.all([
+        prisma.pedidos.findUnique({
+            where: { id: parseInt(id) },
+            select: {
+                ajuste: true,
+                cliente_id: true,
+                pagamentos: { select: { valor_pago: true, forma_pagamento: true } },
+            },
+        }),
+        prisma.formas_pagamento.findMany({
+            where: { pagamento_posterior: true },
+            select: { nome: true },
+        }),
+    ]);
 
     const ajuste = camposPedido.ajuste !== undefined
         ? Number(camposPedido.ajuste ?? 0)
@@ -99,13 +109,28 @@ const atualizarPedido = async (id, dados) => {
         0
     );
 
+    const nomesPosteriores = new Set(formasPosteriores.map(f => f.nome));
+    const totalPagoReal = (pedidoAtual?.pagamentos ?? [])
+        .filter(p => !nomesPosteriores.has(p.forma_pagamento))
+        .reduce((s, p) => s + parseFloat(p.valor_pago), 0);
+
+    const novoTotal = subtotal + ajuste;
+    const creditoGerado = Math.max(0, totalPagoReal - novoTotal);
+
+    if (creditoGerado > 0.01 && pedidoAtual?.cliente_id) {
+        await prisma.clientes.update({
+            where: { id: pedidoAtual.cliente_id },
+            data: { saldo_credito: { increment: creditoGerado } },
+        });
+    }
+
     await prisma.itens_pedido.deleteMany({ where: { pedido_id: parseInt(id) } });
 
     const resultado = await prisma.pedidos.update({
         where: { id: parseInt(id) },
         data: {
             ...camposPedido,
-            valor_total: subtotal + ajuste,
+            valor_total: novoTotal,
             itens_pedido: {
                 create: itens.map(item => ({
                     produto_id: parseInt(item.produto_id),
@@ -123,7 +148,7 @@ const atualizarPedido = async (id, dados) => {
 
     await recalcularStatusPedido(id);
 
-    return resultado;
+    return { ...resultado, creditoGerado };
 };
 
 const buscarPedido = async (id) => {

@@ -130,6 +130,22 @@ class DetalhesPedido extends StatelessWidget {
                                   color: Colors.orange[800]),
                             ),
                           ],
+                          if (totalPagoReal > total + 0.01) ...[
+                            const SizedBox(height: 4),
+                            Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(Icons.info_outline,
+                                    size: 14, color: Colors.amber[800]),
+                                const SizedBox(width: 4),
+                                Text(
+                                  'Crédito de R\$ ${(totalPagoReal - total).toStringAsFixed(2)} adicionado ao cliente.',
+                                  style: TextStyle(
+                                      fontSize: 12, color: Colors.amber[800]),
+                                ),
+                              ],
+                            ),
+                          ],
                         ],
                       ),
                     ],

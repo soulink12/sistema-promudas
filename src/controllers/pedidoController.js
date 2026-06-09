@@ -48,7 +48,7 @@ const listarPedidos = async (req, res) => {
 const atualizarPedido = async (req, res) => {
     try {
         const pedido = await pedidoService.atualizarPedido(req.params.id, req.body);
-        res.json(pedido);
+        res.json({ ...pedido, creditoGerado: pedido.creditoGerado ?? 0 });
     } catch (error) {
         console.error('Erro ao atualizar pedido:', error);
         res.status(error.status || 500).json({ erro: error.message || 'Erro ao atualizar pedido.' });

@@ -19,6 +19,7 @@ model clientes {
   bairro             String?   @db.VarChar(100)
   cidade             String?   @db.VarChar(100)
   estado             String?   @default("PA") @db.VarChar(2)
+  saldo_credito      Decimal?  @default(0) @db.Decimal(10, 2)
   ativo              Boolean?  @default(true)
   criado_em          DateTime? @default(now()) @db.Timestamp(0)
   pedidos            pedidos[]
