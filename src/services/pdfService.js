@@ -104,16 +104,22 @@ const gerarPedidoPDF = async (pedidoId) => {
         doc.fillColor('black');
         doc.moveDown(0.2);
         doc.font('Helvetica-Bold').fontSize(11).text(pedido.clientes.nome);
-        if (pedido.clientes.cpf_cnpj) {
-            doc.font('Helvetica').fontSize(9).fillColor('#555555')
-                .text(`CPF/CNPJ: ${pedido.clientes.cpf_cnpj}`);
-            doc.fillColor('black');
+
+        const c = pedido.clientes;
+        doc.font('Helvetica').fontSize(9).fillColor('#555555');
+
+        if (c.cpf_cnpj) doc.text(`CPF/CNPJ: ${c.cpf_cnpj}`);
+        if (c.telefone_1) doc.text(`Telefone: ${c.telefone_1}`);
+
+        // Endereço — monta apenas com os campos preenchidos
+        if (c.logradouro) {
+            const linha1 = [c.logradouro, c.numero].filter(Boolean).join(', ');
+            const linha2Parts = [c.bairro, c.cidade && c.estado ? `${c.cidade}/${c.estado}` : (c.cidade || c.estado), c.cep].filter(Boolean);
+            doc.text(linha1);
+            if (linha2Parts.length > 0) doc.text(linha2Parts.join(' — '));
         }
-        if (pedido.clientes.telefone_1) {
-            doc.font('Helvetica').fontSize(9).fillColor('#555555')
-                .text(`Telefone: ${pedido.clientes.telefone_1}`);
-            doc.fillColor('black');
-        }
+
+        doc.fillColor('black');
         doc.moveDown(0.8);
 
         // ── ITENS ───────────────────────────────────────────────────────────────
