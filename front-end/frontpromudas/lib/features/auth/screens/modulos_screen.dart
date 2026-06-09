@@ -1,0 +1,139 @@
+import 'package:flutter/material.dart';
+import '../../../core/services/auth_service.dart';
+import '../../vendas/screens/venda_screen.dart';
+import '../../retiradas/screens/retirada_screen.dart';
+import 'login_screen.dart';
+
+class TelaModulos extends StatelessWidget {
+  const TelaModulos({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final nomeUsuario = AuthService.usuario?['nome'] as String? ?? 'Usuário';
+    final cs = Theme.of(context).colorScheme;
+
+    return Scaffold(
+      backgroundColor: cs.surfaceContainerLow,
+      body: SafeArea(
+        child: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(Icons.eco_outlined, size: 56, color: cs.primary),
+              const SizedBox(height: 10),
+              Text(
+                'Sistema Promudas',
+                style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                  fontWeight: FontWeight.bold,
+                  color: cs.onSurface,
+                ),
+              ),
+              const SizedBox(height: 6),
+              Text(
+                'Bem-vindo, $nomeUsuario',
+                style: TextStyle(color: cs.onSurfaceVariant, fontSize: 14),
+              ),
+              const SizedBox(height: 48),
+              ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 560),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 24),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: _CardModulo(
+                          icon: Icons.point_of_sale,
+                          titulo: 'PDV',
+                          descricao: 'Registrar vendas e pedidos',
+                          onTap: () => Navigator.push(
+                            context,
+                            MaterialPageRoute(builder: (_) => const TelaVenda()),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: _CardModulo(
+                          icon: Icons.inventory_2_outlined,
+                          titulo: 'Retiradas',
+                          descricao: 'Registrar retiradas de produtos',
+                          onTap: () => Navigator.push(
+                            context,
+                            MaterialPageRoute(builder: (_) => const TelaRetiradas()),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 48),
+              TextButton.icon(
+                onPressed: () {
+                  AuthService.logout();
+                  Navigator.pushReplacement(
+                    context,
+                    MaterialPageRoute(builder: (_) => const TelaLogin()),
+                  );
+                },
+                icon: const Icon(Icons.logout, size: 16),
+                label: const Text('Sair'),
+                style: TextButton.styleFrom(foregroundColor: cs.onSurfaceVariant),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _CardModulo extends StatelessWidget {
+  final IconData icon;
+  final String titulo;
+  final String descricao;
+  final VoidCallback onTap;
+
+  const _CardModulo({
+    required this.icon,
+    required this.titulo,
+    required this.descricao,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+
+    return Card(
+      elevation: 2,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(12),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 36, horizontal: 20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(icon, size: 52, color: cs.primary),
+              const SizedBox(height: 14),
+              Text(
+                titulo,
+                style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                  fontWeight: FontWeight.bold,
+                  color: cs.onSurface,
+                ),
+              ),
+              const SizedBox(height: 6),
+              Text(
+                descricao,
+                textAlign: TextAlign.center,
+                style: TextStyle(color: cs.onSurfaceVariant, fontSize: 13),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}

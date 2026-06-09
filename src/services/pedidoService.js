@@ -50,6 +50,9 @@ const listarPedidos = async (filtros = {}) => {
                         criado_em: true,
                     },
                     orderBy: { criado_em: 'asc' }
+                },
+                retiradas: {
+                    include: { itens_retirada: true }
                 }
             }
         }),

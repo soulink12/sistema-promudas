@@ -2,7 +2,7 @@ import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import '../../../core/services/api_service.dart';
 import '../../../core/services/auth_service.dart';
-import '../../vendas/screens/venda_screen.dart';
+import 'modulos_screen.dart';
 
 class TelaLogin extends StatefulWidget {
   const TelaLogin({super.key});
@@ -44,7 +44,7 @@ class _TelaLoginState extends State<TelaLogin> {
       if (mounted) {
         Navigator.pushReplacement(
           context,
-          MaterialPageRoute(builder: (_) => const TelaVenda()),
+          MaterialPageRoute(builder: (_) => const TelaModulos()),
         );
       }
     } on DioException catch (e) {

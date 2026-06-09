@@ -171,6 +171,15 @@ class _TelaVendaState extends State<TelaVenda> {
             ),
           ),
           ListTile(
+            leading: const Icon(Icons.apps),
+            title: const Text('Trocar Módulo'),
+            onTap: () {
+              Navigator.pop(context); // fecha drawer
+              Navigator.pop(context); // volta para TelaModulos
+            },
+          ),
+          const Divider(height: 1),
+          ListTile(
             leading: const Icon(Icons.point_of_sale),
             title: const Text('PDV'),
             selected: true,
