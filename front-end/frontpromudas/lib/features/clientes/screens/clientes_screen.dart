@@ -20,6 +20,21 @@ class _TelaListaClientesState extends State<TelaListaClientes> {
   // Impede que a mudança programática do campo de busca limpe a seleção
   bool _atualizandoProgramaticamente = false;
 
+  bool _editando = false;
+  bool _salvandoEdicao = false;
+  final _formEdicaoKey = GlobalKey<FormState>();
+  final _editNome = TextEditingController();
+  final _editCpf = TextEditingController();
+  final _editInscricao = TextEditingController();
+  final _editTel1 = TextEditingController();
+  final _editTel2 = TextEditingController();
+  final _editCep = TextEditingController();
+  final _editLogradouro = TextEditingController();
+  final _editNumero = TextEditingController();
+  final _editBairro = TextEditingController();
+  final _editCidade = TextEditingController();
+  final _editEstado = TextEditingController();
+
   @override
   void initState() {
     super.initState();
@@ -29,6 +44,12 @@ class _TelaListaClientesState extends State<TelaListaClientes> {
   @override
   void dispose() {
     _buscaController.dispose();
+    for (final c in [
+      _editNome, _editCpf, _editInscricao, _editTel1, _editTel2,
+      _editCep, _editLogradouro, _editNumero, _editBairro, _editCidade, _editEstado,
+    ]) {
+      c.dispose();
+    }
     super.dispose();
   }
 
@@ -69,6 +90,7 @@ class _TelaListaClientesState extends State<TelaListaClientes> {
     _atualizandoProgramaticamente = true;
     setState(() {
       _clienteSelecionado = cliente;
+      _editando = false;
       _buscaController.text = cliente['nome'] as String? ?? '';
       _textoBusca = '';
     });
@@ -78,9 +100,97 @@ class _TelaListaClientesState extends State<TelaListaClientes> {
   void _limparSelecao() {
     setState(() {
       _clienteSelecionado = null;
+      _editando = false;
       _buscaController.clear();
       _textoBusca = '';
     });
+  }
+
+  void _iniciarEdicao() {
+    final c = _clienteSelecionado!;
+    _editNome.text = c['nome'] as String? ?? '';
+    _editCpf.text = c['cpf_cnpj'] as String? ?? '';
+    _editInscricao.text = c['inscricao_estadual'] as String? ?? '';
+    _editTel1.text = c['telefone_1'] as String? ?? '';
+    _editTel2.text = c['telefone_2'] as String? ?? '';
+    _editCep.text = c['cep'] as String? ?? '';
+    _editLogradouro.text = c['logradouro'] as String? ?? '';
+    _editNumero.text = c['numero'] as String? ?? '';
+    _editBairro.text = c['bairro'] as String? ?? '';
+    _editCidade.text = c['cidade'] as String? ?? '';
+    _editEstado.text = c['estado'] as String? ?? 'PA';
+    setState(() => _editando = true);
+  }
+
+  Future<void> _salvarEdicao() async {
+    if (!_formEdicaoKey.currentState!.validate()) return;
+
+    final confirmado = await showDialog<bool>(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text('Confirmar edição'),
+        content: Text(
+            'Deseja salvar as alterações do cliente "${_editNome.text.trim()}"?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancelar'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Confirmar'),
+          ),
+        ],
+      ),
+    );
+    if (confirmado != true) return;
+
+    setState(() => _salvandoEdicao = true);
+    try {
+      final id = _clienteSelecionado!['id'];
+      final body = <String, dynamic>{'nome': _editNome.text.trim()};
+      void add(String key, TextEditingController ctrl) {
+        body[key] = ctrl.text.trim().isNotEmpty ? ctrl.text.trim() : null;
+      }
+      add('cpf_cnpj', _editCpf);
+      add('inscricao_estadual', _editInscricao);
+      add('telefone_1', _editTel1);
+      add('telefone_2', _editTel2);
+      add('cep', _editCep);
+      add('logradouro', _editLogradouro);
+      add('numero', _editNumero);
+      add('bairro', _editBairro);
+      add('cidade', _editCidade);
+      add('estado', _editEstado);
+
+      final response = await ApiService.dio.put('/clientes/$id', data: body);
+      final atualizado =
+          Map<String, dynamic>.from(response.data as Map);
+      setState(() {
+        _clienteSelecionado = atualizado;
+        _editando = false;
+        _salvandoEdicao = false;
+      });
+      _carregarClientes();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Cliente atualizado com sucesso!'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+    } catch (_) {
+      setState(() => _salvandoEdicao = false);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Erro ao atualizar cliente. Tente novamente.'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
   }
 
   @override
@@ -129,7 +239,9 @@ class _TelaListaClientesState extends State<TelaListaClientes> {
                 : _erroCarregamento != null
                     ? _buildErro()
                     : _clienteSelecionado != null
-                        ? _buildDetalhes(_clienteSelecionado!)
+                        ? (_editando
+                            ? _buildFormEdicao()
+                            : _buildDetalhes(_clienteSelecionado!))
                         : _buildLista(),
           ),
         ],
@@ -249,6 +361,11 @@ class _TelaListaClientesState extends State<TelaListaClientes> {
                       ],
                     ),
                   ),
+                  IconButton(
+                    icon: const Icon(Icons.edit_outlined),
+                    tooltip: 'Editar cliente',
+                    onPressed: _iniciarEdicao,
+                  ),
                 ],
               ),
               const Divider(height: 32),
@@ -276,6 +393,106 @@ class _TelaListaClientesState extends State<TelaListaClientes> {
             ],
           ),
         ),
+      ),
+    );
+  }
+
+  Widget _buildFormEdicao() {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(16),
+      child: Card(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Form(
+            key: _formEdicaoKey,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    const Expanded(
+                      child: Text('Editar Cliente',
+                          style: TextStyle(
+                              fontSize: 18, fontWeight: FontWeight.bold)),
+                    ),
+                    TextButton(
+                      onPressed: _salvandoEdicao
+                          ? null
+                          : () => setState(() => _editando = false),
+                      child: const Text('Cancelar'),
+                    ),
+                    const SizedBox(width: 8),
+                    FilledButton(
+                      onPressed: _salvandoEdicao ? null : _salvarEdicao,
+                      child: _salvandoEdicao
+                          ? const SizedBox(
+                              width: 18,
+                              height: 18,
+                              child: CircularProgressIndicator(
+                                  strokeWidth: 2, color: Colors.white),
+                            )
+                          : const Text('Salvar'),
+                    ),
+                  ],
+                ),
+                const Divider(height: 24),
+                _campoEdicao(_editNome, 'Nome *', obrigatorio: true),
+                _subtituloEdicao('Identificação'),
+                _campoEdicao(_editCpf, 'CPF / CNPJ'),
+                _campoEdicao(_editInscricao, 'Inscrição Estadual'),
+                _subtituloEdicao('Contato'),
+                _campoEdicao(_editTel1, 'Telefone'),
+                _campoEdicao(_editTel2, 'Telefone 2'),
+                _subtituloEdicao('Endereço'),
+                Row(children: [
+                  Expanded(flex: 2, child: _campoEdicao(_editCep, 'CEP')),
+                  const SizedBox(width: 12),
+                  Expanded(flex: 3, child: _campoEdicao(_editEstado, 'Estado')),
+                ]),
+                _campoEdicao(_editLogradouro, 'Logradouro'),
+                Row(children: [
+                  Expanded(flex: 3, child: _campoEdicao(_editBairro, 'Bairro')),
+                  const SizedBox(width: 12),
+                  Expanded(flex: 1, child: _campoEdicao(_editNumero, 'Número')),
+                ]),
+                _campoEdicao(_editCidade, 'Cidade'),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _subtituloEdicao(String texto) {
+    return Padding(
+      padding: const EdgeInsets.only(top: 12, bottom: 8),
+      child: Text(
+        texto.toUpperCase(),
+        style: TextStyle(
+            fontSize: 11,
+            fontWeight: FontWeight.bold,
+            color: Colors.grey[600],
+            letterSpacing: 0.8),
+      ),
+    );
+  }
+
+  Widget _campoEdicao(TextEditingController controller, String label,
+      {bool obrigatorio = false}) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: TextFormField(
+        controller: controller,
+        decoration: InputDecoration(
+          labelText: label,
+          border: const OutlineInputBorder(),
+          isDense: true,
+        ),
+        validator: obrigatorio
+            ? (v) =>
+                (v == null || v.trim().isEmpty) ? 'Campo obrigatório' : null
+            : null,
       ),
     );
   }
