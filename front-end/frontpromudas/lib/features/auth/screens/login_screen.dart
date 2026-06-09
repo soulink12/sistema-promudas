@@ -64,7 +64,7 @@ class _TelaLoginState extends State<TelaLogin> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.green[50],
+      backgroundColor: Theme.of(context).colorScheme.surfaceContainerLow,
       body: Center(
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 380),
@@ -89,7 +89,7 @@ class _TelaLoginState extends State<TelaLogin> {
                           .headlineSmall
                           ?.copyWith(
                             fontWeight: FontWeight.bold,
-                            color: Colors.green[800],
+                            color: Theme.of(context).colorScheme.primary,
                           ),
                     ),
                     const SizedBox(height: 32),

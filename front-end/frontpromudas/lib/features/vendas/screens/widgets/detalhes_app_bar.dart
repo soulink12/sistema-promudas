@@ -54,16 +54,17 @@ class DetalhesAppBar extends StatelessWidget {
                   isVendaDireta
                       ? 'Venda Direta / Balcão'
                       : 'ID: ${clienteSelecionado!['id']} • CPF: ${clienteSelecionado!['cpf']} • Tel: ${clienteSelecionado!['telefone']}',
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 13,
                     fontWeight: FontWeight.normal,
-                    color: Colors.black87,
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
                   ),
                 ),
               ],
             ),
             const SizedBox(width: 10),
-            Icon(Icons.search, size: 20, color: Colors.black54),
+            Icon(Icons.search, size: 20,
+                color: Theme.of(context).colorScheme.onSurfaceVariant),
           ],
         ),
       ),

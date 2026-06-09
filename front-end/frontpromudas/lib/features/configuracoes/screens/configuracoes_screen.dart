@@ -14,7 +14,6 @@ class _TelaConfiguracoesState extends State<TelaConfiguracoes> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Configurações'),
-        backgroundColor: Colors.green[100],
       ),
       body: ListView(
         children: [

@@ -68,7 +68,6 @@ class _TelaVendaState extends State<TelaVenda> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        backgroundColor: Colors.green[100],
         titleSpacing: 8,
         title: DetalhesAppBar(
           clienteSelecionado: _clienteSelecionado,

@@ -198,7 +198,6 @@ class _TelaListaClientesState extends State<TelaListaClientes> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Clientes'),
-        backgroundColor: Colors.green[100],
       ),
       floatingActionButton: FloatingActionButton(
         onPressed: _abrirFormCadastro,
