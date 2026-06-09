@@ -1,3 +1,7 @@
+import 'dart:io';
+import 'dart:typed_data';
+import 'package:dio/dio.dart';
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import '../../../core/services/api_service.dart';
 
@@ -18,6 +22,7 @@ class _TelaRelatoriosState extends State<TelaRelatorios> {
   double _totalGeral = 0;
   bool _carregando = false;
   bool _carregandoFormas = true;
+  bool _baixandoPdf = false;
 
   @override
   void initState() {
@@ -84,6 +89,50 @@ class _TelaRelatoriosState extends State<TelaRelatorios> {
           ),
         );
       }
+    }
+  }
+
+  Future<void> _baixarPdf() async {
+    setState(() => _baixandoPdf = true);
+    try {
+      final params = <String, dynamic>{};
+      if (_de != null) params['de'] = _de!.toIso8601String();
+      if (_ate != null) {
+        final ateFinaldoDia =
+            DateTime(_ate!.year, _ate!.month, _ate!.day, 23, 59, 59);
+        params['ate'] = ateFinaldoDia.toIso8601String();
+      }
+      if (_formaSelecionada != null) params['forma'] = _formaSelecionada;
+
+      final response = await ApiService.dio.get(
+        '/relatorios/pagamentos/pdf',
+        queryParameters: params,
+        options: Options(responseType: ResponseType.bytes),
+      );
+
+      final bytes = Uint8List.fromList(response.data as List<int>);
+
+      final caminho = await FilePicker.platform.saveFile(
+        dialogTitle: 'Salvar relatório de pagamentos',
+        fileName: 'relatorio_pagamentos.pdf',
+        type: FileType.custom,
+        allowedExtensions: ['pdf'],
+      );
+
+      if (caminho == null) return;
+      await File(caminho).writeAsBytes(bytes);
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Não foi possível gerar o PDF do relatório.'),
+            backgroundColor: Colors.red,
+            duration: Duration(seconds: 3),
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _baixandoPdf = false);
     }
   }
 
@@ -216,34 +265,63 @@ class _TelaRelatoriosState extends State<TelaRelatorios> {
           if (_resultado != null) ...[
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
-              child: Card(
-                color: Colors.green[700],
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: 20, vertical: 14),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      const Text(
-                        'TOTAL GERAL',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontWeight: FontWeight.bold,
-                          letterSpacing: 0.8,
-                          fontSize: 13,
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  Expanded(
+                    child: Card(
+                      color: Colors.green[700],
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 20, vertical: 14),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            const Text(
+                              'TOTAL GERAL',
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.bold,
+                                letterSpacing: 0.8,
+                                fontSize: 13,
+                              ),
+                            ),
+                            Text(
+                              'R\$ ${_totalGeral.toStringAsFixed(2)}',
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.bold,
+                                fontSize: 20,
+                              ),
+                            ),
+                          ],
                         ),
                       ),
-                      Text(
-                        'R\$ ${_totalGeral.toStringAsFixed(2)}',
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontWeight: FontWeight.bold,
-                          fontSize: 20,
-                        ),
-                      ),
-                    ],
+                    ),
                   ),
-                ),
+                  const SizedBox(width: 8),
+                  _baixandoPdf
+                      ? const SizedBox(
+                          width: 48,
+                          height: 48,
+                          child: Center(
+                            child: SizedBox(
+                              width: 24,
+                              height: 24,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            ),
+                          ),
+                        )
+                      : IconButton.filled(
+                          onPressed: _baixarPdf,
+                          tooltip: 'Exportar PDF',
+                          style: IconButton.styleFrom(
+                            backgroundColor: Colors.green[800],
+                            foregroundColor: Colors.white,
+                          ),
+                          icon: const Icon(Icons.picture_as_pdf),
+                        ),
+                ],
               ),
             ),
             if (_resultado!.isEmpty)
