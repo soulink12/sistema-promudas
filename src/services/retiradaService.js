@@ -1,4 +1,5 @@
 const prisma = require('../config/database');
+const BusinessError = require('../utils/BusinessError');
 
 // Recalcula o status de retirada do pedido comparando o total pedido com o total já retirado
 const recalcularStatusRetirada = async (pedido_id) => {
@@ -52,11 +53,11 @@ const criarRetirada = async (dadosRetirada) => {
     });
 
     if (!pedido) {
-        throw new Error('Pedido não encontrado.');
+        throw new BusinessError('Pedido não encontrado.', 404);
     }
 
     if (pedido.ativo === false) {
-        throw new Error('Não é possível registrar retiradas para um pedido desativado ou cancelado.');
+        throw new BusinessError('Não é possível registrar retiradas para um pedido desativado ou cancelado.');
     }
 
     // Validação de saldo por produto
@@ -66,7 +67,7 @@ const criarRetirada = async (dadosRetirada) => {
 
         const itemPedido = pedido.itens_pedido.find(i => i.produto_id === produtoId);
         if (!itemPedido) {
-            throw new Error(`Operação bloqueada: o produto ID ${produtoId} não faz parte deste pedido.`);
+            throw new BusinessError(`Operação bloqueada: o produto ID ${produtoId} não faz parte deste pedido.`);
         }
 
         let totalJaRetirado = 0;
@@ -78,7 +79,7 @@ const criarRetirada = async (dadosRetirada) => {
         const saldoRestante = itemPedido.quantidade - totalJaRetirado;
 
         if (qtdSaindoAgora > saldoRestante) {
-            throw new Error(`Saldo insuficiente para o produto ID ${produtoId}. Restam ${saldoRestante} unidades (tentativa: ${qtdSaindoAgora}).`);
+            throw new BusinessError(`Saldo insuficiente para o produto ID ${produtoId}. Restam ${saldoRestante} unidades (tentativa: ${qtdSaindoAgora}).`);
         }
     }
 
@@ -128,7 +129,7 @@ const atualizarRetirada = async (id, dados) => {
     });
 
     if (!retiradaOriginal) {
-        throw new Error('Retirada não encontrada.');
+        throw new BusinessError('Retirada não encontrada.', 404);
     }
 
     const { itens, ...dadosPrincipais } = dados;
@@ -159,13 +160,13 @@ const atualizarRetirada = async (id, dados) => {
             const totalPedido = itemPedido ? itemPedido.quantidade : 0;
 
             if (totalPedido === 0) {
-                throw new Error(`O produto ID ${novoItem.produto_id} não faz parte deste pedido.`);
+                throw new BusinessError(`O produto ID ${novoItem.produto_id} não faz parte deste pedido.`);
             }
 
             const saldoDisponivel = totalPedido - (jaRetirado[novoItem.produto_id] || 0);
 
             if (novoItem.quantidade > saldoDisponivel) {
-                throw new Error(`Saldo insuficiente para o produto ID ${novoItem.produto_id}. Máximo permitido: ${saldoDisponivel}.`);
+                throw new BusinessError(`Saldo insuficiente para o produto ID ${novoItem.produto_id}. Máximo permitido: ${saldoDisponivel}.`);
             }
         }
     }
@@ -198,7 +199,7 @@ const eliminarRetirada = async (id) => {
     });
 
     if (!retirada) {
-        throw new Error('Retirada não encontrada.');
+        throw new BusinessError('Retirada não encontrada.', 404);
     }
 
     const resultado = await prisma.retiradas.delete({

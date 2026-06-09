@@ -1,4 +1,5 @@
 const prisma = require('../config/database');
+const BusinessError = require('../utils/BusinessError');
 
 // Recalcula o status de pagamento do pedido com base na soma real dos pagamentos no banco.
 // Pagamentos com forma de pagamento posterior (ex: crediário) não contam como valor recebido.
@@ -55,11 +56,11 @@ const criarPagamento = async (dadosPagamento) => {
     ]);
 
     if (!pedido) {
-        throw new Error('Pedido não encontrado.');
+        throw new BusinessError('Pedido não encontrado.', 404);
     }
 
     if (pedido.ativo === false) {
-        throw new Error('Não é possível registrar pagamentos para um pedido desativado ou cancelado.');
+        throw new BusinessError('Não é possível registrar pagamentos para um pedido desativado ou cancelado.');
     }
 
     const valorTotal = parseFloat(pedido.valor_total);
@@ -72,10 +73,10 @@ const criarPagamento = async (dadosPagamento) => {
             .reduce((soma, p) => soma + parseFloat(p.valor_pago), 0);
         const saldoNaoCoberto = valorTotal - totalCoberto;
         if (saldoNaoCoberto <= 0) {
-            throw new Error('Este pedido já está totalmente coberto.');
+            throw new BusinessError('Este pedido já está totalmente coberto.');
         }
         if (parseFloat(valor_pago) > (saldoNaoCoberto + 0.01)) {
-            throw new Error(`Valor excede o saldo disponível. O máximo é R$ ${saldoNaoCoberto.toFixed(2)}.`);
+            throw new BusinessError(`Valor excede o saldo disponível. O máximo é R$ ${saldoNaoCoberto.toFixed(2)}.`);
         }
     } else {
         // Pagamento real: verifica apenas contra pagamentos reais anteriores
@@ -84,10 +85,10 @@ const criarPagamento = async (dadosPagamento) => {
             .reduce((soma, p) => soma + parseFloat(p.valor_pago), 0);
         const saldoDevedorReal = valorTotal - totalPagoReal;
         if (saldoDevedorReal <= 0) {
-            throw new Error('Este pedido já está totalmente pago.');
+            throw new BusinessError('Este pedido já está totalmente pago.');
         }
         if (parseFloat(valor_pago) > (saldoDevedorReal + 0.01)) {
-            throw new Error(`Valor excede o saldo devedor. O máximo permitido é R$ ${saldoDevedorReal.toFixed(2)}.`);
+            throw new BusinessError(`Valor excede o saldo devedor. O máximo permitido é R$ ${saldoDevedorReal.toFixed(2)}.`);
         }
     }
 
@@ -128,7 +129,7 @@ const atualizarPagamento = async (id, dados) => {
     });
 
     if (!pagamentoAtual) {
-        throw new Error('Pagamento não encontrado.');
+        throw new BusinessError('Pagamento não encontrado.', 404);
     }
 
     if (dados.valor_pago !== undefined) {
@@ -143,7 +144,7 @@ const atualizarPagamento = async (id, dados) => {
         const saldoPermitido = parseFloat(pedido.valor_total) - totalPagoOutros;
 
         if (novoValorPago > (saldoPermitido + 0.01)) {
-            throw new Error(`Valor excede o saldo devedor. O máximo permitido para esta edição é R$ ${saldoPermitido.toFixed(2)}.`);
+            throw new BusinessError(`Valor excede o saldo devedor. O máximo permitido para esta edição é R$ ${saldoPermitido.toFixed(2)}.`);
         }
     }
 
@@ -163,7 +164,7 @@ const eliminarPagamento = async (id) => {
     });
 
     if (!pagamento) {
-        throw new Error('Pagamento não encontrado.');
+        throw new BusinessError('Pagamento não encontrado.', 404);
     }
 
     const resultado = await prisma.pagamentos.delete({

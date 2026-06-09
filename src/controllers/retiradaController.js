@@ -6,7 +6,7 @@ const criarRetirada = async (req, res) => {
         res.status(201).json({ mensagem: 'Retirada criada com sucesso', id });
     } catch (erro) {
         console.error(erro);
-        res.status(500).json({ erro: 'Erro ao criar retirada', detalhe: erro.message });
+        res.status(erro.status || 500).json({ erro: erro.message || 'Erro ao criar retirada' });
     }
 };
 
@@ -16,7 +16,7 @@ const listarRetiradas = async (req, res) => {
         res.status(200).json(retiradas);
     } catch (erro) {
         console.error(erro);
-        res.status(500).json({ erro: 'Erro ao listar retiradas', detalhe: erro.message });
+        res.status(500).json({ erro: 'Erro ao listar retiradas' });
     }
 };
 
@@ -27,7 +27,7 @@ const atualizarRetirada = async (req, res) => {
         res.status(200).json({ mensagem: 'Retirada atualizada com sucesso' });
     } catch (erro) {
         console.error(erro);
-        res.status(500).json({ erro: 'Erro ao atualizar retirada', detalhe: erro.message });
+        res.status(erro.status || 500).json({ erro: erro.message || 'Erro ao atualizar retirada' });
     }
 };
 
@@ -38,7 +38,7 @@ const eliminarRetirada = async (req, res) => {
         res.status(200).json({ mensagem: 'Retirada apagada com sucesso' });
     } catch (erro) {
         console.error(erro);
-        res.status(500).json({ erro: 'Erro ao apagar retirada', detalhe: erro.message });
+        res.status(erro.status || 500).json({ erro: erro.message || 'Erro ao apagar retirada' });
     }
 };
 

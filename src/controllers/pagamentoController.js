@@ -6,7 +6,7 @@ const criarPagamento = async (req, res) => {
         res.status(201).json({ mensagem: 'Pagamento criado com sucesso', id });
     } catch (erro) {
         console.error(erro);
-        res.status(500).json({ erro: 'Erro ao criar pagamento', detalhe: erro.message });
+        res.status(erro.status || 500).json({ erro: erro.message || 'Erro ao criar pagamento' });
     }
 };
 
@@ -16,7 +16,7 @@ const listarPagamentos = async (req, res) => {
         res.status(200).json(pagamentos);
     } catch (erro) {
         console.error(erro);
-        res.status(500).json({ erro: 'Erro ao listar pagamentos', detalhe: erro.message });
+        res.status(500).json({ erro: 'Erro ao listar pagamentos' });
     }
 };
 
@@ -28,7 +28,7 @@ const atualizarPagamento = async (req, res) => {
         res.status(200).json({ mensagem: 'Pagamento atualizado com sucesso' });
     } catch (erro) {
         console.error(erro);
-        res.status(500).json({ erro: 'Erro ao atualizar pagamento', detalhe: erro.message });
+        res.status(erro.status || 500).json({ erro: erro.message || 'Erro ao atualizar pagamento' });
     }
 };
 
@@ -39,7 +39,7 @@ const eliminarPagamento = async (req, res) => {
         res.status(200).json({ mensagem: 'Pagamento apagado com sucesso' });
     } catch (erro) {
         console.error(erro);
-        res.status(500).json({ erro: 'Erro ao apagar pagamento', detalhe: erro.message });
+        res.status(erro.status || 500).json({ erro: erro.message || 'Erro ao apagar pagamento' });
     }
 };
 
