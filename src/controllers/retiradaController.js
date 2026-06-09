@@ -1,8 +1,8 @@
-const entregaService = require('../services/entregaService');
+const retiradaService = require('../services/retiradaService');
 
 const criarRetirada = async (req, res) => {
     try {
-        const id = await entregaService.criarRetirada(req.body);
+        const id = await retiradaService.criarRetirada(req.body);
         res.status(201).json({ mensagem: 'Retirada criada com sucesso', id });
     } catch (erro) {
         console.error(erro);
@@ -12,7 +12,7 @@ const criarRetirada = async (req, res) => {
 
 const listarRetiradas = async (req, res) => {
     try {
-        const retiradas = await entregaService.listarRetiradas();
+        const retiradas = await retiradaService.listarRetiradas();
         res.status(200).json(retiradas);
     } catch (erro) {
         console.error(erro);
@@ -23,7 +23,7 @@ const listarRetiradas = async (req, res) => {
 const atualizarRetirada = async (req, res) => {
     try {
         const { id } = req.params;
-        await entregaService.atualizarRetirada(id, req.body);
+        await retiradaService.atualizarRetirada(id, req.body);
         res.status(200).json({ mensagem: 'Retirada atualizada com sucesso' });
     } catch (erro) {
         console.error(erro);
@@ -34,7 +34,7 @@ const atualizarRetirada = async (req, res) => {
 const eliminarRetirada = async (req, res) => {
     try {
         const { id } = req.params;
-        await entregaService.eliminarRetirada(id);
+        await retiradaService.eliminarRetirada(id);
         res.status(200).json({ mensagem: 'Retirada apagada com sucesso' });
     } catch (erro) {
         console.error(erro);

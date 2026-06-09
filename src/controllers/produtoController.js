@@ -1,4 +1,4 @@
-const variedadeService = require('../services/variedadeService');
+const produtoService = require('../services/produtoService');
 
 const criarProduto = async (req, res) => {
     try {
@@ -8,7 +8,7 @@ const criarProduto = async (req, res) => {
             return res.status(400).json({ erro: 'Nome e preço do produto são obrigatórios.' });
         }
 
-        const novoId = await variedadeService.criarProduto(dados);
+        const novoId = await produtoService.criarProduto(dados);
         return res.status(201).json({ mensagem: 'Produto cadastrado com sucesso!', id: novoId });
 
     } catch (error) {
@@ -19,7 +19,7 @@ const criarProduto = async (req, res) => {
 
 const listarProdutos = async (req, res) => {
     try {
-        const produtos = await variedadeService.listarProdutos();
+        const produtos = await produtoService.listarProdutos();
         return res.status(200).json(produtos);
     } catch (error) {
         console.error('Erro ao buscar produtos:', error);
@@ -29,7 +29,7 @@ const listarProdutos = async (req, res) => {
 
 const atualizarProduto = async (req, res) => {
     try {
-        const produto = await variedadeService.atualizarProduto(req.params.id, req.body);
+        const produto = await produtoService.atualizarProduto(req.params.id, req.body);
         res.json(produto);
     } catch (error) {
         res.status(500).json({ erro: 'Erro ao atualizar produto.' });
@@ -38,7 +38,7 @@ const atualizarProduto = async (req, res) => {
 
 const eliminarProduto = async (req, res) => {
     try {
-        await variedadeService.eliminarProduto(req.params.id);
+        await produtoService.eliminarProduto(req.params.id);
         res.status(204).send();
     } catch (error) {
         res.status(500).json({ erro: 'Erro ao eliminar produto.' });

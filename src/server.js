@@ -4,10 +4,10 @@ require('dotenv').config();
 
 const authRoutes = require('./routes/authRoutes.js');
 const clienteRoutes = require('./routes/clienteRoutes');
-const variedadeRoutes = require('./routes/variedadeRoutes');
-const encomendaRoutes = require('./routes/encomendaRoutes');
+const produtoRoutes = require('./routes/produtoRoutes');
+const pedidoRoutes = require('./routes/pedidoRoutes');
 const pagamentoRoutes = require('./routes/pagamentoRoutes');
-const entregaRoutes = require('./routes/entregaRoutes');
+const retiradaRoutes = require('./routes/retiradaRoutes');
 const formaPagamentoRoutes = require('./routes/formaPagamentoRoutes');
 
 const { verificarToken } = require('./middlewares/authMiddleware.js');
@@ -28,10 +28,10 @@ app.use(verificarToken);
 
 app.use('/api/formas-pagamento', formaPagamentoRoutes);
 app.use('/api/clientes', clienteRoutes);
-app.use('/api/produtos', variedadeRoutes);
-app.use('/api/pedidos', encomendaRoutes);
+app.use('/api/produtos', produtoRoutes);
+app.use('/api/pedidos', pedidoRoutes);
 app.use('/api/pagamentos', pagamentoRoutes);
-app.use('/api/retiradas', entregaRoutes);
+app.use('/api/retiradas', retiradaRoutes);
 
 const PORT = process.env.PORT || 6072;
 app.listen(PORT, () => {

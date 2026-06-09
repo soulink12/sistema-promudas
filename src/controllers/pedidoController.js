@@ -1,4 +1,4 @@
-const encomendaService = require('../services/encomendaService');
+const pedidoService = require('../services/pedidoService');
 
 const criarPedido = async (req, res) => {
     try {
@@ -10,7 +10,7 @@ const criarPedido = async (req, res) => {
             });
         }
 
-        const novoPedido = await encomendaService.criarPedido(dados);
+        const novoPedido = await pedidoService.criarPedido(dados);
         return res.status(201).json({
             mensagem: 'Pedido registrado com sucesso!',
             data: novoPedido
@@ -25,7 +25,7 @@ const criarPedido = async (req, res) => {
 const listarPedidos = async (req, res) => {
     try {
         const { cliente } = req.query;
-        const pedidos = await encomendaService.listarPedidos(cliente ? { cliente } : {});
+        const pedidos = await pedidoService.listarPedidos(cliente ? { cliente } : {});
         return res.status(200).json(pedidos);
     } catch (error) {
         console.error('Erro ao buscar pedidos:', error);
@@ -35,7 +35,7 @@ const listarPedidos = async (req, res) => {
 
 const atualizarPedido = async (req, res) => {
     try {
-        const pedido = await encomendaService.atualizarPedido(req.params.id, req.body);
+        const pedido = await pedidoService.atualizarPedido(req.params.id, req.body);
         res.json(pedido);
     } catch (error) {
         res.status(500).json({ erro: 'Erro ao atualizar pedido.' });
@@ -44,7 +44,7 @@ const atualizarPedido = async (req, res) => {
 
 const eliminarPedido = async (req, res) => {
     try {
-        await encomendaService.eliminarPedido(req.params.id);
+        await pedidoService.eliminarPedido(req.params.id);
         res.status(204).send();
     } catch (error) {
         res.status(500).json({ erro: 'Erro ao eliminar pedido.' });
