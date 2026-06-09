@@ -9,7 +9,7 @@ const criarProduto = async (dados) => {
 
 const listarProdutos = async () => {
     return await prisma.produtos.findMany({
-        where: { ativo: true }
+        orderBy: { nome: 'asc' }
     });
 };
 

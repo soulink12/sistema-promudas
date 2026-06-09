@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../../core/services/theme_service.dart';
 import 'formas_pagamento_screen.dart';
+import 'produtos_screen.dart';
 
 class TelaConfiguracoes extends StatefulWidget {
   const TelaConfiguracoes({super.key});
@@ -38,6 +39,16 @@ class _TelaConfiguracoesState extends State<TelaConfiguracoes> {
             },
           ),
           _buildSecao('Cadastros'),
+          ListTile(
+            leading: const Icon(Icons.eco_outlined),
+            title: const Text('Produtos'),
+            subtitle: const Text('Adicionar, editar ou desativar produtos'),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const TelaProdutos()),
+            ),
+          ),
           ListTile(
             leading: const Icon(Icons.payment_outlined),
             title: const Text('Formas de Pagamento'),
