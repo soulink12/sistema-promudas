@@ -127,22 +127,37 @@ class _TelaPedidosState extends State<TelaPedidos> {
     final total = _toDouble(pedido['valor_total']);
     final pedidoId = pedido['id'] as int;
 
+    // Calcula saldo real: exclui pagamentos posteriores (crediário) da soma
+    final pagamentos = (pedido['pagamentos'] as List? ?? []);
+    final totalPagoReal = pagamentos.fold<double>(0.0, (soma, p) {
+      final isPosterior = (p as Map)['pagamento_posterior'] == true;
+      return isPosterior ? soma : soma + _toDouble(p['valor_pago']);
+    });
+    final saldoRestante = (total - totalPagoReal).clamp(0.0, total);
+
     showDialog<void>(
       context: context,
       builder: (_) => ModalPagamento(
-        totalPedido: total,
-        onConfirmar: (pagamentos) => _registrarPagamento(pedidoId, total, pagamentos),
+        totalPedido: saldoRestante,
+        parcialPermitido: true,
+        onConfirmar: (pags) => _registrarPagamento(pedidoId, saldoRestante, pags),
       ),
     );
   }
 
   Future<void> _registrarPagamento(
-      int pedidoId, double total, List<Map<String, dynamic>> pagamentos) async {
+      int pedidoId, double saldoParaPagar, List<Map<String, dynamic>> pagamentos) async {
     setState(() => _salvando = true);
 
     try {
-      double restante = total;
-      for (final p in pagamentos) {
+      // Apenas pagamentos reais — crediário do modal é ignorado (ajustado automaticamente)
+      final pagamentosReais = pagamentos
+          .where((p) => p['pagamentoPosterior'] != true)
+          .toList();
+
+      double restante = saldoParaPagar;
+      double totalRealPago = 0;
+      for (final p in pagamentosReais) {
         if (restante <= 0.005) break;
         final valorPago = (p['valor'] as double).clamp(0.0, restante);
         await ApiService.dio.post('/pagamentos', data: {
@@ -151,11 +166,42 @@ class _TelaPedidosState extends State<TelaPedidos> {
           'forma_pagamento': p['forma'],
           'data_pagamento': DateTime.now().toUtc().toIso8601String(),
         });
+        totalRealPago += valorPago;
         restante -= valorPago;
       }
 
-      await _recarregarSilencioso(pedidoId);
+      // Ajusta o crediário existente: deleta o antigo e recria com o saldo restante
+      final pagamentosAtuais = (_pedidoSelecionado!['pagamentos'] as List? ?? [])
+          .map((e) => Map<String, dynamic>.from(e as Map))
+          .toList();
+      final crediariosExistentes = pagamentosAtuais
+          .where((p) => p['pagamento_posterior'] == true)
+          .toList();
 
+      if (crediariosExistentes.isNotEmpty) {
+        final nomeFormaCredito =
+            crediariosExistentes.first['forma_pagamento'] as String;
+        final totalCreditoAtual = crediariosExistentes.fold<double>(
+            0.0, (s, p) => s + _toDouble(p['valor_pago']));
+
+        // Remove todos os crediários existentes
+        for (final c in crediariosExistentes) {
+          await ApiService.dio.delete('/pagamentos/${c['id']}');
+        }
+
+        // Recria com o saldo atualizado, se ainda houver valor em aberto
+        final novoSaldoCredito = totalCreditoAtual - totalRealPago;
+        if (novoSaldoCredito > 0.005) {
+          await ApiService.dio.post('/pagamentos', data: {
+            'pedido_id': pedidoId,
+            'valor_pago': novoSaldoCredito,
+            'forma_pagamento': nomeFormaCredito,
+            'data_pagamento': DateTime.now().toUtc().toIso8601String(),
+          });
+        }
+      }
+
+      await _recarregarSilencioso(pedidoId);
       setState(() => _salvando = false);
 
       if (mounted) {
@@ -310,11 +356,19 @@ class _TelaPedidosState extends State<TelaPedidos> {
     final itens = (pedido['itens_pedido'] as List? ?? [])
         .map((e) => Map<String, dynamic>.from(e as Map))
         .toList();
-    final pagamentos = (pedido['pagamentos'] as List? ?? [])
+    final todosPagamentos = (pedido['pagamentos'] as List? ?? [])
         .map((e) => Map<String, dynamic>.from(e as Map))
         .toList();
 
-    final podePagar = statusPag == 'Pendente';
+    // Separa crediário (exibido como saldo em aberto) dos pagamentos reais (exibidos na lista)
+    final pagamentosReais = todosPagamentos
+        .where((p) => p['pagamento_posterior'] != true)
+        .toList();
+    final saldoCredito = todosPagamentos
+        .where((p) => p['pagamento_posterior'] == true)
+        .fold<double>(0.0, (s, p) => s + _toDouble(p['valor_pago']));
+
+    final podePagar = statusPag == 'Pendente' || statusPag == 'Parcial';
 
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16),
@@ -379,6 +433,16 @@ class _TelaPedidosState extends State<TelaPedidos> {
                               style: TextStyle(
                                   fontSize: 12,
                                   color: ajuste < 0 ? Colors.blue[700] : Colors.orange[800]),
+                            ),
+                          ],
+                          if (saldoCredito > 0.005) ...[
+                            const SizedBox(height: 4),
+                            Text(
+                              'A receber: R\$ ${saldoCredito.toStringAsFixed(2)}',
+                              style: TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w600,
+                                  color: Colors.orange[800]),
                             ),
                           ]
                         ],
@@ -455,13 +519,13 @@ class _TelaPedidosState extends State<TelaPedidos> {
           // Pagamentos
           _tituloSecao('Pagamentos'),
           Card(
-            child: pagamentos.isEmpty
+            child: pagamentosReais.isEmpty
                 ? const Padding(
                     padding: EdgeInsets.all(16),
-                    child: Text('Nenhum pagamento registrado.'),
+                    child: Text('Nenhum pagamento recebido ainda.'),
                   )
                 : Column(
-                    children: pagamentos.map((pag) {
+                    children: pagamentosReais.map((pag) {
                       final dataPag = _formatarDataHora(pag['criado_em']) ?? '—';
                       final forma = pag['forma_pagamento'] as String? ?? '—';
                       final valor = _toDouble(pag['valor_pago']);

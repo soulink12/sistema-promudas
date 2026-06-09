@@ -14,11 +14,14 @@ class ModalPagamento extends StatefulWidget {
   final double totalPedido;
   // Callback chamado com a lista de pagamentos ao confirmar
   final Function(List<Map<String, dynamic>> pagamentos) onConfirmar;
+  // Quando true, permite finalizar sem cobrir o total (usado na tela de Pedidos)
+  final bool parcialPermitido;
 
   const ModalPagamento({
     super.key,
     required this.totalPedido,
     required this.onConfirmar,
+    this.parcialPermitido = false,
   });
 
   @override
@@ -86,7 +89,9 @@ class _ModalPagamentoState extends State<ModalPagamento> {
   double get _restante => widget.totalPedido - _totalPago;
 
   // Tolerância para imprecisão de ponto flutuante
-  bool get _podeFinalizar => _restante < 0.005;
+  bool get _podeFinalizar => widget.parcialPermitido
+      ? _pagamentos.isNotEmpty
+      : _restante < 0.005;
 
   /// Registra a parcela atual e prepara o campo para a próxima entrada.
   void _adicionarPagamento() {

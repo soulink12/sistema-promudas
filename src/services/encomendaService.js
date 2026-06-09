@@ -31,26 +31,44 @@ const listarPedidos = async (filtros = {}) => {
     if (filtros.cliente) {
         where.clientes = { nome: { contains: filtros.cliente } };
     }
-    return await prisma.pedidos.findMany({
-        where,
-        orderBy: { criado_em: 'desc' },
-        take: filtros.cliente ? 100 : 20,
-        include: {
-            clientes: { select: { id: true, nome: true } },
-            itens_pedido: {
-                include: { produtos: { select: { nome: true } } }
-            },
-            pagamentos: {
-                select: {
-                    id: true,
-                    valor_pago: true,
-                    forma_pagamento: true,
-                    criado_em: true,
+
+    const [pedidos, formasPosteriores] = await Promise.all([
+        prisma.pedidos.findMany({
+            where,
+            orderBy: { criado_em: 'desc' },
+            take: filtros.cliente ? 100 : 20,
+            include: {
+                clientes: { select: { id: true, nome: true } },
+                itens_pedido: {
+                    include: { produtos: { select: { nome: true } } }
                 },
-                orderBy: { criado_em: 'asc' }
+                pagamentos: {
+                    select: {
+                        id: true,
+                        valor_pago: true,
+                        forma_pagamento: true,
+                        criado_em: true,
+                    },
+                    orderBy: { criado_em: 'asc' }
+                }
             }
-        }
-    });
+        }),
+        prisma.formas_pagamento.findMany({
+            where: { pagamento_posterior: true },
+            select: { nome: true }
+        })
+    ]);
+
+    const nomesPosteriores = new Set(formasPosteriores.map(f => f.nome));
+
+    // Adiciona flag pagamento_posterior em cada pagamento
+    return pedidos.map(pedido => ({
+        ...pedido,
+        pagamentos: pedido.pagamentos.map(pag => ({
+            ...pag,
+            pagamento_posterior: nomesPosteriores.has(pag.forma_pagamento)
+        }))
+    }));
 };
 
 const atualizarPedido = async (id, dados) => {
