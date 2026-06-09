@@ -44,8 +44,8 @@ const listarPedidos = async (filtros = {}) => {
                 select: {
                     id: true,
                     valor_pago: true,
-                    data_pagamento: true,
                     forma_pagamento: true,
+                    criado_em: true,
                 },
                 orderBy: { criado_em: 'asc' }
             }

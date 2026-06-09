@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../../core/services/api_service.dart';
+import '../../vendas/screens/widgets/modal_busca_cliente.dart';
 
 class TelaPedidos extends StatefulWidget {
   const TelaPedidos({super.key});
@@ -13,20 +14,13 @@ class _TelaPedidosState extends State<TelaPedidos> {
   bool _carregando = true;
   String? _erro;
 
-  final _buscaController = TextEditingController();
+  Map<String, dynamic>? _clienteFiltro;
   Map<String, dynamic>? _pedidoSelecionado;
-  bool _atualizandoProgramaticamente = false;
 
   @override
   void initState() {
     super.initState();
     _carregarPedidos();
-  }
-
-  @override
-  void dispose() {
-    _buscaController.dispose();
-    super.dispose();
   }
 
   Future<void> _carregarPedidos([String? clienteNome]) async {
@@ -55,68 +49,108 @@ class _TelaPedidosState extends State<TelaPedidos> {
     }
   }
 
-  void _selecionarPedido(Map<String, dynamic> pedido) {
-    _atualizandoProgramaticamente = true;
+  void _selecionarClienteFiltro(Map<String, dynamic> cliente) {
     setState(() {
-      _pedidoSelecionado = pedido;
-      _buscaController.text = pedido['clientes']?['nome'] as String? ?? '';
+      _clienteFiltro = cliente;
+      _pedidoSelecionado = null;
     });
-    _atualizandoProgramaticamente = false;
+    _carregarPedidos(cliente['nome'] as String?);
   }
 
-  void _limparSelecao() {
+  void _limparFiltro() {
     setState(() {
+      _clienteFiltro = null;
       _pedidoSelecionado = null;
-      _buscaController.clear();
     });
     _carregarPedidos();
   }
 
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: const Text('Pedidos')),
-      body: Column(
-        children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-            child: TextField(
-              controller: _buscaController,
-              decoration: InputDecoration(
-                hintText: 'Buscar por nome do cliente...',
-                prefixIcon: const Icon(Icons.search),
-                border: const OutlineInputBorder(),
-                suffixIcon: _buscaController.text.isNotEmpty
-                    ? IconButton(
-                        icon: const Icon(Icons.close),
-                        tooltip: 'Limpar',
-                        onPressed: _limparSelecao,
-                      )
-                    : null,
+  void _selecionarPedido(Map<String, dynamic> pedido) {
+    setState(() => _pedidoSelecionado = pedido);
+  }
+
+  void _abrirBuscaCliente() {
+    showDialog<void>(
+      context: context,
+      barrierColor: Colors.black26,
+      builder: (context) => Align(
+        alignment: Alignment.topLeft,
+        child: Padding(
+          padding: EdgeInsets.only(
+            top: MediaQuery.of(context).padding.top + kToolbarHeight + 8,
+            left: 8,
+          ),
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 440),
+            child: Material(
+              elevation: 8,
+              borderRadius: BorderRadius.circular(12),
+              child: BuscaClienteModal(
+                onClienteSelecionado: _selecionarClienteFiltro,
               ),
-              onChanged: (texto) {
-                if (_atualizandoProgramaticamente) return;
-                setState(() => _pedidoSelecionado = null);
-                if (texto.isEmpty) _carregarPedidos();
-              },
-              onSubmitted: (texto) {
-                if (texto.trim().isNotEmpty) {
-                  _carregarPedidos(texto.trim());
-                }
-              },
             ),
           ),
-          Expanded(
-            child: _carregando
-                ? const Center(child: CircularProgressIndicator())
-                : _erro != null
-                    ? _buildErro()
-                    : _pedidoSelecionado != null
-                        ? _buildDetalhes(_pedidoSelecionado!)
-                        : _buildLista(),
+        ),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final nomeCliente = _clienteFiltro?['nome'] as String?;
+
+    return Scaffold(
+      appBar: AppBar(
+        titleSpacing: 8,
+        title: InkWell(
+          onTap: _abrirBuscaCliente,
+          borderRadius: BorderRadius.circular(8),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      nomeCliente ?? 'Todos os pedidos',
+                      style: const TextStyle(
+                          fontSize: 18, fontWeight: FontWeight.bold),
+                    ),
+                    Text(
+                      nomeCliente != null
+                          ? 'Filtrado por cliente'
+                          : 'Últimos 20 pedidos',
+                      style: TextStyle(
+                          fontSize: 12, color: cs.onSurfaceVariant),
+                    ),
+                  ],
+                ),
+                const SizedBox(width: 8),
+                Icon(Icons.search, size: 20, color: cs.onSurfaceVariant),
+              ],
+            ),
           ),
+        ),
+        actions: [
+          if (_clienteFiltro != null)
+            IconButton(
+              icon: const Icon(Icons.close),
+              tooltip: 'Remover filtro',
+              onPressed: _limparFiltro,
+            ),
         ],
       ),
+      body: _carregando
+          ? const Center(child: CircularProgressIndicator())
+          : _erro != null
+              ? _buildErro()
+              : _pedidoSelecionado != null
+                  ? _buildDetalhes(_pedidoSelecionado!)
+                  : _buildLista(),
     );
   }
 
@@ -154,7 +188,7 @@ class _TelaPedidosState extends State<TelaPedidos> {
         final p = _pedidos[index];
         final nomeCliente = p['clientes']?['nome'] as String? ?? 'Cliente desconhecido';
         final total = _toDouble(p['valor_total']);
-        final data = _formatarData(p['criado_em']);
+        final data = _formatarDataHora(p['criado_em']);
         final statusPag = p['status_pagamento'] as String? ?? 'Pendente';
 
         return ListTile(
@@ -175,7 +209,7 @@ class _TelaPedidosState extends State<TelaPedidos> {
     final nomeCliente = pedido['clientes']?['nome'] as String? ?? '—';
     final total = _toDouble(pedido['valor_total']);
     final ajuste = _toDouble(pedido['ajuste']);
-    final data = _formatarData(pedido['criado_em']);
+    final data = _formatarDataHora(pedido['criado_em']);
     final statusPag = pedido['status_pagamento'] as String? ?? 'Pendente';
     final statusRet = pedido['status_retirada'] as String? ?? 'Pendente';
     final obs = pedido['observacoes'] as String?;
@@ -198,7 +232,7 @@ class _TelaPedidosState extends State<TelaPedidos> {
               IconButton(
                 icon: const Icon(Icons.arrow_back),
                 tooltip: 'Voltar para a lista',
-                onPressed: _limparSelecao,
+                onPressed: () => setState(() => _pedidoSelecionado = null),
               ),
               const SizedBox(width: 4),
               Text(
@@ -334,7 +368,7 @@ class _TelaPedidosState extends State<TelaPedidos> {
                   )
                 : Column(
                     children: pagamentos.map((pag) {
-                      final dataPag = _formatarData(pag['data_pagamento']) ?? '—';
+                      final dataPag = _formatarDataHora(pag['criado_em']) ?? '—';
                       final forma = pag['forma_pagamento'] as String? ?? '—';
                       final valor = _toDouble(pag['valor_pago']);
                       return ListTile(
@@ -457,6 +491,20 @@ class _TelaPedidosState extends State<TelaPedidos> {
       return '${dt.day.toString().padLeft(2, '0')}/'
           '${dt.month.toString().padLeft(2, '0')}/'
           '${dt.year}';
+    } catch (_) {
+      return valor.toString();
+    }
+  }
+
+  String? _formatarDataHora(dynamic valor) {
+    if (valor == null) return null;
+    try {
+      final dt = DateTime.parse(valor.toString()).toLocal();
+      return '${dt.day.toString().padLeft(2, '0')}/'
+          '${dt.month.toString().padLeft(2, '0')}/'
+          '${dt.year}  '
+          '${dt.hour.toString().padLeft(2, '0')}:'
+          '${dt.minute.toString().padLeft(2, '0')}';
     } catch (_) {
       return valor.toString();
     }
