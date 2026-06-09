@@ -6,6 +6,7 @@ class DetalhesPedido extends StatelessWidget {
   final bool salvando;
   final VoidCallback onVoltar;
   final VoidCallback onRegistrarPagamento;
+  final VoidCallback onEmitirPdf;
 
   const DetalhesPedido({
     super.key,
@@ -13,6 +14,7 @@ class DetalhesPedido extends StatelessWidget {
     required this.salvando,
     required this.onVoltar,
     required this.onRegistrarPagamento,
+    required this.onEmitirPdf,
   });
 
   @override
@@ -238,6 +240,19 @@ class DetalhesPedido extends StatelessWidget {
               ),
             ),
           ],
+
+          const SizedBox(height: 12),
+          SizedBox(
+            width: double.infinity,
+            child: OutlinedButton.icon(
+              onPressed: salvando ? null : onEmitirPdf,
+              icon: const Icon(Icons.picture_as_pdf_outlined),
+              label: const Text('Emitir PDF'),
+              style: OutlinedButton.styleFrom(
+                padding: const EdgeInsets.symmetric(vertical: 14),
+              ),
+            ),
+          ),
 
           const SizedBox(height: 24),
         ],

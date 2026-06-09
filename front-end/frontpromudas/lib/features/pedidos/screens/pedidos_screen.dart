@@ -6,6 +6,7 @@ import 'widgets/lista_pedidos.dart';
 import 'widgets/detalhes_pedido.dart';
 import '../../../core/services/pdf_download_service.dart';
 
+
 class TelaPedidos extends StatefulWidget {
   const TelaPedidos({super.key});
 
@@ -281,6 +282,8 @@ class _TelaPedidosState extends State<TelaPedidos> {
                               setState(() => _pedidoSelecionado = null),
                           onRegistrarPagamento: () =>
                               _abrirModalPagamento(_pedidoSelecionado!),
+                          onEmitirPdf: () => PdfDownloadService.baixarESalvar(
+                              context, _pedidoSelecionado!['id'] as int),
                         )
                       : ListaPedidos(
                           pedidos: _pedidos,
