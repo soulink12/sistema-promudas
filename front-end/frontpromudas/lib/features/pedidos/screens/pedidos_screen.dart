@@ -5,6 +5,7 @@ import '../../vendas/screens/widgets/modal_pagamento.dart';
 import 'widgets/lista_pedidos.dart';
 import 'widgets/detalhes_pedido.dart';
 import '../../../core/services/pdf_download_service.dart';
+import '../../vendas/screens/venda_screen.dart';
 
 
 class TelaPedidos extends StatefulWidget {
@@ -69,23 +70,13 @@ class _TelaPedidosState extends State<TelaPedidos> {
 
   Future<void> _recarregarSilencioso(int pedidoId) async {
     try {
-      final clienteNome = _clienteFiltro?['nome'] as String?;
-      final response = await ApiService.dio.get(
-        '/pedidos',
-        queryParameters: clienteNome != null && clienteNome.isNotEmpty
-            ? {'cliente': clienteNome}
-            : null,
-      );
-      final novos = (response.data as List)
-          .map<Map<String, dynamic>>((e) => Map<String, dynamic>.from(e as Map))
-          .toList();
-      final atualizado = novos.firstWhere(
-        (p) => p['id'] == pedidoId,
-        orElse: () => _pedidoSelecionado!,
-      );
+      final response = await ApiService.dio.get('/pedidos/$pedidoId');
+      final atualizado =
+          Map<String, dynamic>.from(response.data as Map);
       setState(() {
-        _pedidos = novos;
         _pedidoSelecionado = atualizado;
+        final idx = _pedidos.indexWhere((p) => p['id'] == pedidoId);
+        if (idx != -1) _pedidos[idx] = atualizado;
       });
     } catch (_) {
       // Falha silenciosa — mantém dados antigos
@@ -153,6 +144,16 @@ class _TelaPedidosState extends State<TelaPedidos> {
         onConfirmar: (pags) => _registrarPagamento(pedidoId, saldoRestante, pags),
       ),
     );
+  }
+
+  Future<void> _abrirEdicaoPedido(Map<String, dynamic> pedido) async {
+    await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => TelaVenda(pedidoParaEditar: pedido),
+      ),
+    );
+    await _recarregarSilencioso(pedido['id'] as int);
   }
 
   Future<void> _registrarPagamento(
@@ -295,6 +296,8 @@ class _TelaPedidosState extends State<TelaPedidos> {
                               _abrirModalPagamento(_pedidoSelecionado!),
                           onEmitirPdf: () => PdfDownloadService.baixarESalvar(
                               context, _pedidoSelecionado!['id'] as int),
+                          onEditar: () =>
+                              _abrirEdicaoPedido(_pedidoSelecionado!),
                         )
                       : ListaPedidos(
                           pedidos: _pedidos,

@@ -23,6 +23,17 @@ const criarPedido = async (req, res) => {
     }
 };
 
+const buscarPedido = async (req, res) => {
+    try {
+        const pedido = await pedidoService.buscarPedido(req.params.id);
+        if (!pedido) return res.status(404).json({ erro: 'Pedido não encontrado.' });
+        res.json(pedido);
+    } catch (error) {
+        console.error('Erro ao buscar pedido:', error);
+        res.status(500).json({ erro: 'Erro ao buscar pedido.' });
+    }
+};
+
 const listarPedidos = async (req, res) => {
     try {
         const { cliente } = req.query;
@@ -39,7 +50,8 @@ const atualizarPedido = async (req, res) => {
         const pedido = await pedidoService.atualizarPedido(req.params.id, req.body);
         res.json(pedido);
     } catch (error) {
-        res.status(500).json({ erro: 'Erro ao atualizar pedido.' });
+        console.error('Erro ao atualizar pedido:', error);
+        res.status(error.status || 500).json({ erro: error.message || 'Erro ao atualizar pedido.' });
     }
 };
 
@@ -68,6 +80,7 @@ const gerarPDF = async (req, res) => {
 module.exports = {
     criarPedido,
     listarPedidos,
+    buscarPedido,
     atualizarPedido,
     eliminarPedido,
     gerarPDF

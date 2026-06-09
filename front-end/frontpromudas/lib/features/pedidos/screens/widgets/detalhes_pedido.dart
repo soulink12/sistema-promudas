@@ -7,6 +7,7 @@ class DetalhesPedido extends StatelessWidget {
   final VoidCallback onVoltar;
   final VoidCallback onRegistrarPagamento;
   final VoidCallback onEmitirPdf;
+  final VoidCallback onEditar;
 
   const DetalhesPedido({
     super.key,
@@ -15,6 +16,7 @@ class DetalhesPedido extends StatelessWidget {
     required this.onVoltar,
     required this.onRegistrarPagamento,
     required this.onEmitirPdf,
+    required this.onEditar,
   });
 
   @override
@@ -36,9 +38,9 @@ class DetalhesPedido extends StatelessWidget {
 
     final pagamentosReais =
         todosPagamentos.where((p) => p['pagamento_posterior'] != true).toList();
-    final saldoCredito = todosPagamentos
-        .where((p) => p['pagamento_posterior'] == true)
+    final totalPagoReal = pagamentosReais
         .fold<double>(0.0, (s, p) => s + _toDouble(p['valor_pago']));
+    final saldoCredito = (total - totalPagoReal).clamp(0.0, double.infinity);
 
     final podePagar = statusPag == 'Pendente' || statusPag == 'Parcial';
 
@@ -60,6 +62,12 @@ class DetalhesPedido extends StatelessWidget {
                 'Pedido #${pedido['id']}',
                 style:
                     const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+              ),
+              const Spacer(),
+              IconButton(
+                icon: const Icon(Icons.edit_outlined),
+                tooltip: 'Editar pedido',
+                onPressed: onEditar,
               ),
             ],
           ),

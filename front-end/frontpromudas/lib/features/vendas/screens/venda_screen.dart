@@ -14,11 +14,15 @@ import 'widgets/formulario_venda.dart';
 import 'widgets/rodape_venda.dart';
 import 'widgets/modal_pagamento.dart';
 import '../../../core/services/pdf_download_service.dart';
+import '../../../core/widgets/dialog_confirmacao.dart';
 
 /// Tela principal de registro de venda (PDV).
-/// Gerencia o estado do carrinho de compras e do cliente selecionado.
+/// Quando [pedidoParaEditar] é fornecido, entra em modo de edição: o carrinho
+/// é pré-carregado com os itens do pedido e ao finalizar atualiza o pedido existente.
 class TelaVenda extends StatefulWidget {
-  const TelaVenda({super.key});
+  final Map<String, dynamic>? pedidoParaEditar;
+
+  const TelaVenda({super.key, this.pedidoParaEditar});
 
   @override
   State<TelaVenda> createState() => _TelaVendaState();
@@ -44,6 +48,45 @@ class _TelaVendaState extends State<TelaVenda> {
     super.initState();
     _clienteSelecionado = _consumidorPadrao;
     HardwareKeyboard.instance.addHandler(_onTecla);
+    if (widget.pedidoParaEditar != null) {
+      _preencherCarrinhoComPedido(widget.pedidoParaEditar!);
+    }
+  }
+
+  void _preencherCarrinhoComPedido(Map<String, dynamic> pedido) {
+    final cliente = pedido['clientes'];
+    if (cliente != null) {
+      _clienteSelecionado = {
+        'id': cliente['id'],
+        'nome': cliente['nome'] as String? ?? '—',
+        'cpf': 'Não informado',
+        'telefone': 'Não informado',
+      };
+    }
+
+    final itens = (pedido['itens_pedido'] as List? ?? [])
+        .map((e) => Map<String, dynamic>.from(e as Map))
+        .toList();
+
+    for (final item in itens) {
+      final preco = _toDouble(item['valor_unitario']);
+      _carrinhoService.adicionarItem(
+        {
+          'id': item['produto_id'],
+          'nome': item['produtos']?['nome'] as String? ?? '—',
+          'preco': preco,
+        },
+        quantidade: item['quantidade'] as int? ?? 1,
+      );
+    }
+
+    final ajuste = _toDouble(pedido['ajuste']);
+    if (ajuste.abs() > 0.001) {
+      _carrinhoService.aplicarAjuste(
+        ajuste,
+        ajuste < 0 ? 'Desconto' : 'Acréscimo',
+      );
+    }
   }
 
   @override
@@ -69,15 +112,22 @@ class _TelaVendaState extends State<TelaVenda> {
 
   @override
   Widget build(BuildContext context) {
+    final modoEdicao = widget.pedidoParaEditar != null;
+    final pedidoId = modoEdicao ? widget.pedidoParaEditar!['id'] as int : null;
+
     return Scaffold(
       appBar: AppBar(
         titleSpacing: 8,
         title: DetalhesAppBar(
           clienteSelecionado: _clienteSelecionado,
-          onTap: _salvando ? null : () => _mostrarBuscaClienteModal(context),
+          onTap: modoEdicao || _salvando
+              ? null
+              : () => _mostrarBuscaClienteModal(context),
+          subtituloOverride:
+              modoEdicao ? 'Editando Pedido #$pedidoId' : null,
         ),
       ),
-      drawer: _buildDrawer(context),
+      drawer: modoEdicao ? null : _buildDrawer(context),
       body: Stack(
         children: [
           Padding(
@@ -291,6 +341,11 @@ class _TelaVendaState extends State<TelaVenda> {
   void _finalizarPedido() {
     if (_carrinhoService.itens.isEmpty || _salvando) return;
 
+    if (widget.pedidoParaEditar != null) {
+      _confirmarEdicao();
+      return;
+    }
+
     showDialog<void>(
       context: context,
       builder: (_) => ModalPagamento(
@@ -298,6 +353,61 @@ class _TelaVendaState extends State<TelaVenda> {
         onConfirmar: _registrarPedido,
       ),
     );
+  }
+
+  Future<void> _confirmarEdicao() async {
+    final pedidoId = widget.pedidoParaEditar!['id'] as int;
+    final confirmado = await mostrarDialogConfirmacao(
+      context: context,
+      titulo: 'Confirmar edição',
+      mensagem: 'Deseja salvar as alterações no Pedido #$pedidoId?',
+      textoConfirmar: 'Salvar',
+    );
+    if (!confirmado || !mounted) return;
+    _salvarEdicao(pedidoId);
+  }
+
+  Future<void> _salvarEdicao(int pedidoId) async {
+    setState(() => _salvando = true);
+
+    final itens = _carrinhoService.itens;
+    final ajuste = _carrinhoService.ajuste;
+
+    try {
+      await ApiService.dio.put('/pedidos/$pedidoId', data: {
+        'itens': itens
+            .map((item) => {
+                  'produto_id': item['id'],
+                  'quantidade': item['quantidade'],
+                  'valor_unitario': item['preco'],
+                })
+            .toList(),
+        'ajuste': ajuste != 0.0 ? ajuste : null,
+      });
+
+      setState(() => _salvando = false);
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Pedido atualizado com sucesso!'),
+            backgroundColor: Colors.green,
+          ),
+        );
+        Navigator.pop(context);
+      }
+    } catch (_) {
+      setState(() => _salvando = false);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Erro ao atualizar pedido. Tente novamente.'),
+            backgroundColor: Colors.red,
+            duration: Duration(seconds: 4),
+          ),
+        );
+      }
+    }
   }
 
   /// Envia o pedido à API: cria o pedido com os itens e registra cada pagamento.
@@ -372,3 +482,6 @@ class _TelaVendaState extends State<TelaVenda> {
     }
   }
 }
+
+double _toDouble(dynamic v) =>
+    v == null ? 0.0 : double.tryParse(v.toString()) ?? 0.0;

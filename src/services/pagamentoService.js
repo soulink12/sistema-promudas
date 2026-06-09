@@ -180,5 +180,6 @@ module.exports = {
     criarPagamento,
     listarPagamentos,
     atualizarPagamento,
-    eliminarPagamento
+    eliminarPagamento,
+    recalcularStatusPedido
 };

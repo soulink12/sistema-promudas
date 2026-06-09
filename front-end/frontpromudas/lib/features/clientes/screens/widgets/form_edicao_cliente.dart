@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../../core/widgets/dialog_confirmacao.dart';
 
 class FormEdicaoCliente extends StatefulWidget {
   final Map<String, dynamic> cliente;
@@ -67,25 +68,12 @@ class _FormEdicaoClienteState extends State<FormEdicaoCliente> {
   Future<void> _tentarSalvar() async {
     if (!_formKey.currentState!.validate()) return;
 
-    final confirmado = await showDialog<bool>(
+    final confirmado = await mostrarDialogConfirmacao(
       context: context,
-      builder: (_) => AlertDialog(
-        title: const Text('Confirmar edição'),
-        content: Text(
-            'Deseja salvar as alterações do cliente "${_nome.text.trim()}"?'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancelar'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: const Text('Confirmar'),
-          ),
-        ],
-      ),
+      titulo: 'Confirmar edição',
+      mensagem: 'Deseja salvar as alterações do cliente "${_nome.text.trim()}"?',
     );
-    if (confirmado != true) return;
+    if (!confirmado) return;
 
     final body = <String, dynamic>{'nome': _nome.text.trim()};
     void add(String key, TextEditingController ctrl) {

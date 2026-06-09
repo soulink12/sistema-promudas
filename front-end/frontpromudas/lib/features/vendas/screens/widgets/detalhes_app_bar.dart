@@ -7,12 +7,15 @@ class DetalhesAppBar extends StatelessWidget {
   final Map<String, dynamic>? clienteSelecionado;
   // Ação executada ao tocar na área do cliente (normalmente abre o modal de busca)
   final VoidCallback? onTap;
+  // Quando fornecido, substitui a linha secundária (ex: "Editando Pedido #5")
+  final String? subtituloOverride;
 
   const DetalhesAppBar({
-    Key? key,
+    super.key,
     required this.clienteSelecionado,
     this.onTap,
-  }) : super(key: key);
+    this.subtituloOverride,
+  });
 
   /// Constrói o conteúdo da AppBar com nome e dados do cliente.
   /// Se o cliente for o consumidor padrão (id == 1), exibe "Venda Direta / Balcão"
@@ -49,11 +52,12 @@ class DetalhesAppBar extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 2),
-                // Linha secundária: "Venda Direta" para consumidor padrão ou ID/CPF/Tel para clientes cadastrados
+                // Linha secundária: override (modo edição), "Venda Direta" ou ID/CPF/Tel
                 Text(
-                  isVendaDireta
-                      ? 'Venda Direta / Balcão'
-                      : 'ID: ${clienteSelecionado!['id']} • CPF: ${clienteSelecionado!['cpf']} • Tel: ${clienteSelecionado!['telefone']}',
+                  subtituloOverride ??
+                      (isVendaDireta
+                          ? 'Venda Direta / Balcão'
+                          : 'ID: ${clienteSelecionado!['id']} • CPF: ${clienteSelecionado!['cpf']} • Tel: ${clienteSelecionado!['telefone']}'),
                   style: TextStyle(
                     fontSize: 13,
                     fontWeight: FontWeight.normal,
