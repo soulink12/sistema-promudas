@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'relatorios_screen.dart';
+import 'relatorios_pagamentos_screen.dart';
 import 'relatorio_pedidos_screen.dart';
 
 class TelaRelatoriosHub extends StatelessWidget {
@@ -19,7 +19,7 @@ class TelaRelatoriosHub extends StatelessWidget {
                 'Total recebido por forma de pagamento, com filtro por data e forma.',
             onTap: () => Navigator.push(
               context,
-              MaterialPageRoute(builder: (_) => const TelaRelatorios()),
+              MaterialPageRoute(builder: (_) => const TelaRelatorioPagamentos()),
             ),
           ),
           const SizedBox(height: 12),

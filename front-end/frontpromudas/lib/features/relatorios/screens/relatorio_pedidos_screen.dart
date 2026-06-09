@@ -1,3 +1,7 @@
+import 'dart:io';
+import 'dart:typed_data';
+import 'package:dio/dio.dart';
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import '../../../core/services/api_service.dart';
 import '../../../core/widgets/botao_data.dart';
@@ -19,6 +23,7 @@ class _TelaRelatorioPedidosState extends State<TelaRelatorioPedidos> {
 
   Map<String, dynamic>? _resultado;
   bool _carregando = false;
+  bool _baixandoPdf = false;
 
   Future<void> _gerarRelatorio() async {
     setState(() {
@@ -57,6 +62,51 @@ class _TelaRelatorioPedidosState extends State<TelaRelatorioPedidos> {
           ),
         );
       }
+    }
+  }
+
+  Future<void> _baixarPdf() async {
+    setState(() => _baixandoPdf = true);
+    try {
+      final params = <String, dynamic>{};
+      if (_de != null) params['de'] = _de!.toIso8601String();
+      if (_ate != null) {
+        final fim = DateTime(_ate!.year, _ate!.month, _ate!.day, 23, 59, 59);
+        params['ate'] = fim.toIso8601String();
+      }
+      if (_statusPagamento != null) params['statusPagamento'] = _statusPagamento;
+      if (_statusRetirada != null) params['statusRetirada'] = _statusRetirada;
+      if (_clienteSelecionado != null) params['clienteId'] = _clienteSelecionado!['id'];
+
+      final response = await ApiService.dio.get(
+        '/relatorios/pedidos/pdf',
+        queryParameters: params,
+        options: Options(responseType: ResponseType.bytes),
+      );
+
+      final bytes = Uint8List.fromList(response.data as List<int>);
+
+      final caminho = await FilePicker.platform.saveFile(
+        dialogTitle: 'Salvar relatório de pedidos',
+        fileName: 'relatorio_pedidos.pdf',
+        type: FileType.custom,
+        allowedExtensions: ['pdf'],
+      );
+
+      if (caminho == null) return;
+      await File(caminho).writeAsBytes(bytes);
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Não foi possível gerar o PDF do relatório.'),
+            backgroundColor: Colors.red,
+            duration: Duration(seconds: 3),
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _baixandoPdf = false);
     }
   }
 
@@ -234,6 +284,28 @@ class _TelaRelatorioPedidosState extends State<TelaRelatorioPedidos> {
                     label: 'valor total',
                   ),
                 ),
+                const SizedBox(width: 8),
+                _baixandoPdf
+                    ? const SizedBox(
+                        width: 48,
+                        height: 48,
+                        child: Center(
+                          child: SizedBox(
+                            width: 24,
+                            height: 24,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          ),
+                        ),
+                      )
+                    : IconButton.filled(
+                        onPressed: _baixarPdf,
+                        tooltip: 'Exportar PDF',
+                        style: IconButton.styleFrom(
+                          backgroundColor: Colors.green[800],
+                          foregroundColor: Colors.white,
+                        ),
+                        icon: const Icon(Icons.picture_as_pdf),
+                      ),
               ],
             ),
             if ((resumo['porStatusPagamento'] as Map?)?.isNotEmpty ?? false) ...[

@@ -307,4 +307,193 @@ const relatorioPedidos = async ({ de, ate, statusPagamento, statusRetirada, clie
     };
 };
 
-module.exports = { relatorioPagamentos, gerarRelatorioPDF, relatorioPedidos };
+const gerarRelatorioPedidosPDF = async ({ de, ate, statusPagamento, statusRetirada, clienteId }) => {
+    const where = {
+        ativo: true,
+        ...(de || ate ? {
+            criado_em: {
+                ...(de && { gte: new Date(de) }),
+                ...(ate && { lte: new Date(ate) }),
+            }
+        } : {}),
+        ...(statusPagamento ? { status_pagamento: statusPagamento } : {}),
+        ...(statusRetirada ? { status_retirada: statusRetirada } : {}),
+        ...(clienteId ? { cliente_id: parseInt(clienteId) } : {}),
+    };
+
+    const pedidos = await prisma.pedidos.findMany({
+        where,
+        include: {
+            clientes: { select: { nome: true } },
+            itens_pedido: {
+                include: {
+                    produtos: { select: { nome: true } },
+                },
+            },
+            pagamentos: {
+                orderBy: { criado_em: 'asc' },
+            },
+        },
+        orderBy: { criado_em: 'desc' },
+    });
+
+    return new Promise((resolve, reject) => {
+        const doc = new PDFDocument({ size: 'A4', margin: 50 });
+        const chunks = [];
+        doc.on('data', c => chunks.push(c));
+        doc.on('end', () => resolve(Buffer.concat(chunks)));
+        doc.on('error', reject);
+
+        const paginaFundo = doc.page.height - doc.page.margins.bottom;
+
+        // ── CABEÇALHO ──────────────────────────────────────────────────────
+        doc.font('Helvetica-Bold').fontSize(20).fillColor('#1b5e20')
+            .text('Viveiro Promudas', { align: 'center' });
+        doc.font('Helvetica').fontSize(10).fillColor('#555555')
+            .text('Relatório de Pedidos', { align: 'center' });
+        doc.fillColor('black');
+        doc.moveDown(0.5);
+
+        const periodoParts = [];
+        if (de) periodoParts.push(`De: ${formatarDataCurta(de)}`);
+        if (ate) periodoParts.push(`Até: ${formatarDataCurta(ate)}`);
+        if (!de && !ate) periodoParts.push('Todo o período');
+        if (statusPagamento) periodoParts.push(`Pagamento: ${statusPagamento}`);
+        if (statusRetirada) periodoParts.push(`Retirada: ${statusRetirada}`);
+
+        doc.font('Helvetica').fontSize(9).fillColor('#777777')
+            .text(periodoParts.join('   '), { align: 'center' });
+        doc.fillColor('black');
+        doc.moveDown(0.6);
+
+        linhaHorizontal(doc);
+        doc.moveDown(0.5);
+
+        // ── RESUMO ─────────────────────────────────────────────────────────
+        const valorTotal = pedidos.reduce((s, p) => s + parseFloat(p.valor_total), 0);
+        const yRes = doc.y;
+        doc.font('Helvetica-Bold').fontSize(9).fillColor('#555555');
+        doc.text(`Total de pedidos: ${pedidos.length}`, 50, yRes, { lineBreak: false });
+        doc.font('Helvetica-Bold').fontSize(9).fillColor('#1b5e20')
+            .text(`Valor total: ${moeda(valorTotal)}`, 300, yRes, { width: 245, align: 'right' });
+        doc.fillColor('black');
+        doc.moveDown(1);
+
+        if (pedidos.length === 0) {
+            doc.font('Helvetica').fontSize(10).fillColor('#888888')
+                .text('Nenhum pedido encontrado para os filtros aplicados.', { align: 'center' });
+            doc.fillColor('black');
+        }
+
+        // ── PEDIDOS ────────────────────────────────────────────────────────
+        pedidos.forEach((pedido) => {
+            // Estima altura mínima do bloco: cabeçalho (30) + itens (14 cada) + pagamentos (14 cada) + margem (20)
+            const alturaEstimada = 30 + (pedido.itens_pedido.length * 14) + (pedido.pagamentos.length * 14) + 20;
+            // Quebra de página se não há espaço suficiente para ao menos o cabeçalho do pedido
+            if (doc.y + Math.min(alturaEstimada, 60) > paginaFundo) {
+                doc.addPage();
+            }
+
+            // Cabeçalho do pedido
+            const yPed = doc.y;
+            doc.rect(50, yPed, 495, 20).fill('#e8f5e9');
+            doc.font('Helvetica-Bold').fontSize(10).fillColor('#1b5e20')
+                .text(`Pedido #${pedido.id}`, 56, yPed + 4, { width: 160, lineBreak: false });
+            doc.font('Helvetica').fontSize(9).fillColor('#333333')
+                .text(pedido.clientes?.nome ?? '—', 220, yPed + 5, { width: 180, lineBreak: false });
+            doc.font('Helvetica').fontSize(9).fillColor('#555555')
+                .text(formatarDataCurta(pedido.criado_em), 410, yPed + 5, { width: 130, align: 'right' });
+            doc.fillColor('black');
+            doc.moveDown(1.6);
+
+            // Status
+            const yStatus = doc.y;
+            doc.font('Helvetica').fontSize(8).fillColor('#555555');
+            doc.text(`Pagamento: ${pedido.status_pagamento}`, 56, yStatus, { lineBreak: false });
+            doc.text(`Retirada: ${pedido.status_retirada}`, 200, yStatus, { lineBreak: false });
+
+            // Valor total e ajuste
+            const ajuste = parseFloat(pedido.ajuste ?? 0);
+            const subtotal = parseFloat(pedido.valor_total) - ajuste;
+            if (ajuste !== 0) {
+                const tipoAjuste = ajuste > 0 ? `Acréscimo: ${moeda(ajuste)}` : `Desconto: ${moeda(Math.abs(ajuste))}`;
+                doc.text(tipoAjuste, 350, yStatus, { width: 195, align: 'right' });
+            }
+            doc.moveDown(0.5);
+
+            doc.font('Helvetica-Bold').fontSize(10).fillColor('#1b5e20');
+            const yValor = doc.y;
+            doc.text(`Total: ${moeda(pedido.valor_total)}`, 350, yValor, { width: 195, align: 'right' });
+            doc.fillColor('black');
+            doc.moveDown(0.5);
+
+            // ── Itens do pedido ────────────────────────────────────────────
+            doc.moveTo(56, doc.y).lineTo(545, doc.y).strokeColor('#dddddd').lineWidth(0.5).stroke();
+            doc.strokeColor('black').lineWidth(1);
+            doc.moveDown(0.3);
+
+            const yItensCab = doc.y;
+            doc.font('Helvetica-Bold').fontSize(8).fillColor('#777777');
+            doc.text('Produto', 56, yItensCab, { width: 260, lineBreak: false });
+            doc.text('Qtd', 320, yItensCab, { width: 60, align: 'center', lineBreak: false });
+            doc.text('Unit.', 385, yItensCab, { width: 75, align: 'right', lineBreak: false });
+            doc.text('Subtotal', 463, yItensCab, { width: 82, align: 'right' });
+            doc.fillColor('black');
+            doc.moveDown(0.3);
+
+            pedido.itens_pedido.forEach((item, idx) => {
+                if (doc.y + 14 > paginaFundo) { doc.addPage(); }
+                const yItem = doc.y;
+                if (idx % 2 === 0) doc.rect(56, yItem - 1, 489, 13).fill('#f9f9f9');
+                doc.font('Helvetica').fontSize(8).fillColor('black');
+                doc.text(item.produtos?.nome ?? '—', 56, yItem, { width: 260, lineBreak: false });
+                doc.text(String(item.quantidade), 320, yItem, { width: 60, align: 'center', lineBreak: false });
+                doc.text(moeda(item.valor_unitario), 385, yItem, { width: 75, align: 'right', lineBreak: false });
+                doc.text(moeda(parseFloat(item.valor_unitario) * item.quantidade), 463, yItem, { width: 82, align: 'right' });
+                doc.moveDown(0.4);
+            });
+
+            // ── Pagamentos ─────────────────────────────────────────────────
+            if (pedido.pagamentos.length > 0) {
+                doc.moveDown(0.3);
+                doc.moveTo(56, doc.y).lineTo(545, doc.y).strokeColor('#dddddd').lineWidth(0.5).stroke();
+                doc.strokeColor('black').lineWidth(1);
+                doc.moveDown(0.3);
+
+                const yPagCab = doc.y;
+                doc.font('Helvetica-Bold').fontSize(8).fillColor('#777777');
+                doc.text('Pagamentos', 56, yPagCab, { width: 200, lineBreak: false });
+                doc.text('Forma', 260, yPagCab, { width: 140, lineBreak: false });
+                doc.text('Data', 403, yPagCab, { width: 80, lineBreak: false });
+                doc.text('Valor', 463, yPagCab, { width: 82, align: 'right' });
+                doc.fillColor('black');
+                doc.moveDown(0.3);
+
+                pedido.pagamentos.forEach((pag) => {
+                    if (doc.y + 14 > paginaFundo) { doc.addPage(); }
+                    const yPag = doc.y;
+                    const nomeFP = pag.forma_pagamento ?? '—';
+                    const dataPag = formatarDataCurta(pag.data_pagamento || pag.criado_em);
+                    doc.font('Helvetica').fontSize(8).fillColor('black');
+                    doc.text('', 56, yPag, { width: 200, lineBreak: false });
+                    doc.text(nomeFP, 260, yPag, { width: 140, lineBreak: false });
+                    doc.text(dataPag, 403, yPag, { width: 80, lineBreak: false });
+                    doc.text(moeda(pag.valor_pago), 463, yPag, { width: 82, align: 'right' });
+                    doc.moveDown(0.4);
+                });
+            }
+
+            doc.moveDown(0.8);
+            linhaHorizontal(doc, '#eeeeee');
+            doc.moveDown(0.6);
+        });
+
+        // ── RODAPÉ ─────────────────────────────────────────────────────────
+        doc.font('Helvetica').fontSize(8).fillColor('#aaaaaa')
+            .text(`Viveiro Promudas — documento gerado em ${formatarData(new Date())}`, { align: 'center' });
+
+        doc.end();
+    });
+};
+
+module.exports = { relatorioPagamentos, gerarRelatorioPDF, relatorioPedidos, gerarRelatorioPedidosPDF };

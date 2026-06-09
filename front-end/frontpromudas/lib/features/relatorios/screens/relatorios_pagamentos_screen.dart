@@ -6,14 +6,14 @@ import 'package:flutter/material.dart';
 import '../../../core/services/api_service.dart';
 import '../../../core/widgets/botao_data.dart';
 
-class TelaRelatorios extends StatefulWidget {
-  const TelaRelatorios({super.key});
+class TelaRelatorioPagamentos extends StatefulWidget {
+  const TelaRelatorioPagamentos({super.key});
 
   @override
-  State<TelaRelatorios> createState() => _TelaRelatoriosState();
+  State<TelaRelatorioPagamentos> createState() => _TelaRelatorioPagamentosState();
 }
 
-class _TelaRelatoriosState extends State<TelaRelatorios> {
+class _TelaRelatorioPagamentosState extends State<TelaRelatorioPagamentos> {
   DateTime? _de;
   DateTime? _ate;
   String? _formaSelecionada;
@@ -167,7 +167,7 @@ class _TelaRelatoriosState extends State<TelaRelatorios> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Relatórios')),
+      appBar: AppBar(title: const Text('Relatório de Pagamentos')),
       body: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -424,4 +424,3 @@ class _TelaRelatoriosState extends State<TelaRelatorios> {
     );
   }
 }
-

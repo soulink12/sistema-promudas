@@ -32,4 +32,16 @@ const relatorioPedidos = async (req, res) => {
     }
 };
 
-module.exports = { relatorioPagamentos, relatorioPDF, relatorioPedidos };
+const relatorioPedidosPDF = async (req, res) => {
+    try {
+        const { de, ate, statusPagamento, statusRetirada, clienteId } = req.query;
+        const buffer = await relatorioService.gerarRelatorioPedidosPDF({ de, ate, statusPagamento, statusRetirada, clienteId });
+        res.setHeader('Content-Type', 'application/pdf');
+        res.setHeader('Content-Disposition', 'attachment; filename="relatorio_pedidos.pdf"');
+        res.status(200).send(buffer);
+    } catch (erro) {
+        res.status(erro.status || 500).json({ erro: erro.message || 'Erro ao gerar PDF.' });
+    }
+};
+
+module.exports = { relatorioPagamentos, relatorioPDF, relatorioPedidos, relatorioPedidosPDF };
