@@ -26,13 +26,28 @@ const criarPedido = async (dados) => {
     });
 };
 
-const listarPedidos = async () => {
+const listarPedidos = async (filtros = {}) => {
+    const where = { ativo: true };
+    if (filtros.cliente) {
+        where.clientes = { nome: { contains: filtros.cliente } };
+    }
     return await prisma.pedidos.findMany({
-        where: { ativo: true },
+        where,
+        orderBy: { criado_em: 'desc' },
+        take: filtros.cliente ? 100 : 20,
         include: {
-            clientes: { select: { nome: true } },
+            clientes: { select: { id: true, nome: true } },
             itens_pedido: {
                 include: { produtos: { select: { nome: true } } }
+            },
+            pagamentos: {
+                select: {
+                    id: true,
+                    valor_pago: true,
+                    data_pagamento: true,
+                    forma_pagamento: true,
+                },
+                orderBy: { criado_em: 'asc' }
             }
         }
     });

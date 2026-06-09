@@ -24,7 +24,8 @@ const criarPedido = async (req, res) => {
 
 const listarPedidos = async (req, res) => {
     try {
-        const pedidos = await encomendaService.listarPedidos();
+        const { cliente } = req.query;
+        const pedidos = await encomendaService.listarPedidos(cliente ? { cliente } : {});
         return res.status(200).json(pedidos);
     } catch (error) {
         console.error('Erro ao buscar pedidos:', error);

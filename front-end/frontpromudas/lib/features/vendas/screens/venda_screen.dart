@@ -6,6 +6,7 @@ import '../../../core/services/carrinho_service.dart';
 import '../../auth/screens/login_screen.dart';
 import '../../clientes/screens/clientes_screen.dart';
 import '../../configuracoes/screens/configuracoes_screen.dart';
+import '../../pedidos/screens/pedidos_screen.dart';
 import 'widgets/detalhes_app_bar.dart';
 import 'widgets/modal_busca_cliente.dart';
 import 'widgets/formulario_venda.dart';
@@ -183,6 +184,17 @@ class _TelaVendaState extends State<TelaVenda> {
                 context,
                 MaterialPageRoute(
                     builder: (_) => const TelaListaClientes()),
+              );
+            },
+          ),
+          ListTile(
+            leading: const Icon(Icons.receipt_long_outlined),
+            title: const Text('Pedidos'),
+            onTap: () {
+              Navigator.pop(context);
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const TelaPedidos()),
               );
             },
           ),
