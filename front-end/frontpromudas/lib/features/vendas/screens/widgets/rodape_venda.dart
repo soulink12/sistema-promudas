@@ -90,9 +90,10 @@ class _RodapeVendaState extends State<RodapeVenda> {
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
     return Container(
       width: double.infinity,
-      color: Colors.green[100],
+      color: cs.surfaceContainer,
       padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
       child: Column(
         mainAxisSize: MainAxisSize.min,
@@ -158,17 +159,17 @@ class _RodapeVendaState extends State<RodapeVenda> {
                         return TextField(
                           controller: controller,
                           focusNode: focusNode,
-                          decoration: const InputDecoration(
+                          decoration: InputDecoration(
                             isDense: true,
-                            contentPadding: EdgeInsets.symmetric(
+                            contentPadding: const EdgeInsets.symmetric(
                               vertical: 8,
                               horizontal: 8,
                             ),
                             hintText: 'Nome, Cód. ou QTDxID (ex: 10x1)',
-                            border: OutlineInputBorder(),
-                            prefixIcon: Icon(Icons.search),
+                            border: const OutlineInputBorder(),
+                            prefixIcon: const Icon(Icons.search),
                             filled: true,
-                            fillColor: Colors.white,
+                            fillColor: cs.surface,
                           ),
                           // onEditingComplete fecha o dropdown do Autocomplete
                           onEditingComplete: onEditingComplete,

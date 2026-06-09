@@ -242,7 +242,8 @@ class _FormularioVendaWidgetState extends State<FormularioVendaWidget> {
               child: SizedBox(
                 width: double.infinity,
                 child: DataTable(
-                  headingRowColor: WidgetStateProperty.all(Colors.grey[200]),
+                  headingRowColor: WidgetStateProperty.all(
+                      Theme.of(context).colorScheme.surfaceContainerHighest),
                   columns: const [
                     DataColumn(label: Text('Código', style: TextStyle(fontWeight: FontWeight.bold))),
                     DataColumn(label: Text('Variedade / Produto', style: TextStyle(fontWeight: FontWeight.bold))),
@@ -288,15 +289,16 @@ class _FormularioVendaWidgetState extends State<FormularioVendaWidget> {
           ),
 
         // Total geral e botão de finalização — exibidos apenas quando há itens
-        if (widget.carrinho.isNotEmpty) _rodapeTotalPedido(),
-        if (widget.carrinho.isNotEmpty) _botaoFinalizar(),
+        if (widget.carrinho.isNotEmpty) _rodapeTotalPedido(context),
+        if (widget.carrinho.isNotEmpty) _botaoFinalizar(context),
       ],
     );
   }
 
   /// Exibe subtotal, ajuste (quando aplicado) e total final.
   /// Toque para abrir o diálogo de desconto/acréscimo.
-  Widget _rodapeTotalPedido() {
+  Widget _rodapeTotalPedido(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
     final subtotal = widget.carrinho.fold<double>(
       0,
       (soma, item) => soma + (item['total'] as double),
@@ -308,26 +310,24 @@ class _FormularioVendaWidgetState extends State<FormularioVendaWidget> {
       width: double.infinity,
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
       decoration: BoxDecoration(
-        color: Colors.green[50],
-        border: Border(top: BorderSide(color: Colors.green.shade200)),
+        color: cs.surfaceContainerLow,
+        border: Border(top: BorderSide(color: cs.outlineVariant)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.end,
         children: [
-          // Linha de subtotal — exibida apenas quando há ajuste
           if (temAjuste) ...[
             Row(
               mainAxisAlignment: MainAxisAlignment.end,
               children: [
                 Text('Subtotal:',
-                    style: TextStyle(fontSize: 14, color: Colors.grey[600])),
+                    style: TextStyle(fontSize: 14, color: cs.onSurfaceVariant)),
                 const SizedBox(width: 8),
                 Text('R\$ ${subtotal.toStringAsFixed(2)}',
-                    style: TextStyle(fontSize: 14, color: Colors.grey[600])),
+                    style: TextStyle(fontSize: 14, color: cs.onSurfaceVariant)),
               ],
             ),
             const SizedBox(height: 2),
-            // Linha do ajuste com ícone e cor indicativa
             Row(
               mainAxisAlignment: MainAxisAlignment.end,
               children: [
@@ -336,18 +336,14 @@ class _FormularioVendaWidgetState extends State<FormularioVendaWidget> {
                       ? Icons.arrow_downward_rounded
                       : Icons.arrow_upward_rounded,
                   size: 13,
-                  color: widget.ajuste < 0
-                      ? Colors.blue[700]
-                      : Colors.orange[800],
+                  color: widget.ajuste < 0 ? Colors.blue[700] : Colors.orange[800],
                 ),
                 const SizedBox(width: 4),
                 Text(
                   widget.descricaoAjuste ?? '',
                   style: TextStyle(
                     fontSize: 13,
-                    color: widget.ajuste < 0
-                        ? Colors.blue[700]
-                        : Colors.orange[800],
+                    color: widget.ajuste < 0 ? Colors.blue[700] : Colors.orange[800],
                   ),
                 ),
                 const SizedBox(width: 8),
@@ -356,22 +352,19 @@ class _FormularioVendaWidgetState extends State<FormularioVendaWidget> {
                   style: TextStyle(
                     fontSize: 13,
                     fontWeight: FontWeight.bold,
-                    color: widget.ajuste < 0
-                        ? Colors.blue[700]
-                        : Colors.orange[800],
+                    color: widget.ajuste < 0 ? Colors.blue[700] : Colors.orange[800],
                   ),
                 ),
               ],
             ),
             const SizedBox(height: 6),
           ],
-          // Total final — apenas este trecho é clicável
           Tooltip(
             message: 'Clique para adicionar desconto ou acréscimo',
             child: InkWell(
               onTap: () => _abrirDialogAjuste(subtotal),
               borderRadius: BorderRadius.circular(4),
-              hoverColor: Colors.green.withAlpha(30),
+              hoverColor: cs.primary.withAlpha(30),
               child: Padding(
                 padding: const EdgeInsets.symmetric(vertical: 2, horizontal: 4),
                 child: Row(
@@ -387,11 +380,11 @@ class _FormularioVendaWidgetState extends State<FormularioVendaWidget> {
                       style: TextStyle(
                         fontSize: 20,
                         fontWeight: FontWeight.bold,
-                        color: Colors.green[800],
+                        color: cs.primary,
                       ),
                     ),
                     const SizedBox(width: 6),
-                    Icon(Icons.edit_outlined, size: 15, color: Colors.grey[500]),
+                    Icon(Icons.edit_outlined, size: 15, color: cs.onSurfaceVariant),
                   ],
                 ),
               ),
@@ -418,7 +411,7 @@ class _FormularioVendaWidgetState extends State<FormularioVendaWidget> {
   }
 
   /// Botão de finalização do pedido, com atalho F12 indicado na label.
-  Widget _botaoFinalizar() {
+  Widget _botaoFinalizar(BuildContext context) {
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 4, 16, 12),
       child: Align(
@@ -428,7 +421,6 @@ class _FormularioVendaWidgetState extends State<FormularioVendaWidget> {
           icon: const Icon(Icons.check_circle_outline),
           label: const Text('Finalizar Pedido  •  F12'),
           style: FilledButton.styleFrom(
-            backgroundColor: Colors.green[700],
             padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 24),
             textStyle: const TextStyle(
               fontSize: 16,
@@ -562,65 +554,68 @@ class _DialogAjusteState extends State<_DialogAjuste> {
             ),
             const SizedBox(height: 16),
             // Preview em tempo real do total após o ajuste
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: Colors.grey[100],
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Column(
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      const Text('Subtotal:'),
-                      Text('R\$ ${widget.subtotal.toStringAsFixed(2)}'),
-                    ],
-                  ),
-                  if (ajustePreview != 0) ...[
-                    const SizedBox(height: 4),
+            Builder(builder: (context) {
+              final cs = Theme.of(context).colorScheme;
+              return Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: cs.surfaceContainerHighest,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Column(
+                  children: [
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Text(
-                          _ehDesconto ? 'Desconto:' : 'Acréscimo:',
-                          style: TextStyle(
-                            color: _ehDesconto
-                                ? Colors.blue[700]
-                                : Colors.orange[800],
+                        const Text('Subtotal:'),
+                        Text('R\$ ${widget.subtotal.toStringAsFixed(2)}'),
+                      ],
+                    ),
+                    if (ajustePreview != 0) ...[
+                      const SizedBox(height: 4),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text(
+                            _ehDesconto ? 'Desconto:' : 'Acréscimo:',
+                            style: TextStyle(
+                              color: _ehDesconto
+                                  ? Colors.blue[700]
+                                  : Colors.orange[800],
+                            ),
                           ),
-                        ),
+                          Text(
+                            '${ajustePreview < 0 ? '-' : '+'}R\$ ${ajustePreview.abs().toStringAsFixed(2)}',
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              color: _ehDesconto
+                                  ? Colors.blue[700]
+                                  : Colors.orange[800],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                    const Divider(height: 12),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text('Total:',
+                            style: TextStyle(fontWeight: FontWeight.bold)),
                         Text(
-                          '${ajustePreview < 0 ? '-' : '+'}R\$ ${ajustePreview.abs().toStringAsFixed(2)}',
+                          'R\$ ${totalPreview.toStringAsFixed(2)}',
                           style: TextStyle(
                             fontWeight: FontWeight.bold,
-                            color: _ehDesconto
-                                ? Colors.blue[700]
-                                : Colors.orange[800],
+                            color: cs.primary,
                           ),
                         ),
                       ],
                     ),
                   ],
-                  const Divider(height: 12),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      const Text('Total:',
-                          style: TextStyle(fontWeight: FontWeight.bold)),
-                      Text(
-                        'R\$ ${totalPreview.toStringAsFixed(2)}',
-                        style: TextStyle(
-                          fontWeight: FontWeight.bold,
-                          color: Colors.green[800],
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
+                ),
+              );
+            }),
           ],
         ),
       ),
@@ -631,7 +626,7 @@ class _DialogAjusteState extends State<_DialogAjuste> {
             widget.onRemover();
             Navigator.pop(context);
           },
-          child: Text('Limpar', style: TextStyle(color: Colors.grey[600])),
+          child: const Text('Limpar'),
         ),
         TextButton(
           onPressed: () => Navigator.pop(context),
@@ -654,7 +649,6 @@ class _DialogAjusteState extends State<_DialogAjuste> {
             }
             Navigator.pop(context);
           },
-          style: FilledButton.styleFrom(backgroundColor: Colors.green[700]),
           child: const Text('Aplicar'),
         ),
       ],
