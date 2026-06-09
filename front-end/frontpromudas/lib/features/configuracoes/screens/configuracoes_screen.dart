@@ -33,10 +33,7 @@ class _TelaConfiguracoesState extends State<TelaConfiguracoes> {
                   mode == ThemeMode.dark ? 'Ativado' : 'Desativado',
                 ),
                 value: mode == ThemeMode.dark,
-                onChanged: (_) {
-                  ThemeService.toggleTheme();
-                  setState(() {});
-                },
+                onChanged: (_) => ThemeService.toggleTheme(),
               );
             },
           ),

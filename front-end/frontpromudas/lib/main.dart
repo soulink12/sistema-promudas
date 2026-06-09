@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'core/services/theme_service.dart';
 import 'features/auth/screens/login_screen.dart';
 
-void main() {
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await ThemeService.carregar();
   runApp(const MeuViveiroApp());
 }
 
