@@ -6,13 +6,19 @@ const moeda = (v) => `R$ ${parseFloat(v || 0).toFixed(2).replace('.', ',')}`;
 const formatarData = (d) => {
     if (!d) return '—';
     const dt = new Date(d);
-    return dt.toLocaleDateString('pt-BR') + '  ' + dt.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+    const dia = String(dt.getDate()).padStart(2, '0');
+    const mes = String(dt.getMonth() + 1).padStart(2, '0');
+    const hora = String(dt.getHours()).padStart(2, '0');
+    const min = String(dt.getMinutes()).padStart(2, '0');
+    return `${dia}/${mes}/${dt.getFullYear()}  ${hora}:${min}`;
 };
 
 const formatarDataCurta = (d) => {
     if (!d) return '—';
     const dt = new Date(d);
-    return dt.toLocaleDateString('pt-BR');
+    const dia = String(dt.getDate()).padStart(2, '0');
+    const mes = String(dt.getMonth() + 1).padStart(2, '0');
+    return `${dia}/${mes}/${dt.getFullYear()}`;
 };
 
 const linhaHorizontal = (doc, cor = '#cccccc') => {
