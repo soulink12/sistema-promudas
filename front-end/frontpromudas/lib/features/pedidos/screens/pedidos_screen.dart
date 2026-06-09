@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../../core/services/api_service.dart';
 import '../../vendas/screens/widgets/modal_busca_cliente.dart';
+import '../../vendas/screens/widgets/modal_pagamento.dart';
 
 class TelaPedidos extends StatefulWidget {
   const TelaPedidos({super.key});
@@ -12,6 +13,7 @@ class TelaPedidos extends StatefulWidget {
 class _TelaPedidosState extends State<TelaPedidos> {
   List<Map<String, dynamic>> _pedidos = [];
   bool _carregando = true;
+  bool _salvando = false;
   String? _erro;
 
   Map<String, dynamic>? _clienteFiltro;
@@ -46,6 +48,32 @@ class _TelaPedidosState extends State<TelaPedidos> {
         _erro = 'Não foi possível carregar os pedidos.';
         _carregando = false;
       });
+    }
+  }
+
+  // Recarrega silenciosamente e atualiza o pedido selecionado sem trocar a view
+  Future<void> _recarregarSilencioso(int pedidoId) async {
+    try {
+      final clienteNome = _clienteFiltro?['nome'] as String?;
+      final response = await ApiService.dio.get(
+        '/pedidos',
+        queryParameters:
+            clienteNome != null && clienteNome.isNotEmpty ? {'cliente': clienteNome} : null,
+      );
+      final dados = response.data as List;
+      final novos = dados
+          .map<Map<String, dynamic>>((e) => Map<String, dynamic>.from(e as Map))
+          .toList();
+      final atualizado = novos.firstWhere(
+        (p) => p['id'] == pedidoId,
+        orElse: () => _pedidoSelecionado!,
+      );
+      setState(() {
+        _pedidos = novos;
+        _pedidoSelecionado = atualizado;
+      });
+    } catch (_) {
+      // Falha silenciosa — mantém dados antigos
     }
   }
 
@@ -93,6 +121,63 @@ class _TelaPedidosState extends State<TelaPedidos> {
         ),
       ),
     );
+  }
+
+  void _abrirModalPagamento(Map<String, dynamic> pedido) {
+    final total = _toDouble(pedido['valor_total']);
+    final pedidoId = pedido['id'] as int;
+
+    showDialog<void>(
+      context: context,
+      builder: (_) => ModalPagamento(
+        totalPedido: total,
+        onConfirmar: (pagamentos) => _registrarPagamento(pedidoId, total, pagamentos),
+      ),
+    );
+  }
+
+  Future<void> _registrarPagamento(
+      int pedidoId, double total, List<Map<String, dynamic>> pagamentos) async {
+    setState(() => _salvando = true);
+
+    try {
+      double restante = total;
+      for (final p in pagamentos) {
+        if (restante <= 0.005) break;
+        final valorPago = (p['valor'] as double).clamp(0.0, restante);
+        await ApiService.dio.post('/pagamentos', data: {
+          'pedido_id': pedidoId,
+          'valor_pago': valorPago,
+          'forma_pagamento': p['forma'],
+          'data_pagamento': DateTime.now().toUtc().toIso8601String(),
+        });
+        restante -= valorPago;
+      }
+
+      await _recarregarSilencioso(pedidoId);
+
+      setState(() => _salvando = false);
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Pagamento registrado com sucesso!'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+    } catch (_) {
+      setState(() => _salvando = false);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Erro ao registrar pagamento. Tente novamente.'),
+            backgroundColor: Colors.red,
+            duration: Duration(seconds: 4),
+          ),
+        );
+      }
+    }
   }
 
   @override
@@ -144,13 +229,21 @@ class _TelaPedidosState extends State<TelaPedidos> {
             ),
         ],
       ),
-      body: _carregando
-          ? const Center(child: CircularProgressIndicator())
-          : _erro != null
-              ? _buildErro()
-              : _pedidoSelecionado != null
-                  ? _buildDetalhes(_pedidoSelecionado!)
-                  : _buildLista(),
+      body: Stack(
+        children: [
+          _carregando
+              ? const Center(child: CircularProgressIndicator())
+              : _erro != null
+                  ? _buildErro()
+                  : _pedidoSelecionado != null
+                      ? _buildDetalhes(_pedidoSelecionado!)
+                      : _buildLista(),
+          if (_salvando) ...[
+            const ModalBarrier(dismissible: false, color: Colors.black26),
+            const Center(child: CircularProgressIndicator()),
+          ],
+        ],
+      ),
     );
   }
 
@@ -220,6 +313,8 @@ class _TelaPedidosState extends State<TelaPedidos> {
     final pagamentos = (pedido['pagamentos'] as List? ?? [])
         .map((e) => Map<String, dynamic>.from(e as Map))
         .toList();
+
+    final podePagar = statusPag == 'Pendente';
 
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16),
@@ -323,7 +418,6 @@ class _TelaPedidosState extends State<TelaPedidos> {
                   )
                 : Column(
                     children: [
-                      // Cabeçalho da tabela
                       _linhaTabela(
                         context,
                         isHeader: true,
@@ -387,6 +481,24 @@ class _TelaPedidosState extends State<TelaPedidos> {
                     }).toList(),
                   ),
           ),
+
+          // Botão de registrar pagamento — visível apenas quando status é Pendente
+          if (podePagar) ...[
+            const SizedBox(height: 16),
+            SizedBox(
+              width: double.infinity,
+              child: FilledButton.icon(
+                onPressed: _salvando ? null : () => _abrirModalPagamento(pedido),
+                icon: const Icon(Icons.payments_outlined),
+                label: const Text('Registrar Pagamento'),
+                style: FilledButton.styleFrom(
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                ),
+              ),
+            ),
+          ],
+
           const SizedBox(height: 24),
         ],
       ),
@@ -483,18 +595,6 @@ class _TelaPedidosState extends State<TelaPedidos> {
 
   double _toDouble(dynamic v) =>
       v == null ? 0.0 : double.tryParse(v.toString()) ?? 0.0;
-
-  String? _formatarData(dynamic valor) {
-    if (valor == null) return null;
-    try {
-      final dt = DateTime.parse(valor.toString()).toLocal();
-      return '${dt.day.toString().padLeft(2, '0')}/'
-          '${dt.month.toString().padLeft(2, '0')}/'
-          '${dt.year}';
-    } catch (_) {
-      return valor.toString();
-    }
-  }
 
   String? _formatarDataHora(dynamic valor) {
     if (valor == null) return null;

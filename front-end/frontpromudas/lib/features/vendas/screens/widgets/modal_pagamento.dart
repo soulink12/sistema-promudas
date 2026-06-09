@@ -26,11 +26,14 @@ class ModalPagamento extends StatefulWidget {
 }
 
 class _ModalPagamentoState extends State<ModalPagamento> {
+  // Cada parcela: {forma: String, valor: double, pagamentoPosterior: bool}
   final List<Map<String, dynamic>> _pagamentos = [];
   final TextEditingController _valorCtrl = TextEditingController();
   final FocusNode _valorFocusNode = FocusNode();
 
-  List<String> _formasPagamento = [];
+  // Lista completa de formas vindas da API
+  List<Map<String, dynamic>> _formasPagamento = [];
+  // Nome da forma selecionada no dropdown
   String? _formaSelecionada;
   bool _carregando = true;
   String? _erroCarregamento;
@@ -46,7 +49,7 @@ class _ModalPagamentoState extends State<ModalPagamento> {
       final formas = await FormaPagamentoService().listar();
       setState(() {
         _formasPagamento = formas;
-        _formaSelecionada = formas.isNotEmpty ? formas.first : null;
+        _formaSelecionada = formas.isNotEmpty ? formas.first['nome'] as String : null;
         _valorCtrl.text = widget.totalPedido.toStringAsFixed(2);
         _carregando = false;
       });
@@ -66,6 +69,17 @@ class _ModalPagamentoState extends State<ModalPagamento> {
     super.dispose();
   }
 
+  // Retorna true se a forma selecionada é de pagamento posterior (crediário etc.)
+  bool get _formaSelecionadaPosterior {
+    if (_formaSelecionada == null) return false;
+    for (final f in _formasPagamento) {
+      if (f['nome'] == _formaSelecionada) {
+        return f['pagamentoPosterior'] == true;
+      }
+    }
+    return false;
+  }
+
   double get _totalPago =>
       _pagamentos.fold(0.0, (s, p) => s + (p['valor'] as double));
 
@@ -82,7 +96,11 @@ class _ModalPagamentoState extends State<ModalPagamento> {
     if (valor == null || valor <= 0) return;
 
     setState(() {
-      _pagamentos.add({'forma': _formaSelecionada, 'valor': valor});
+      _pagamentos.add({
+        'forma': _formaSelecionada,
+        'valor': valor,
+        'pagamentoPosterior': _formaSelecionadaPosterior,
+      });
       final restante = _restante;
       _valorCtrl.text =
           restante > 0.005 ? restante.toStringAsFixed(2) : '';
@@ -137,21 +155,46 @@ class _ModalPagamentoState extends State<ModalPagamento> {
                 ..._pagamentos.asMap().entries.map((e) {
                   final i = e.key;
                   final p = e.value;
+                  final isPosterior = p['pagamentoPosterior'] as bool;
                   return Padding(
                     padding: const EdgeInsets.only(bottom: 6),
                     child: Row(
                       children: [
-                        Icon(Icons.check_circle_outline,
-                            size: 16, color: Colors.green[700]),
+                        // Ícone diferente para pagamentos posteriores (crediário)
+                        isPosterior
+                            ? Icon(Icons.access_time,
+                                size: 16, color: Colors.orange[700])
+                            : Icon(Icons.check_circle_outline,
+                                size: 16, color: Colors.green[700]),
                         const SizedBox(width: 8),
                         Expanded(
-                          child: Text(p['forma'] as String,
-                              style: const TextStyle(fontSize: 14)),
+                          child: Text(
+                            p['forma'] as String,
+                            style: TextStyle(
+                              fontSize: 14,
+                              color: isPosterior ? Colors.orange[800] : null,
+                            ),
+                          ),
                         ),
+                        if (isPosterior)
+                          Padding(
+                            padding: const EdgeInsets.only(right: 8),
+                            child: Text(
+                              'a receber',
+                              style: TextStyle(
+                                fontSize: 11,
+                                color: Colors.orange[700],
+                                fontStyle: FontStyle.italic,
+                              ),
+                            ),
+                          ),
                         Text(
                           'R\$ ${(p['valor'] as double).toStringAsFixed(2)}',
-                          style: const TextStyle(
-                              fontSize: 14, fontWeight: FontWeight.w600),
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                            color: isPosterior ? Colors.orange[800] : null,
+                          ),
                         ),
                         const SizedBox(width: 4),
                         InkWell(
@@ -243,9 +286,29 @@ class _ModalPagamentoState extends State<ModalPagamento> {
                     border: OutlineInputBorder(),
                     isDense: true,
                   ),
-                  items: _formasPagamento
-                      .map((f) => DropdownMenuItem(value: f, child: Text(f)))
-                      .toList(),
+                  items: _formasPagamento.map((f) {
+                    final nome = f['nome'] as String;
+                    final isPosterior = f['pagamentoPosterior'] as bool;
+                    return DropdownMenuItem<String>(
+                      value: nome,
+                      child: Row(
+                        children: [
+                          Text(nome),
+                          if (isPosterior) ...[
+                            const SizedBox(width: 8),
+                            Icon(Icons.access_time,
+                                size: 14, color: Colors.orange[700]),
+                            const SizedBox(width: 4),
+                            Text(
+                              'a receber',
+                              style: TextStyle(
+                                  fontSize: 12, color: Colors.orange[700]),
+                            ),
+                          ],
+                        ],
+                      ),
+                    );
+                  }).toList(),
                   onChanged: (v) {
                     if (v == null) return;
                     setState(() => _formaSelecionada = v);
@@ -284,6 +347,7 @@ class _ModalPagamentoState extends State<ModalPagamento> {
                     label: const Text('Adicionar'),
                     style: FilledButton.styleFrom(
                       backgroundColor: Colors.blueGrey[700],
+                      foregroundColor: Colors.white,
                       padding: const EdgeInsets.symmetric(
                           vertical: 14, horizontal: 16),
                     ),

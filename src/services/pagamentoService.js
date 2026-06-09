@@ -1,19 +1,31 @@
 const prisma = require('../config/database');
 
-// Recalcula o status de pagamento do pedido com base na soma real dos pagamentos no banco
+// Recalcula o status de pagamento do pedido com base na soma real dos pagamentos no banco.
+// Pagamentos com forma de pagamento posterior (ex: crediário) não contam como valor recebido.
 const recalcularStatusPedido = async (pedido_id) => {
-    const pedido = await prisma.pedidos.findUnique({
-        where: { id: parseInt(pedido_id) },
-        include: { pagamentos: true }
-    });
+    const [pedido, formasPosteriores] = await Promise.all([
+        prisma.pedidos.findUnique({
+            where: { id: parseInt(pedido_id) },
+            include: { pagamentos: true }
+        }),
+        prisma.formas_pagamento.findMany({
+            where: { pagamento_posterior: true },
+            select: { nome: true }
+        })
+    ]);
 
     if (!pedido) return;
 
-    const totalPago = pedido.pagamentos.reduce((soma, p) => soma + parseFloat(p.valor_pago), 0);
+    const nomesPosteriores = new Set(formasPosteriores.map(f => f.nome));
+
+    // Só conta pagamentos efetivamente recebidos (exclui crediário e similares)
+    const totalPago = pedido.pagamentos
+        .filter(p => !nomesPosteriores.has(p.forma_pagamento))
+        .reduce((soma, p) => soma + parseFloat(p.valor_pago), 0);
+
     const valorTotal = parseFloat(pedido.valor_total);
 
     let novoStatus = 'Pendente';
-
     if (totalPago >= (valorTotal - 0.01)) {
         novoStatus = 'Pago';
     } else if (totalPago > 0) {
@@ -31,10 +43,16 @@ const recalcularStatusPedido = async (pedido_id) => {
 const criarPagamento = async (dadosPagamento) => {
     const { pedido_id, valor_pago } = dadosPagamento;
 
-    const pedido = await prisma.pedidos.findUnique({
-        where: { id: parseInt(pedido_id) },
-        include: { pagamentos: true }
-    });
+    const [pedido, formasPosteriores] = await Promise.all([
+        prisma.pedidos.findUnique({
+            where: { id: parseInt(pedido_id) },
+            include: { pagamentos: true }
+        }),
+        prisma.formas_pagamento.findMany({
+            where: { pagamento_posterior: true },
+            select: { nome: true }
+        })
+    ]);
 
     if (!pedido) {
         throw new Error('Pedido não encontrado.');
@@ -44,16 +62,33 @@ const criarPagamento = async (dadosPagamento) => {
         throw new Error('Não é possível registrar pagamentos para um pedido desativado ou cancelado.');
     }
 
-    const totalPagoAnterior = pedido.pagamentos.reduce((soma, p) => soma + parseFloat(p.valor_pago), 0);
     const valorTotal = parseFloat(pedido.valor_total);
-    const saldoDevedor = valorTotal - totalPagoAnterior;
+    const nomesPosteriores = new Set(formasPosteriores.map(f => f.nome));
+    const ehPosterior = nomesPosteriores.has(dadosPagamento.forma_pagamento);
 
-    if (saldoDevedor <= 0) {
-        throw new Error('Este pedido já está totalmente pago.');
-    }
-
-    if (parseFloat(valor_pago) > (saldoDevedor + 0.01)) {
-        throw new Error(`Valor excede o saldo devedor. O máximo permitido é R$ ${saldoDevedor.toFixed(2)}.`);
+    if (ehPosterior) {
+        // Crediário: verifica contra o total já coberto (real + crediário)
+        const totalCoberto = pedido.pagamentos
+            .reduce((soma, p) => soma + parseFloat(p.valor_pago), 0);
+        const saldoNaoCoberto = valorTotal - totalCoberto;
+        if (saldoNaoCoberto <= 0) {
+            throw new Error('Este pedido já está totalmente coberto.');
+        }
+        if (parseFloat(valor_pago) > (saldoNaoCoberto + 0.01)) {
+            throw new Error(`Valor excede o saldo disponível. O máximo é R$ ${saldoNaoCoberto.toFixed(2)}.`);
+        }
+    } else {
+        // Pagamento real: verifica apenas contra pagamentos reais anteriores
+        const totalPagoReal = pedido.pagamentos
+            .filter(p => !nomesPosteriores.has(p.forma_pagamento))
+            .reduce((soma, p) => soma + parseFloat(p.valor_pago), 0);
+        const saldoDevedorReal = valorTotal - totalPagoReal;
+        if (saldoDevedorReal <= 0) {
+            throw new Error('Este pedido já está totalmente pago.');
+        }
+        if (parseFloat(valor_pago) > (saldoDevedorReal + 0.01)) {
+            throw new Error(`Valor excede o saldo devedor. O máximo permitido é R$ ${saldoDevedorReal.toFixed(2)}.`);
+        }
     }
 
     const novoPagamento = await prisma.pagamentos.create({

@@ -121,7 +121,8 @@ model usuarios {
 }
 
 model formas_pagamento {
-  id   Int     @id @default(autoincrement())
-  nome String  @db.VarChar(50)
-  ativo Boolean @default(true)
+  id                  Int     @id @default(autoincrement())
+  nome                String  @db.VarChar(50)
+  ativo               Boolean @default(true)
+  pagamento_posterior Boolean @default(false)
 }

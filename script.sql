@@ -20,4 +20,9 @@ INSERT INTO clientes (nome, cpf_cnpj, telefone_1, telefone_2, cep, logradouro, n
   ('Carlos Souza',      '333.333.333-33', '(91) 97777-3333', NULL,              '68400-000', 'Trav. dos Ipês',     '5',   'São João',      'Castanhal',    'PA'),
   ('Ana Paula Ferreira','444.444.444-44', '(91) 96666-4444', NULL,              '68005-000', 'Rua Sete de Setembro','88', 'Jaderlândia',   'Castanhal',    'PA'),
   ('Fazenda Boa Terra', '11.111.111/0001-11', '(91) 3245-5555', '(91) 99111-5555', '68740-000', 'Ramal do Açaí',  's/n', 'Zona Rural',    'Tomé-Açu',     'PA');
+  
+INSERT INTO formas_pagamento (nome) VALUES ('Crediário');
+UPDATE formas_pagamento SET pagamento_posterior = 1 WHERE nome = 'Crediário';
+  
+  
 
