@@ -12,6 +12,7 @@ import 'widgets/modal_busca_cliente.dart';
 import 'widgets/formulario_venda.dart';
 import 'widgets/rodape_venda.dart';
 import 'widgets/modal_pagamento.dart';
+import '../../../core/services/pdf_download_service.dart';
 
 /// Tela principal de registro de venda (PDV).
 /// Gerencia o estado do carrinho de compras e do cliente selecionado.
@@ -333,6 +334,7 @@ class _TelaVendaState extends State<TelaVenda> {
             backgroundColor: Colors.green,
           ),
         );
+        await PdfDownloadService.baixarESalvar(context, pedidoId);
       }
     } catch (_) {
       setState(() => _salvando = false);

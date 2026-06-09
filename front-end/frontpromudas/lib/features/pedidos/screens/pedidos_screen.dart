@@ -4,6 +4,7 @@ import '../../vendas/screens/widgets/modal_busca_cliente.dart';
 import '../../vendas/screens/widgets/modal_pagamento.dart';
 import 'widgets/lista_pedidos.dart';
 import 'widgets/detalhes_pedido.dart';
+import '../../../core/services/pdf_download_service.dart';
 
 class TelaPedidos extends StatefulWidget {
   const TelaPedidos({super.key});
@@ -202,6 +203,7 @@ class _TelaPedidosState extends State<TelaPedidos> {
             backgroundColor: Colors.green,
           ),
         );
+        await PdfDownloadService.baixarESalvar(context, pedidoId);
       }
     } catch (_) {
       setState(() => _salvando = false);

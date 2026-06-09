@@ -1,4 +1,5 @@
 const pedidoService = require('../services/pedidoService');
+const pdfService = require('../services/pdfService');
 
 const criarPedido = async (req, res) => {
     try {
@@ -51,9 +52,23 @@ const eliminarPedido = async (req, res) => {
     }
 };
 
+const gerarPDF = async (req, res) => {
+    try {
+        const buffer = await pdfService.gerarPedidoPDF(req.params.id);
+        res.setHeader('Content-Type', 'application/pdf');
+        res.setHeader('Content-Disposition', `attachment; filename="pedido_${req.params.id}.pdf"`);
+        res.setHeader('Content-Length', buffer.length);
+        res.send(buffer);
+    } catch (error) {
+        console.error('Erro ao gerar PDF:', error);
+        res.status(error.status || 500).json({ erro: error.message || 'Erro ao gerar PDF do pedido.' });
+    }
+};
+
 module.exports = {
     criarPedido,
     listarPedidos,
     atualizarPedido,
-    eliminarPedido
+    eliminarPedido,
+    gerarPDF
 };
