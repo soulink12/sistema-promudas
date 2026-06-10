@@ -7,6 +7,7 @@ import '../../vendas/screens/widgets/modal_pagamento.dart';
 import 'widgets/lista_pedidos.dart';
 import 'widgets/detalhes_pedido.dart';
 import 'widgets/dialog_editar_pagamento.dart';
+import 'widgets/dialog_nota_fiscal.dart';
 import '../../../core/services/pdf_download_service.dart';
 import '../../vendas/screens/venda_screen.dart';
 import '../../clientes/screens/clientes_screen.dart';
@@ -301,6 +302,37 @@ class _TelaPedidosState extends State<TelaPedidos> {
     }
   }
 
+  Future<void> _editarNotaFiscal(Map<String, dynamic> pagamento) async {
+    final resultado = await showDialog<Map<String, dynamic>>(
+      context: context,
+      builder: (_) => DialogNotaFiscal(pagamento: pagamento),
+    );
+    if (resultado == null) return;
+
+    final pedidoId = _pedidoSelecionado!['id'] as int;
+    setState(() => _salvando = true);
+    try {
+      await ApiService.dio.put('/pagamentos/${pagamento['id']}', data: {
+        'status_nota': resultado['status_nota'],
+        'numero_nota': resultado['numero_nota'],
+        'data_emissao_nota': resultado['data_emissao_nota'],
+      });
+      await _recarregarSilencioso(pedidoId);
+      setState(() => _salvando = false);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Nota fiscal atualizada com sucesso!'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+    } catch (e) {
+      setState(() => _salvando = false);
+      _mostrarErro(_extrairErro(e, 'Erro ao atualizar nota fiscal.'));
+    }
+  }
+
   String _extrairErro(Object e, String fallback) {
     if (e is DioException) {
       final data = e.response?.data;
@@ -351,6 +383,7 @@ class _TelaPedidosState extends State<TelaPedidos> {
                         _abrirDetalhesCliente(_pedidoSelecionado!),
                     onEditarPagamento: _editarPagamento,
                     onExcluirPagamento: _excluirPagamento,
+                    onNotaFiscalPagamento: _editarNotaFiscal,
                   )
                 : _buildListagem(),
             if (_salvando) ...[

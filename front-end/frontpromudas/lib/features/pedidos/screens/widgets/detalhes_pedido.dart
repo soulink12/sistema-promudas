@@ -11,6 +11,7 @@ class DetalhesPedido extends StatelessWidget {
   final VoidCallback onTapCliente;
   final void Function(Map<String, dynamic> pagamento) onEditarPagamento;
   final void Function(Map<String, dynamic> pagamento) onExcluirPagamento;
+  final void Function(Map<String, dynamic> pagamento) onNotaFiscalPagamento;
 
   const DetalhesPedido({
     super.key,
@@ -23,6 +24,7 @@ class DetalhesPedido extends StatelessWidget {
     required this.onTapCliente,
     required this.onEditarPagamento,
     required this.onExcluirPagamento,
+    required this.onNotaFiscalPagamento,
   });
 
   @override
@@ -274,86 +276,14 @@ class DetalhesPedido extends StatelessWidget {
                     child: Text('Nenhum pagamento recebido ainda.'),
                   )
                 : Column(
-                    children: pagamentosReais.map((pag) {
-                      final dataPag =
-                          _formatarDataHora(pag['criado_em']) ?? '—';
-                      final forma = pag['forma_pagamento'] as String? ?? '—';
-                      final valor = _toDouble(pag['valor_pago']);
-                      final nomePagador = pag['nome_pagador'] as String?;
-                      final temPagador =
-                          nomePagador != null && nomePagador.isNotEmpty;
-                      return ListTile(
-                        isThreeLine: temPagador,
-                        leading: const Icon(Icons.payments_outlined),
-                        title: Text(forma),
-                        subtitle: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(dataPag),
-                            if (temPagador)
-                              Text(
-                                'Pago por: $nomePagador',
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  color:
-                                      Theme.of(context).colorScheme.primary,
-                                ),
-                              ),
-                          ],
-                        ),
-                        trailing: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Text(
-                              'R\$ ${valor.toStringAsFixed(2)}',
-                              style: TextStyle(
-                                fontWeight: FontWeight.bold,
-                                fontSize: 15,
-                                color: Theme.of(context).colorScheme.primary,
-                              ),
-                            ),
-                            PopupMenuButton<String>(
-                              icon: Icon(Icons.more_vert,
-                                  size: 20,
-                                  color: Theme.of(context)
-                                      .colorScheme
-                                      .onSurfaceVariant),
-                              tooltip: 'Ações',
-                              onSelected: (valor) {
-                                if (valor == 'editar') onEditarPagamento(pag);
-                                if (valor == 'excluir') onExcluirPagamento(pag);
-                              },
-                              itemBuilder: (_) => [
-                                const PopupMenuItem(
-                                  value: 'editar',
-                                  child: ListTile(
-                                    leading: Icon(Icons.edit_outlined),
-                                    title: Text('Editar'),
-                                    contentPadding: EdgeInsets.zero,
-                                    dense: true,
-                                  ),
-                                ),
-                                PopupMenuItem(
-                                  value: 'excluir',
-                                  child: ListTile(
-                                    leading: Icon(Icons.delete_outline,
-                                        color:
-                                            Theme.of(context).colorScheme.error),
-                                    title: Text('Excluir',
-                                        style: TextStyle(
-                                            color: Theme.of(context)
-                                                .colorScheme
-                                                .error)),
-                                    contentPadding: EdgeInsets.zero,
-                                    dense: true,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ],
-                        ),
-                      );
-                    }).toList(),
+                    children: pagamentosReais
+                        .map((pag) => _LinhaPagamento(
+                              pag: pag,
+                              onEditar: onEditarPagamento,
+                              onExcluir: onExcluirPagamento,
+                              onNota: onNotaFiscalPagamento,
+                            ))
+                        .toList(),
                   ),
           ),
 
@@ -435,6 +365,137 @@ class _TituloSecao extends StatelessWidget {
           color: Colors.green[700],
           letterSpacing: 0.8,
         ),
+      ),
+    );
+  }
+}
+
+/// Linha de um pagamento na lista de detalhes do pedido — mostra forma, data,
+/// pagador (se houver), status da nota fiscal e o menu de ações.
+class _LinhaPagamento extends StatelessWidget {
+  final Map<String, dynamic> pag;
+  final void Function(Map<String, dynamic>) onEditar;
+  final void Function(Map<String, dynamic>) onExcluir;
+  final void Function(Map<String, dynamic>) onNota;
+
+  const _LinhaPagamento({
+    required this.pag,
+    required this.onEditar,
+    required this.onExcluir,
+    required this.onNota,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+
+    final dataPag = _formatarDataHora(pag['criado_em']) ?? '—';
+    final forma = pag['forma_pagamento'] as String? ?? '—';
+    final valor = _toDouble(pag['valor_pago']);
+    final nomePagador = pag['nome_pagador'] as String?;
+    final temPagador = nomePagador != null && nomePagador.isNotEmpty;
+
+    final statusNota = pag['status_nota'] as String? ?? 'Pendente';
+    final numeroNota = pag['numero_nota'] as String?;
+    final dataNota = _formatarDataNota(pag['data_emissao_nota']);
+    final corNota = _corStatusNota(statusNota, cs);
+    final textoNota = _textoNota(statusNota, numeroNota, dataNota);
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: const EdgeInsets.only(top: 2, right: 12),
+            child: Icon(Icons.payments_outlined, color: cs.onSurfaceVariant),
+          ),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(forma,
+                    style: const TextStyle(
+                        fontWeight: FontWeight.w500, fontSize: 15)),
+                const SizedBox(height: 2),
+                Text(dataPag,
+                    style: TextStyle(fontSize: 12, color: cs.onSurfaceVariant)),
+                if (temPagador) ...[
+                  const SizedBox(height: 2),
+                  Text('Pago por: $nomePagador',
+                      style: TextStyle(fontSize: 12, color: cs.primary)),
+                ],
+                const SizedBox(height: 4),
+                Row(
+                  children: [
+                    Icon(Icons.receipt_long_outlined, size: 13, color: corNota),
+                    const SizedBox(width: 4),
+                    Flexible(
+                      child: Text(
+                        textoNota,
+                        style: TextStyle(
+                            fontSize: 12,
+                            color: corNota,
+                            fontWeight: FontWeight.w500),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 8),
+          Padding(
+            padding: const EdgeInsets.only(top: 2),
+            child: Text(
+              'R\$ ${valor.toStringAsFixed(2)}',
+              style: TextStyle(
+                fontWeight: FontWeight.bold,
+                fontSize: 15,
+                color: cs.primary,
+              ),
+            ),
+          ),
+          PopupMenuButton<String>(
+            icon: Icon(Icons.more_vert, size: 20, color: cs.onSurfaceVariant),
+            tooltip: 'Ações',
+            onSelected: (v) {
+              if (v == 'editar') onEditar(pag);
+              if (v == 'nota') onNota(pag);
+              if (v == 'excluir') onExcluir(pag);
+            },
+            itemBuilder: (_) => [
+              const PopupMenuItem(
+                value: 'editar',
+                child: ListTile(
+                  leading: Icon(Icons.edit_outlined),
+                  title: Text('Editar'),
+                  contentPadding: EdgeInsets.zero,
+                  dense: true,
+                ),
+              ),
+              const PopupMenuItem(
+                value: 'nota',
+                child: ListTile(
+                  leading: Icon(Icons.receipt_long_outlined),
+                  title: Text('Nota fiscal'),
+                  contentPadding: EdgeInsets.zero,
+                  dense: true,
+                ),
+              ),
+              PopupMenuItem(
+                value: 'excluir',
+                child: ListTile(
+                  leading: Icon(Icons.delete_outline, color: cs.error),
+                  title: Text('Excluir', style: TextStyle(color: cs.error)),
+                  contentPadding: EdgeInsets.zero,
+                  dense: true,
+                ),
+              ),
+            ],
+          ),
+        ],
       ),
     );
   }
@@ -579,6 +640,40 @@ class _LinhaTabela extends StatelessWidget {
 
 double _toDouble(dynamic v) =>
     v == null ? 0.0 : double.tryParse(v.toString()) ?? 0.0;
+
+/// Formata a data de emissão da nota (coluna só-data). Usa componentes UTC
+/// para não deslocar o dia ao converter para o fuso local.
+String? _formatarDataNota(dynamic valor) {
+  if (valor == null) return null;
+  final dt = DateTime.tryParse(valor.toString());
+  if (dt == null) return null;
+  final u = dt.toUtc();
+  return '${u.day.toString().padLeft(2, '0')}/'
+      '${u.month.toString().padLeft(2, '0')}/${u.year}';
+}
+
+Color _corStatusNota(String status, ColorScheme cs) {
+  switch (status) {
+    case 'Emitida':
+      return Colors.green.shade700;
+    case 'Rejeitada':
+      return cs.error;
+    case 'Processando':
+      return Colors.blue.shade700;
+    default: // Pendente
+      return Colors.orange.shade800;
+  }
+}
+
+String _textoNota(String status, String? numero, String? data) {
+  if (status == 'Emitida') {
+    final partes = <String>['Nota emitida'];
+    if (numero != null && numero.isNotEmpty) partes.add('nº $numero');
+    if (data != null) partes.add(data);
+    return partes.join(' · ');
+  }
+  return 'Nota: $status';
+}
 
 String? _formatarDataHora(dynamic valor) {
   if (valor == null) return null;

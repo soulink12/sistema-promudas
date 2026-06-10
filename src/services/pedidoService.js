@@ -54,6 +54,9 @@ const listarPedidos = async (filtros = {}) => {
                         forma_pagamento: true,
                         nome_pagador: true,
                         cpf_cnpj_pagador: true,
+                        status_nota: true,
+                        numero_nota: true,
+                        data_emissao_nota: true,
                         criado_em: true,
                     },
                     orderBy: { criado_em: 'asc' }
@@ -173,6 +176,9 @@ const buscarPedido = async (id) => {
                         forma_pagamento: true,
                         nome_pagador: true,
                         cpf_cnpj_pagador: true,
+                        status_nota: true,
+                        numero_nota: true,
+                        data_emissao_nota: true,
                         criado_em: true,
                     },
                     orderBy: { criado_em: 'asc' }
