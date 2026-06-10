@@ -245,6 +245,14 @@ const gerarRelatorioPDF = async ({ de, ate, forma }) => {
                 doc.text(cliente, 291, y, { width: 164, lineBreak: false });
                 doc.text(moeda(pag.valor_pago), 460, y, { width: 85, align: 'right' });
                 doc.moveDown(0.4);
+
+                // Pagador, quando diferente do cliente
+                if (pag.nome_pagador) {
+                    doc.font('Helvetica-Oblique').fontSize(7).fillColor('#888888')
+                        .text(`Pago por: ${pag.nome_pagador}`, 143, doc.y, { width: 312, lineBreak: false });
+                    doc.fillColor('black');
+                    doc.moveDown(0.35);
+                }
                 idxDet++;
             });
         }
@@ -333,6 +341,14 @@ const gerarRelatorioPedidosPDF = async ({ de, ate, statusPagamento, statusRetira
             pagamentos: {
                 orderBy: { criado_em: 'asc' },
             },
+            retiradas: {
+                orderBy: { criado_em: 'asc' },
+                include: {
+                    itens_retirada: {
+                        include: { produtos: { select: { nome: true } } },
+                    },
+                },
+            },
         },
         orderBy: { criado_em: 'desc' },
     });
@@ -359,7 +375,7 @@ const gerarRelatorioPedidosPDF = async ({ de, ate, statusPagamento, statusRetira
         if (ate) periodoParts.push(`Até: ${formatarDataCurta(ate)}`);
         if (!de && !ate) periodoParts.push('Todo o período');
         if (statusPagamento) periodoParts.push(`Pagamento: ${statusPagamento}`);
-        if (statusRetirada) periodoParts.push(`Retirada: ${statusRetirada}`);
+        if (statusRetirada) periodoParts.push(`Entrega: ${statusRetirada}`);
 
         doc.font('Helvetica').fontSize(9).fillColor('#777777')
             .text(periodoParts.join('   '), { align: 'center' });
@@ -410,7 +426,7 @@ const gerarRelatorioPedidosPDF = async ({ de, ate, statusPagamento, statusRetira
             const yStatus = doc.y;
             doc.font('Helvetica').fontSize(8).fillColor('#555555');
             doc.text(`Pagamento: ${pedido.status_pagamento}`, 56, yStatus, { lineBreak: false });
-            doc.text(`Retirada: ${pedido.status_retirada}`, 200, yStatus, { lineBreak: false });
+            doc.text(`Entrega: ${pedido.status_retirada}`, 200, yStatus, { lineBreak: false });
 
             // Valor total e ajuste
             const ajuste = parseFloat(pedido.ajuste ?? 0);
@@ -474,12 +490,50 @@ const gerarRelatorioPedidosPDF = async ({ de, ate, statusPagamento, statusRetira
                     const yPag = doc.y;
                     const nomeFP = pag.forma_pagamento ?? '—';
                     const dataPag = formatarDataCurta(pag.data_pagamento || pag.criado_em);
-                    doc.font('Helvetica').fontSize(8).fillColor('black');
-                    doc.text('', 56, yPag, { width: 200, lineBreak: false });
+                    const pagador = pag.nome_pagador ? `Pago por: ${pag.nome_pagador}` : '';
+                    doc.font('Helvetica').fontSize(8).fillColor('#666666');
+                    doc.text(pagador, 56, yPag, { width: 200, lineBreak: false });
+                    doc.fillColor('black');
                     doc.text(nomeFP, 260, yPag, { width: 140, lineBreak: false });
                     doc.text(dataPag, 403, yPag, { width: 80, lineBreak: false });
                     doc.text(moeda(pag.valor_pago), 463, yPag, { width: 82, align: 'right' });
                     doc.moveDown(0.4);
+                });
+            }
+
+            // ── Entregas ───────────────────────────────────────────────────
+            if (pedido.retiradas.length > 0) {
+                doc.moveDown(0.3);
+                doc.moveTo(56, doc.y).lineTo(545, doc.y).strokeColor('#dddddd').lineWidth(0.5).stroke();
+                doc.strokeColor('black').lineWidth(1);
+                doc.moveDown(0.3);
+
+                doc.font('Helvetica-Bold').fontSize(8).fillColor('#777777')
+                    .text('Entregas', 56, doc.y);
+                doc.fillColor('black');
+                doc.moveDown(0.2);
+
+                pedido.retiradas.forEach((ret) => {
+                    if (doc.y + 14 > paginaFundo) { doc.addPage(); }
+                    const dataRet = formatarDataCurta(ret.data_retirada || ret.criado_em);
+                    const local = ret.local_saida ?? '—';
+                    const veiculo = [ret.motorista, ret.placa_veiculo].filter(Boolean).join(' · ');
+                    const cabecalho = `${dataRet}  ·  Local: ${local}${veiculo ? '  ·  ' + veiculo : ''}`;
+                    doc.font('Helvetica-Bold').fontSize(8).fillColor('#555555')
+                        .text(cabecalho, 56, doc.y, { width: 489 });
+                    doc.fillColor('black');
+                    doc.moveDown(0.15);
+
+                    ret.itens_retirada.forEach((it) => {
+                        if (doc.y + 12 > paginaFundo) { doc.addPage(); }
+                        const yIt = doc.y;
+                        const nomeProd = it.produtos?.nome ?? '—';
+                        doc.font('Helvetica').fontSize(8).fillColor('#333333');
+                        doc.text(`• ${nomeProd}`, 66, yIt, { width: 380, lineBreak: false });
+                        doc.text(`${it.quantidade}x`, 463, yIt, { width: 82, align: 'right' });
+                        doc.fillColor('black');
+                        doc.moveDown(0.35);
+                    });
                 });
             }
 
