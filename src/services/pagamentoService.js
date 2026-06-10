@@ -26,8 +26,12 @@ const recalcularStatusPedido = async (pedido_id) => {
 
     const valorTotal = parseFloat(pedido.valor_total);
 
+    // "Crédito": o cliente pagou mais do que o total atual do pedido — sobra que
+    // vira saldo de crédito (ocorre quando um pedido já pago é editado para menos).
     let novoStatus = 'Pendente';
-    if (totalPago >= (valorTotal - 0.01)) {
+    if (totalPago > (valorTotal + 0.01)) {
+        novoStatus = 'Crédito';
+    } else if (totalPago >= (valorTotal - 0.01)) {
         novoStatus = 'Pago';
     } else if (totalPago > 0) {
         novoStatus = 'Parcial';

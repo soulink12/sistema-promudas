@@ -290,7 +290,7 @@ const relatorioPedidos = async ({ de, ate, statusPagamento, statusRetirada, clie
 
     const valorTotal = pedidos.reduce((s, p) => s + parseFloat(p.valor_total), 0);
 
-    const porStatusPagamento = { Pago: 0, Parcial: 0, Pendente: 0 };
+    const porStatusPagamento = { Pago: 0, Crédito: 0, Parcial: 0, Pendente: 0 };
     pedidos.forEach(p => { porStatusPagamento[p.status_pagamento]++; });
 
     return {

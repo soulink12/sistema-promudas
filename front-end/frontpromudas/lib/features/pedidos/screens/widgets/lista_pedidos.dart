@@ -90,6 +90,9 @@ class ChipStatus extends StatelessWidget {
       case 'realizada':
         cor = Colors.green;
         break;
+      case 'crédito':
+        cor = Colors.blue;
+        break;
       case 'parcial':
         cor = Colors.orange;
         break;

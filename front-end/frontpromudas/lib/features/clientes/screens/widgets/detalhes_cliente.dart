@@ -24,6 +24,7 @@ class DetalhesCliente extends StatelessWidget {
   Widget build(BuildContext context) {
     final c = cliente;
     final nome = c['nome'] as String? ?? '';
+    final saldoCredito = _toDouble(c['saldo_credito']);
     final pendentes = pedidosCliente
         .where((p) {
           final s = p['status_pagamento'] as String? ?? '';
@@ -105,6 +106,58 @@ class DetalhesCliente extends StatelessWidget {
               ),
             ),
           ),
+
+          // ── Crédito disponível ─────────────────────────────────────────
+          if (saldoCredito > 0) ...[
+            const SizedBox(height: 12),
+            Card(
+              color: Colors.green[50],
+              child: Padding(
+                padding: const EdgeInsets.symmetric(
+                    horizontal: 20, vertical: 16),
+                child: Row(
+                  children: [
+                    Container(
+                      width: 44,
+                      height: 44,
+                      decoration: BoxDecoration(
+                        color: Colors.green[100],
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Icon(Icons.savings_outlined,
+                          color: Colors.green[800]),
+                    ),
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'CRÉDITO DISPONÍVEL',
+                            style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.green[700],
+                              letterSpacing: 0.8,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            'R\$ ${saldoCredito.toStringAsFixed(2)}',
+                            style: TextStyle(
+                              fontSize: 22,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.green[800],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
 
           // ── Pedidos pendentes ──────────────────────────────────────────
           const SizedBox(height: 20),

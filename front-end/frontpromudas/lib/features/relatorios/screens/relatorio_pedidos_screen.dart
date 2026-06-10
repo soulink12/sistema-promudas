@@ -196,7 +196,7 @@ class _TelaRelatorioPedidosState extends State<TelaRelatorioPedidos> {
                   const SizedBox(height: 16),
                   _FiltroStatus(
                     label: 'STATUS DE PAGAMENTO',
-                    opcoes: const ['Pago', 'Parcial', 'Pendente'],
+                    opcoes: const ['Pago', 'Crédito', 'Parcial', 'Pendente'],
                     selecionado: _statusPagamento,
                     onSelecionar: (v) => setState(() => _statusPagamento = v),
                   ),
@@ -448,6 +448,8 @@ class _ChipStatus extends StatelessWidget {
     switch (status) {
       case 'Pago':
         return Colors.green[700]!;
+      case 'Crédito':
+        return Colors.blue[700]!;
       case 'Parcial':
         return Colors.orange[700]!;
       default:
@@ -547,9 +549,11 @@ class _CardPedido extends StatelessWidget {
                   label: statusPag,
                   cor: statusPag == 'Pago'
                       ? Colors.green[700]!
-                      : statusPag == 'Parcial'
-                          ? Colors.orange[700]!
-                          : Colors.grey[600]!,
+                      : statusPag == 'Crédito'
+                          ? Colors.blue[700]!
+                          : statusPag == 'Parcial'
+                              ? Colors.orange[700]!
+                              : Colors.grey[600]!,
                 ),
                 const SizedBox(width: 8),
                 _PillStatus(
