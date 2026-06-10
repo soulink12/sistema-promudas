@@ -124,10 +124,12 @@ class _ModalPagamentoState extends State<ModalPagamento> {
     final nome = _nomePagadorCtrl.text.trim();
     final cpf = _cpfPagadorCtrl.text.trim();
     return _pagamentos.map((p) {
+      // Crediário (a receber) não tem pagador
+      final posterior = p['pagamentoPosterior'] == true;
       return {
         ...p,
-        if (nome.isNotEmpty) 'nomePagador': nome,
-        if (cpf.isNotEmpty) 'cpfPagador': cpf,
+        if (!posterior && nome.isNotEmpty) 'nomePagador': nome,
+        if (!posterior && cpf.isNotEmpty) 'cpfPagador': cpf,
       };
     }).toList();
   }
@@ -379,47 +381,49 @@ class _ModalPagamentoState extends State<ModalPagamento> {
                 ],
               ),
 
-              const SizedBox(height: 16),
-
-              // Pagador (opcional) — preencher quando quem paga não é o cliente
-              Text(
-                'PAGADOR (SE DIFERENTE DO CLIENTE)',
-                style: TextStyle(
-                  fontSize: 11,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.grey[600],
-                  letterSpacing: 0.8,
+              // Pagador (opcional) — escondido quando a forma é crediário
+              // (pagamento posterior), pois ainda não há quem pagou.
+              if (!_formaSelecionadaPosterior) ...[
+                const SizedBox(height: 16),
+                Text(
+                  'PAGADOR (SE DIFERENTE DO CLIENTE)',
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.grey[600],
+                    letterSpacing: 0.8,
+                  ),
                 ),
-              ),
-              const SizedBox(height: 8),
-              Row(
-                children: [
-                  Expanded(
-                    flex: 2,
-                    child: TextField(
-                      controller: _nomePagadorCtrl,
-                      decoration: const InputDecoration(
-                        labelText: 'Nome do pagador',
-                        border: OutlineInputBorder(),
-                        isDense: true,
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    Expanded(
+                      flex: 2,
+                      child: TextField(
+                        controller: _nomePagadorCtrl,
+                        decoration: const InputDecoration(
+                          labelText: 'Nome do pagador',
+                          border: OutlineInputBorder(),
+                          isDense: true,
+                        ),
                       ),
                     ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    flex: 1,
-                    child: TextField(
-                      controller: _cpfPagadorCtrl,
-                      keyboardType: TextInputType.number,
-                      decoration: const InputDecoration(
-                        labelText: 'CPF/CNPJ',
-                        border: OutlineInputBorder(),
-                        isDense: true,
+                    const SizedBox(width: 12),
+                    Expanded(
+                      flex: 1,
+                      child: TextField(
+                        controller: _cpfPagadorCtrl,
+                        keyboardType: TextInputType.number,
+                        decoration: const InputDecoration(
+                          labelText: 'CPF/CNPJ',
+                          border: OutlineInputBorder(),
+                          isDense: true,
+                        ),
                       ),
                     ),
-                  ),
-                ],
-              ),
+                  ],
+                ),
+              ],
 
               const SizedBox(height: 20),
 

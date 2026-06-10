@@ -231,7 +231,9 @@ const gerarRelatorioPDF = async ({ de, ate, forma }) => {
                     cabecalhoDetalhes();
                     idxDet = 0;
                 }
-                const dataEfetiva = pag.data_pagamento || pag.criado_em;
+                // criado_em é Timestamp (tem a hora real); data_pagamento é só data
+                // (@db.Date) e renderiza sempre meia-noite UTC = 21:00 em UTC-3.
+                const dataEfetiva = pag.criado_em || pag.data_pagamento;
                 const pedidoId = pag.pedidos?.id ? `#${pag.pedidos.id}` : '—';
                 const cliente = pag.pedidos?.clientes?.nome ?? '—';
                 const formaPag = pag.forma_pagamento ?? '(não informado)';
