@@ -31,22 +31,20 @@ class _TelaRetiradasState extends State<TelaRetiradas> {
   Future<void> _carregarPedidos() async {
     setState(() => _carregando = true);
     try {
-      final params = <String, dynamic>{};
+      // Só pedidos com entrega pendente ou parcial; backend já limita a 20
+      final params = <String, dynamic>{'statusRetirada': 'Pendente,Parcial'};
       if (_clienteSelecionado != null) {
         params['cliente'] = _clienteSelecionado!['nome'];
       }
 
       final response = await ApiService.dio.get(
         '/pedidos',
-        queryParameters: params.isEmpty ? null : params,
+        queryParameters: params,
       );
 
       final lista = (response.data as List)
           .map<Map<String, dynamic>>((e) => Map<String, dynamic>.from(e as Map))
-          .where((p) {
-            final s = p['status_retirada'] as String? ?? '';
-            return s == 'Pendente' || s == 'Parcial';
-          })
+          .take(20)
           .toList();
 
       setState(() {

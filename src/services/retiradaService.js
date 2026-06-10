@@ -112,6 +112,7 @@ const listarRetiradas = async (filtros = {}) => {
             pedidos: wherePedido
         },
         orderBy: { criado_em: 'desc' },
+        take: 20,
         include: {
             itens_retirada: {
                 include: { produtos: { select: { nome: true } } }

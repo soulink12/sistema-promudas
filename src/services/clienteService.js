@@ -7,12 +7,32 @@ const criarCliente = async (dadosCliente) => {
     return novoCliente.id;
 };
 
-const listarClientes = async () => {
-    // Busca todos os clientes onde ativo for igual a true
+const listarClientes = async (filtros = {}) => {
+    const where = { ativo: true };
+
+    // Pesquisa por nome, CPF/CNPJ ou telefone
+    if (filtros.busca) {
+        where.OR = [
+            { nome: { contains: filtros.busca } },
+            { cpf_cnpj: { contains: filtros.busca } },
+            { telefone_1: { contains: filtros.busca } },
+        ];
+    }
+
+    // Sem busca: retorna só os 20 últimos cadastrados.
+    // Com busca: retorna todos os resultados encontrados.
     const clientes = await prisma.clientes.findMany({
-        where: { ativo: true }
+        where,
+        orderBy: { id: 'desc' },
+        take: filtros.busca ? undefined : 20,
     });
     return clientes;
+};
+
+const buscarCliente = async (id) => {
+    return await prisma.clientes.findUnique({
+        where: { id: parseInt(id) }
+    });
 };
 
 const atualizarCliente = async (id, dados) => {
@@ -32,6 +52,7 @@ const eliminarCliente = async (id) => {
 module.exports = {
     criarCliente,
     listarClientes,
+    buscarCliente,
     atualizarCliente,
     eliminarCliente
 };

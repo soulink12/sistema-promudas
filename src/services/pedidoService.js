@@ -32,6 +32,10 @@ const listarPedidos = async (filtros = {}) => {
     if (filtros.cliente) {
         where.clientes = { nome: { contains: filtros.cliente } };
     }
+    // Filtra por status de entrega (ex.: 'Pendente,Parcial') quando informado
+    if (filtros.statusRetirada) {
+        where.status_retirada = { in: filtros.statusRetirada.split(',') };
+    }
 
     const [pedidos, formasPosteriores] = await Promise.all([
         prisma.pedidos.findMany({

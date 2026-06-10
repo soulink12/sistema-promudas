@@ -14,19 +14,13 @@ class ListaClientes extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    if (textoBusca.isEmpty) {
-      return const Center(
-        child: Text(
-          'Digite para pesquisar clientes.',
-          style: TextStyle(color: Colors.grey),
-        ),
-      );
-    }
     if (clientes.isEmpty) {
-      return const Center(
+      return Center(
         child: Text(
-          'Nenhum cliente encontrado.',
-          style: TextStyle(color: Colors.grey),
+          textoBusca.isEmpty
+              ? 'Nenhum cliente cadastrado.'
+              : 'Nenhum cliente encontrado.',
+          style: const TextStyle(color: Colors.grey),
         ),
       );
     }

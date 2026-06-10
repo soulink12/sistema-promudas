@@ -20,10 +20,21 @@ const criarCliente = async (req, res) => {
 
 const listarClientes = async (req, res) => {
     try {
-        const clientes = await clienteService.listarClientes();
+        const clientes = await clienteService.listarClientes({ busca: req.query.busca });
         return res.status(200).json(clientes);
     } catch (error) {
         console.error('Erro ao buscar clientes:', error);
+        return res.status(500).json({ erro: 'Erro interno do servidor.' });
+    }
+};
+
+const buscarCliente = async (req, res) => {
+    try {
+        const cliente = await clienteService.buscarCliente(req.params.id);
+        if (!cliente) return res.status(404).json({ erro: 'Cliente não encontrado.' });
+        return res.status(200).json(cliente);
+    } catch (error) {
+        console.error('Erro ao buscar cliente:', error);
         return res.status(500).json({ erro: 'Erro interno do servidor.' });
     }
 };
@@ -49,6 +60,7 @@ const eliminarCliente = async (req, res) => {
 module.exports = {
     criarCliente,
     listarClientes,
+    buscarCliente,
     atualizarCliente,
     eliminarCliente
 };

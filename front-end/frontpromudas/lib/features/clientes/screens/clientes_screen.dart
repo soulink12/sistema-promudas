@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import '../../../core/services/api_service.dart';
 import '../../pedidos/screens/pedidos_screen.dart';
@@ -26,6 +27,7 @@ class _TelaListaClientesState extends State<TelaListaClientes> {
 
   final _buscaController = TextEditingController();
   String _textoBusca = '';
+  Timer? _debounce;
   Map<String, dynamic>? _clienteSelecionado;
 
   // Impede que a mudança programática do campo de busca limpe a seleção
@@ -45,17 +47,24 @@ class _TelaListaClientesState extends State<TelaListaClientes> {
 
   @override
   void dispose() {
+    _debounce?.cancel();
     _buscaController.dispose();
     super.dispose();
   }
 
-  Future<void> _carregarClientes() async {
+  /// Carrega os clientes. Sem [busca], traz os 20 últimos cadastrados;
+  /// com [busca], pesquisa no backend (nome, CPF/CNPJ ou telefone).
+  Future<void> _carregarClientes([String? busca]) async {
     setState(() {
       _carregando = true;
       _erroCarregamento = null;
     });
     try {
-      final response = await ApiService.dio.get('/clientes');
+      final response = await ApiService.dio.get(
+        '/clientes',
+        queryParameters:
+            (busca != null && busca.isNotEmpty) ? {'busca': busca} : null,
+      );
       final dados = response.data as List<dynamic>;
       setState(() {
         _clientes = dados
@@ -65,15 +74,7 @@ class _TelaListaClientesState extends State<TelaListaClientes> {
         _carregando = false;
       });
 
-      // Abre direto nos detalhes do cliente quando veio um id inicial
-      if (!_selecaoInicialFeita && widget.clienteInicialId != null) {
-        _selecaoInicialFeita = true;
-        final inicial = _clientes.firstWhere(
-          (c) => c['id'] == widget.clienteInicialId,
-          orElse: () => {},
-        );
-        if (inicial.isNotEmpty) _selecionarCliente(inicial);
-      }
+      await _preSelecionarInicial();
     } catch (_) {
       setState(() {
         _erroCarregamento = 'Não foi possível carregar os clientes.';
@@ -82,14 +83,29 @@ class _TelaListaClientesState extends State<TelaListaClientes> {
     }
   }
 
-  List<Map<String, dynamic>> get _clientesFiltrados {
-    if (_textoBusca.isEmpty) return _clientes;
-    final busca = _textoBusca.toLowerCase();
-    return _clientes.where((c) {
-      return (c['nome'] as String? ?? '').toLowerCase().contains(busca) ||
-          (c['cpf_cnpj'] as String? ?? '').toLowerCase().contains(busca) ||
-          (c['telefone_1'] as String? ?? '').toLowerCase().contains(busca);
-    }).toList();
+  /// Abre direto nos detalhes quando a tela recebe um [clienteInicialId].
+  /// Como a lista mostra só os 20 recentes, busca o cliente pelo id se ele
+  /// não estiver entre os carregados.
+  Future<void> _preSelecionarInicial() async {
+    if (_selecaoInicialFeita || widget.clienteInicialId == null) return;
+    _selecaoInicialFeita = true;
+
+    var inicial = _clientes.firstWhere(
+      (c) => c['id'] == widget.clienteInicialId,
+      orElse: () => {},
+    );
+
+    if (inicial.isEmpty) {
+      try {
+        final resp =
+            await ApiService.dio.get('/clientes/${widget.clienteInicialId}');
+        inicial = Map<String, dynamic>.from(resp.data as Map);
+      } catch (_) {
+        return;
+      }
+    }
+
+    if (inicial.isNotEmpty && mounted) _selecionarCliente(inicial);
   }
 
   void _selecionarCliente(Map<String, dynamic> cliente) {
@@ -106,6 +122,7 @@ class _TelaListaClientesState extends State<TelaListaClientes> {
   }
 
   void _limparSelecao() {
+    _debounce?.cancel();
     setState(() {
       _clienteSelecionado = null;
       _editando = false;
@@ -113,6 +130,7 @@ class _TelaListaClientesState extends State<TelaListaClientes> {
       _buscaController.clear();
       _textoBusca = '';
     });
+    _carregarClientes(); // volta a mostrar os 20 mais recentes
   }
 
   Future<void> _carregarPedidosCliente(String nome) async {
@@ -215,33 +233,81 @@ class _TelaListaClientesState extends State<TelaListaClientes> {
       ),
       body: Column(
         children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-            child: TextField(
-              controller: _buscaController,
-              autofocus: true,
-              decoration: InputDecoration(
-                hintText: 'Buscar por nome, CPF ou telefone...',
-                prefixIcon: const Icon(Icons.search),
-                border: const OutlineInputBorder(),
-                suffixIcon: _buscaController.text.isNotEmpty
-                    ? IconButton(
-                        icon: const Icon(Icons.close),
-                        tooltip: 'Limpar',
-                        onPressed: _limparSelecao,
-                      )
-                    : null,
+          // Topo: barra de busca na listagem; cabeçalho com nome ao ver detalhes
+          if (_clienteSelecionado == null)
+            _buildBusca()
+          else
+            _buildCabecalhoCliente(),
+          Expanded(child: _buildConteudo()),
+        ],
+      ),
+    );
+  }
+
+  /// Barra de busca exibida na listagem de clientes.
+  Widget _buildBusca() {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+      child: TextField(
+        controller: _buscaController,
+        autofocus: true,
+        decoration: InputDecoration(
+          hintText: 'Buscar por nome, CPF ou telefone...',
+          prefixIcon: const Icon(Icons.search),
+          border: const OutlineInputBorder(),
+          suffixIcon: _buscaController.text.isNotEmpty
+              ? IconButton(
+                  icon: const Icon(Icons.close),
+                  tooltip: 'Limpar',
+                  onPressed: _limparSelecao,
+                )
+              : null,
+        ),
+        onChanged: (texto) {
+          if (_atualizandoProgramaticamente) return;
+          setState(() {
+            _textoBusca = texto;
+            _clienteSelecionado = null;
+          });
+          // Debounce para não consultar a API a cada tecla
+          _debounce?.cancel();
+          _debounce = Timer(const Duration(milliseconds: 350), () {
+            _carregarClientes(texto.trim());
+          });
+        },
+      ),
+    );
+  }
+
+  /// Cabeçalho exibido ao ver/editar um cliente: seta de voltar + nome em
+  /// destaque, no mesmo padrão dos detalhes do pedido.
+  Widget _buildCabecalhoCliente() {
+    final cs = Theme.of(context).colorScheme;
+    final nome = _clienteSelecionado!['nome'] as String? ?? '';
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(8, 8, 16, 8),
+      child: Row(
+        children: [
+          IconButton(
+            icon: const Icon(Icons.arrow_back),
+            tooltip: 'Voltar para a lista',
+            onPressed: _editando
+                ? () => setState(() => _editando = false)
+                : _limparSelecao,
+          ),
+          const SizedBox(width: 4),
+          Expanded(
+            child: Text(
+              nome,
+              style: TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+                color: cs.primary,
               ),
-              onChanged: (texto) {
-                if (_atualizandoProgramaticamente) return;
-                setState(() {
-                  _textoBusca = texto;
-                  _clienteSelecionado = null;
-                });
-              },
+              overflow: TextOverflow.ellipsis,
             ),
           ),
-          Expanded(child: _buildConteudo()),
         ],
       ),
     );
@@ -270,7 +336,7 @@ class _TelaListaClientesState extends State<TelaListaClientes> {
 
     if (_clienteSelecionado == null) {
       return ListaClientes(
-        clientes: _clientesFiltrados,
+        clientes: _clientes,
         textoBusca: _textoBusca,
         onSelecionarCliente: _selecionarCliente,
       );
