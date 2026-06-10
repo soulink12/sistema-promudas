@@ -279,10 +279,28 @@ class DetalhesPedido extends StatelessWidget {
                           _formatarDataHora(pag['criado_em']) ?? '—';
                       final forma = pag['forma_pagamento'] as String? ?? '—';
                       final valor = _toDouble(pag['valor_pago']);
+                      final nomePagador = pag['nome_pagador'] as String?;
+                      final temPagador =
+                          nomePagador != null && nomePagador.isNotEmpty;
                       return ListTile(
+                        isThreeLine: temPagador,
                         leading: const Icon(Icons.payments_outlined),
                         title: Text(forma),
-                        subtitle: Text(dataPag),
+                        subtitle: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(dataPag),
+                            if (temPagador)
+                              Text(
+                                'Pago por: $nomePagador',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color:
+                                      Theme.of(context).colorScheme.primary,
+                                ),
+                              ),
+                          ],
+                        ),
                         trailing: Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [

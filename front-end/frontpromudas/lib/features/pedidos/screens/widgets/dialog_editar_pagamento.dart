@@ -16,6 +16,8 @@ class DialogEditarPagamento extends StatefulWidget {
 
 class _DialogEditarPagamentoState extends State<DialogEditarPagamento> {
   late final TextEditingController _valorCtrl;
+  late final TextEditingController _nomePagadorCtrl;
+  late final TextEditingController _cpfPagadorCtrl;
   String? _formaSelecionada;
   List<Map<String, dynamic>> _formas = [];
   bool _carregando = true;
@@ -26,6 +28,10 @@ class _DialogEditarPagamentoState extends State<DialogEditarPagamento> {
     super.initState();
     final valor = _toDouble(widget.pagamento['valor_pago']);
     _valorCtrl = TextEditingController(text: valor.toStringAsFixed(2));
+    _nomePagadorCtrl = TextEditingController(
+        text: widget.pagamento['nome_pagador'] as String? ?? '');
+    _cpfPagadorCtrl = TextEditingController(
+        text: widget.pagamento['cpf_cnpj_pagador'] as String? ?? '');
     _formaSelecionada = widget.pagamento['forma_pagamento'] as String?;
     _carregarFormas();
   }
@@ -33,6 +39,8 @@ class _DialogEditarPagamentoState extends State<DialogEditarPagamento> {
   @override
   void dispose() {
     _valorCtrl.dispose();
+    _nomePagadorCtrl.dispose();
+    _cpfPagadorCtrl.dispose();
     super.dispose();
   }
 
@@ -66,9 +74,15 @@ class _DialogEditarPagamentoState extends State<DialogEditarPagamento> {
         double.tryParse(_valorCtrl.text.trim().replaceAll(',', '.')) ?? 0;
     if (valor <= 0 || _formaSelecionada == null) return;
 
+    final nomePagador = _nomePagadorCtrl.text.trim();
+    final cpfPagador = _cpfPagadorCtrl.text.trim();
+
     Navigator.pop(context, <String, dynamic>{
       'valor_pago': valor,
       'forma_pagamento': _formaSelecionada,
+      // null limpa o campo; valor preenchido atualiza
+      'nome_pagador': nomePagador.isEmpty ? null : nomePagador,
+      'cpf_cnpj_pagador': cpfPagador.isEmpty ? null : cpfPagador,
     });
   }
 
@@ -126,6 +140,23 @@ class _DialogEditarPagamentoState extends State<DialogEditarPagamento> {
                             .toList(),
                         onChanged: (v) =>
                             setState(() => _formaSelecionada = v),
+                      ),
+                      const SizedBox(height: 16),
+                      TextField(
+                        controller: _nomePagadorCtrl,
+                        decoration: const InputDecoration(
+                          labelText: 'Nome do pagador (opcional)',
+                          border: OutlineInputBorder(),
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      TextField(
+                        controller: _cpfPagadorCtrl,
+                        keyboardType: TextInputType.number,
+                        decoration: const InputDecoration(
+                          labelText: 'CPF/CNPJ do pagador (opcional)',
+                          border: OutlineInputBorder(),
+                        ),
                       ),
                     ],
                   ),

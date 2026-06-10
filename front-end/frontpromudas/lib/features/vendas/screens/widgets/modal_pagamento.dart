@@ -34,6 +34,10 @@ class _ModalPagamentoState extends State<ModalPagamento> {
   final TextEditingController _valorCtrl = TextEditingController();
   final FocusNode _valorFocusNode = FocusNode();
 
+  // Pagador opcional — usado quando quem paga não é o dono do pedido
+  final TextEditingController _nomePagadorCtrl = TextEditingController();
+  final TextEditingController _cpfPagadorCtrl = TextEditingController();
+
   // Lista completa de formas vindas da API
   List<Map<String, dynamic>> _formasPagamento = [];
   // Nome da forma selecionada no dropdown
@@ -69,6 +73,8 @@ class _ModalPagamentoState extends State<ModalPagamento> {
   void dispose() {
     _valorCtrl.dispose();
     _valorFocusNode.dispose();
+    _nomePagadorCtrl.dispose();
+    _cpfPagadorCtrl.dispose();
     super.dispose();
   }
 
@@ -111,6 +117,19 @@ class _ModalPagamentoState extends State<ModalPagamento> {
           restante > 0.005 ? restante.toStringAsFixed(2) : '';
     });
     _valorFocusNode.requestFocus();
+  }
+
+  /// Anexa o pagador (se informado) a cada parcela antes de confirmar.
+  List<Map<String, dynamic>> _pagamentosComPagador() {
+    final nome = _nomePagadorCtrl.text.trim();
+    final cpf = _cpfPagadorCtrl.text.trim();
+    return _pagamentos.map((p) {
+      return {
+        ...p,
+        if (nome.isNotEmpty) 'nomePagador': nome,
+        if (cpf.isNotEmpty) 'cpfPagador': cpf,
+      };
+    }).toList();
   }
 
   @override
@@ -360,6 +379,48 @@ class _ModalPagamentoState extends State<ModalPagamento> {
                 ],
               ),
 
+              const SizedBox(height: 16),
+
+              // Pagador (opcional) — preencher quando quem paga não é o cliente
+              Text(
+                'PAGADOR (SE DIFERENTE DO CLIENTE)',
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.grey[600],
+                  letterSpacing: 0.8,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  Expanded(
+                    flex: 2,
+                    child: TextField(
+                      controller: _nomePagadorCtrl,
+                      decoration: const InputDecoration(
+                        labelText: 'Nome do pagador',
+                        border: OutlineInputBorder(),
+                        isDense: true,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    flex: 1,
+                    child: TextField(
+                      controller: _cpfPagadorCtrl,
+                      keyboardType: TextInputType.number,
+                      decoration: const InputDecoration(
+                        labelText: 'CPF/CNPJ',
+                        border: OutlineInputBorder(),
+                        isDense: true,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+
               const SizedBox(height: 20),
 
               // Ações
@@ -375,7 +436,7 @@ class _ModalPagamentoState extends State<ModalPagamento> {
                     onPressed: _podeFinalizar
                         ? () {
                             Navigator.pop(context);
-                            widget.onConfirmar(List.from(_pagamentos));
+                            widget.onConfirmar(_pagamentosComPagador());
                           }
                         : null,
                     icon: const Icon(Icons.check_circle_outline, size: 18),

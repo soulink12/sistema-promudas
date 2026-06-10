@@ -227,6 +227,17 @@ const gerarPedidoPDF = async (pedidoId) => {
                     { x: 460, largura: 85, texto: moeda(pag.valor_pago), alinhamento: 'right' },
                 ]);
                 doc.moveDown(0.45);
+
+                // Pagador, quando diferente do cliente
+                if (pag.nome_pagador) {
+                    const detalhePagador = pag.cpf_cnpj_pagador
+                        ? `Pago por: ${pag.nome_pagador} (${pag.cpf_cnpj_pagador})`
+                        : `Pago por: ${pag.nome_pagador}`;
+                    doc.font('Helvetica-Oblique').fontSize(8).fillColor('#666666')
+                        .text(detalhePagador, 60, doc.y, { width: 470 });
+                    doc.fillColor('black');
+                    doc.moveDown(0.4);
+                }
             });
         }
 

@@ -168,6 +168,8 @@ class _TelaPedidosState extends State<TelaPedidos> {
             'valor_pago': valorPago,
             'forma_pagamento': p['forma'],
             'data_pagamento': DateTime.now().toUtc().toIso8601String(),
+            if (p['nomePagador'] != null) 'nome_pagador': p['nomePagador'],
+            if (p['cpfPagador'] != null) 'cpf_cnpj_pagador': p['cpfPagador'],
           },
         );
         totalRealPago += valorPago;
@@ -249,6 +251,8 @@ class _TelaPedidosState extends State<TelaPedidos> {
         data: {
           'valor_pago': resultado['valor_pago'],
           'forma_pagamento': resultado['forma_pagamento'],
+          'nome_pagador': resultado['nome_pagador'],
+          'cpf_cnpj_pagador': resultado['cpf_cnpj_pagador'],
         },
       );
       await _recarregarSilencioso(pedidoId);
