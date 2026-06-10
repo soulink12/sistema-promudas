@@ -4,6 +4,7 @@ import '../../../core/services/api_service.dart';
 import '../../../core/services/auth_service.dart';
 import '../../../core/services/carrinho_service.dart';
 import '../../auth/screens/login_screen.dart';
+import '../../clientes/screens/widgets/dialog_cadastro_cliente.dart';
 import '../../consulta/screens/consulta_hub_screen.dart';
 import '../../configuracoes/screens/configuracoes_screen.dart';
 import '../../relatorios/screens/relatorios_hub_screen.dart';
@@ -102,7 +103,8 @@ class _TelaVendaState extends State<TelaVenda> {
     super.dispose();
   }
 
-  /// Intercepta F5 e F12 globalmente na tela, independente de qual campo tem foco.
+  /// Intercepta atalhos globais da tela, independente de qual campo tem foco:
+  /// F5 (buscar cliente), F12 (finalizar) e Ctrl+C (cadastrar novo cliente).
   bool _onTecla(KeyEvent event) {
     if (event is! KeyDownEvent) return false;
     if (_salvando) return false;
@@ -114,7 +116,20 @@ class _TelaVendaState extends State<TelaVenda> {
       _finalizarPedido();
       return true;
     }
+    if (HardwareKeyboard.instance.isControlPressed &&
+        event.logicalKey == LogicalKeyboardKey.keyC) {
+      _mostrarCadastroCliente();
+      return true;
+    }
     return false;
+  }
+
+  /// Abre o modal de cadastro de novo cliente (atalho Ctrl+C).
+  void _mostrarCadastroCliente() {
+    showDialog<bool>(
+      context: context,
+      builder: (_) => const DialogCadastroCliente(),
+    );
   }
 
   @override
