@@ -62,14 +62,16 @@ class _TelaListaClientesState extends State<TelaListaClientes> {
     try {
       final response = await ApiService.dio.get(
         '/clientes',
-        queryParameters:
-            (busca != null && busca.isNotEmpty) ? {'busca': busca} : null,
+        queryParameters: (busca != null && busca.isNotEmpty)
+            ? {'busca': busca}
+            : null,
       );
       final dados = response.data as List<dynamic>;
       setState(() {
         _clientes = dados
             .map<Map<String, dynamic>>(
-                (item) => Map<String, dynamic>.from(item as Map))
+              (item) => Map<String, dynamic>.from(item as Map),
+            )
             .toList();
         _carregando = false;
       });
@@ -97,8 +99,9 @@ class _TelaListaClientesState extends State<TelaListaClientes> {
 
     if (inicial.isEmpty) {
       try {
-        final resp =
-            await ApiService.dio.get('/clientes/${widget.clienteInicialId}');
+        final resp = await ApiService.dio.get(
+          '/clientes/${widget.clienteInicialId}',
+        );
         inicial = Map<String, dynamic>.from(resp.data as Map);
       } catch (_) {
         return;
@@ -144,7 +147,8 @@ class _TelaListaClientesState extends State<TelaListaClientes> {
       setState(() {
         _pedidosCliente = dados
             .map<Map<String, dynamic>>(
-                (e) => Map<String, dynamic>.from(e as Map))
+              (e) => Map<String, dynamic>.from(e as Map),
+            )
             .toList();
         _carregandoPedidos = false;
       });
@@ -157,10 +161,8 @@ class _TelaListaClientesState extends State<TelaListaClientes> {
     setState(() => _salvandoEdicao = true);
     try {
       final id = _clienteSelecionado!['id'];
-      final response =
-          await ApiService.dio.put('/clientes/$id', data: body);
-      final atualizado =
-          Map<String, dynamic>.from(response.data as Map);
+      final response = await ApiService.dio.put('/clientes/$id', data: body);
+      final atualizado = Map<String, dynamic>.from(response.data as Map);
       setState(() {
         _clienteSelecionado = atualizado;
         _editando = false;
@@ -205,9 +207,7 @@ class _TelaListaClientesState extends State<TelaListaClientes> {
     final c = _clienteSelecionado!;
     await Navigator.push(
       context,
-      MaterialPageRoute(
-        builder: (_) => TelaPedidos(clienteInicial: c),
-      ),
+      MaterialPageRoute(builder: (_) => TelaPedidos(clienteInicial: c)),
     );
     if (mounted && _clienteSelecionado != null) {
       _carregarPedidosCliente(_clienteSelecionado!['nome'] as String? ?? '');
@@ -224,22 +224,34 @@ class _TelaListaClientesState extends State<TelaListaClientes> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: const Text('Clientes')),
-      floatingActionButton: FloatingActionButton(
-        onPressed: _abrirFormCadastro,
-        tooltip: 'Novo cliente',
-        child: const Icon(Icons.add),
-      ),
-      body: Column(
-        children: [
-          // Topo: barra de busca na listagem; cabeçalho com nome ao ver detalhes
-          if (_clienteSelecionado == null)
-            _buildBusca()
-          else
-            _buildCabecalhoCliente(),
-          Expanded(child: _buildConteudo()),
-        ],
+    // No detalhe/edição, "voltar" não fecha a tela: volta para a lista.
+    return PopScope(
+      canPop: _clienteSelecionado == null,
+      onPopInvokedWithResult: (didPop, _) {
+        if (didPop) return;
+        if (_editando) {
+          setState(() => _editando = false);
+        } else {
+          _limparSelecao();
+        }
+      },
+      child: Scaffold(
+        appBar: AppBar(title: const Text('Clientes')),
+        floatingActionButton: FloatingActionButton(
+          onPressed: _abrirFormCadastro,
+          tooltip: 'Novo cliente',
+          child: const Icon(Icons.add),
+        ),
+        body: Column(
+          children: [
+            // Topo: barra de busca na listagem; cabeçalho com nome ao ver detalhes
+            if (_clienteSelecionado == null)
+              _buildBusca()
+            else
+              _buildCabecalhoCliente(),
+            Expanded(child: _buildConteudo()),
+          ],
+        ),
       ),
     );
   }
@@ -250,7 +262,6 @@ class _TelaListaClientesState extends State<TelaListaClientes> {
       padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
       child: TextField(
         controller: _buscaController,
-        autofocus: true,
         decoration: InputDecoration(
           hintText: 'Buscar por nome, CPF ou telefone...',
           prefixIcon: const Icon(Icons.search),

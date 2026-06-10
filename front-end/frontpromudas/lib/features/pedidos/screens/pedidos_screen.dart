@@ -1,13 +1,15 @@
 import 'package:flutter/material.dart';
+import 'package:dio/dio.dart';
 import '../../../core/services/api_service.dart';
 import '../../../core/widgets/pesquisa_cliente_lista.dart';
+import '../../../core/widgets/dialog_confirmacao.dart';
 import '../../vendas/screens/widgets/modal_pagamento.dart';
 import 'widgets/lista_pedidos.dart';
 import 'widgets/detalhes_pedido.dart';
+import 'widgets/dialog_editar_pagamento.dart';
 import '../../../core/services/pdf_download_service.dart';
 import '../../vendas/screens/venda_screen.dart';
 import '../../clientes/screens/clientes_screen.dart';
-
 
 class TelaPedidos extends StatefulWidget {
   final Map<String, dynamic>? clienteInicial;
@@ -57,7 +59,9 @@ class _TelaPedidosState extends State<TelaPedidos> {
       final dados = response.data as List;
       setState(() {
         _pedidos = dados
-            .map<Map<String, dynamic>>((e) => Map<String, dynamic>.from(e as Map))
+            .map<Map<String, dynamic>>(
+              (e) => Map<String, dynamic>.from(e as Map),
+            )
             .toList();
         _carregando = false;
       });
@@ -72,8 +76,7 @@ class _TelaPedidosState extends State<TelaPedidos> {
   Future<void> _recarregarSilencioso(int pedidoId) async {
     try {
       final response = await ApiService.dio.get('/pedidos/$pedidoId');
-      final atualizado =
-          Map<String, dynamic>.from(response.data as Map);
+      final atualizado = Map<String, dynamic>.from(response.data as Map);
       setState(() {
         _pedidoSelecionado = atualizado;
         final idx = _pedidos.indexWhere((p) => p['id'] == pedidoId);
@@ -116,7 +119,8 @@ class _TelaPedidosState extends State<TelaPedidos> {
       builder: (_) => ModalPagamento(
         totalPedido: saldoRestante,
         parcialPermitido: true,
-        onConfirmar: (pags) => _registrarPagamento(pedidoId, saldoRestante, pags),
+        onConfirmar: (pags) =>
+            _registrarPagamento(pedidoId, saldoRestante, pags),
       ),
     );
   }
@@ -135,47 +139,56 @@ class _TelaPedidosState extends State<TelaPedidos> {
   Future<void> _abrirEdicaoPedido(Map<String, dynamic> pedido) async {
     await Navigator.push(
       context,
-      MaterialPageRoute(
-        builder: (_) => TelaVenda(pedidoParaEditar: pedido),
-      ),
+      MaterialPageRoute(builder: (_) => TelaVenda(pedidoParaEditar: pedido)),
     );
     await _recarregarSilencioso(pedido['id'] as int);
   }
 
   Future<void> _registrarPagamento(
-      int pedidoId, double saldoParaPagar, List<Map<String, dynamic>> pagamentos) async {
+    int pedidoId,
+    double saldoParaPagar,
+    List<Map<String, dynamic>> pagamentos,
+  ) async {
     setState(() => _salvando = true);
 
     try {
-      final pagamentosReais =
-          pagamentos.where((p) => p['pagamentoPosterior'] != true).toList();
+      final pagamentosReais = pagamentos
+          .where((p) => p['pagamentoPosterior'] != true)
+          .toList();
 
       double restante = saldoParaPagar;
       double totalRealPago = 0;
       for (final p in pagamentosReais) {
         if (restante <= 0.005) break;
         final valorPago = (p['valor'] as double).clamp(0.0, restante);
-        await ApiService.dio.post('/pagamentos', data: {
-          'pedido_id': pedidoId,
-          'valor_pago': valorPago,
-          'forma_pagamento': p['forma'],
-          'data_pagamento': DateTime.now().toUtc().toIso8601String(),
-        });
+        await ApiService.dio.post(
+          '/pagamentos',
+          data: {
+            'pedido_id': pedidoId,
+            'valor_pago': valorPago,
+            'forma_pagamento': p['forma'],
+            'data_pagamento': DateTime.now().toUtc().toIso8601String(),
+          },
+        );
         totalRealPago += valorPago;
         restante -= valorPago;
       }
 
-      final pagamentosAtuais = (_pedidoSelecionado!['pagamentos'] as List? ?? [])
-          .map((e) => Map<String, dynamic>.from(e as Map))
+      final pagamentosAtuais =
+          (_pedidoSelecionado!['pagamentos'] as List? ?? [])
+              .map((e) => Map<String, dynamic>.from(e as Map))
+              .toList();
+      final crediariosExistentes = pagamentosAtuais
+          .where((p) => p['pagamento_posterior'] == true)
           .toList();
-      final crediariosExistentes =
-          pagamentosAtuais.where((p) => p['pagamento_posterior'] == true).toList();
 
       if (crediariosExistentes.isNotEmpty) {
         final nomeFormaCredito =
             crediariosExistentes.first['forma_pagamento'] as String;
         final totalCreditoAtual = crediariosExistentes.fold<double>(
-            0.0, (s, p) => s + _toDouble(p['valor_pago']));
+          0.0,
+          (s, p) => s + _toDouble(p['valor_pago']),
+        );
 
         for (final c in crediariosExistentes) {
           await ApiService.dio.delete('/pagamentos/${c['id']}');
@@ -183,12 +196,15 @@ class _TelaPedidosState extends State<TelaPedidos> {
 
         final novoSaldoCredito = totalCreditoAtual - totalRealPago;
         if (novoSaldoCredito > 0.005) {
-          await ApiService.dio.post('/pagamentos', data: {
-            'pedido_id': pedidoId,
-            'valor_pago': novoSaldoCredito,
-            'forma_pagamento': nomeFormaCredito,
-            'data_pagamento': DateTime.now().toUtc().toIso8601String(),
-          });
+          await ApiService.dio.post(
+            '/pagamentos',
+            data: {
+              'pedido_id': pedidoId,
+              'valor_pago': novoSaldoCredito,
+              'forma_pagamento': nomeFormaCredito,
+              'data_pagamento': DateTime.now().toUtc().toIso8601String(),
+            },
+          );
         }
       }
 
@@ -218,33 +234,127 @@ class _TelaPedidosState extends State<TelaPedidos> {
     }
   }
 
+  Future<void> _editarPagamento(Map<String, dynamic> pagamento) async {
+    final resultado = await showDialog<Map<String, dynamic>>(
+      context: context,
+      builder: (_) => DialogEditarPagamento(pagamento: pagamento),
+    );
+    if (resultado == null) return;
+
+    final pedidoId = _pedidoSelecionado!['id'] as int;
+    setState(() => _salvando = true);
+    try {
+      await ApiService.dio.put(
+        '/pagamentos/${pagamento['id']}',
+        data: {
+          'valor_pago': resultado['valor_pago'],
+          'forma_pagamento': resultado['forma_pagamento'],
+        },
+      );
+      await _recarregarSilencioso(pedidoId);
+      setState(() => _salvando = false);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Pagamento atualizado com sucesso!'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+    } catch (e) {
+      setState(() => _salvando = false);
+      _mostrarErro(_extrairErro(e, 'Erro ao atualizar pagamento.'));
+    }
+  }
+
+  Future<void> _excluirPagamento(Map<String, dynamic> pagamento) async {
+    final confirmado = await mostrarDialogConfirmacao(
+      context: context,
+      titulo: 'Excluir pagamento',
+      mensagem:
+          'Tem certeza que deseja excluir este pagamento? O status do pedido será recalculado.',
+      textoConfirmar: 'Excluir',
+    );
+    if (!confirmado) return;
+
+    final pedidoId = _pedidoSelecionado!['id'] as int;
+    setState(() => _salvando = true);
+    try {
+      await ApiService.dio.delete('/pagamentos/${pagamento['id']}');
+      await _recarregarSilencioso(pedidoId);
+      setState(() => _salvando = false);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Pagamento excluído com sucesso!'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+    } catch (e) {
+      setState(() => _salvando = false);
+      _mostrarErro(_extrairErro(e, 'Erro ao excluir pagamento.'));
+    }
+  }
+
+  String _extrairErro(Object e, String fallback) {
+    if (e is DioException) {
+      final data = e.response?.data;
+      if (data is Map && data['erro'] is String) return data['erro'] as String;
+    }
+    return fallback;
+  }
+
+  void _mostrarErro(String mensagem) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(mensagem),
+        backgroundColor: Colors.red,
+        duration: const Duration(seconds: 4),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: const Text('Pedidos')),
-      body: Stack(
-        children: [
-          // Em modo detalhe, o DetalhesPedido ocupa a tela inteira (tem seu
-          // próprio cabeçalho com voltar). Na listagem, mostramos a busca no topo.
-          _pedidoSelecionado != null
-              ? DetalhesPedido(
-                  pedido: _pedidoSelecionado!,
-                  salvando: _salvando,
-                  onVoltar: () => setState(() => _pedidoSelecionado = null),
-                  onRegistrarPagamento: () =>
-                      _abrirModalPagamento(_pedidoSelecionado!),
-                  onEmitirPdf: () => PdfDownloadService.baixarESalvar(
-                      context, _pedidoSelecionado!['id'] as int),
-                  onEditar: () => _abrirEdicaoPedido(_pedidoSelecionado!),
-                  onTapCliente: () =>
-                      _abrirDetalhesCliente(_pedidoSelecionado!),
-                )
-              : _buildListagem(),
-          if (_salvando) ...[
-            const ModalBarrier(dismissible: false, color: Colors.black26),
-            const Center(child: CircularProgressIndicator()),
+    // No detalhe, "voltar" não fecha a tela: volta para a lista de pedidos.
+    return PopScope(
+      canPop: _pedidoSelecionado == null,
+      onPopInvokedWithResult: (didPop, _) {
+        if (didPop) return;
+        setState(() => _pedidoSelecionado = null);
+      },
+      child: Scaffold(
+        appBar: AppBar(title: const Text('Pedidos')),
+        body: Stack(
+          children: [
+            // Em modo detalhe, o DetalhesPedido ocupa a tela inteira (tem seu
+            // próprio cabeçalho com voltar). Na listagem, mostramos a busca no topo.
+            _pedidoSelecionado != null
+                ? DetalhesPedido(
+                    pedido: _pedidoSelecionado!,
+                    salvando: _salvando,
+                    onVoltar: () => setState(() => _pedidoSelecionado = null),
+                    onRegistrarPagamento: () =>
+                        _abrirModalPagamento(_pedidoSelecionado!),
+                    onEmitirPdf: () => PdfDownloadService.baixarESalvar(
+                      context,
+                      _pedidoSelecionado!['id'] as int,
+                    ),
+                    onEditar: () => _abrirEdicaoPedido(_pedidoSelecionado!),
+                    onTapCliente: () =>
+                        _abrirDetalhesCliente(_pedidoSelecionado!),
+                    onEditarPagamento: _editarPagamento,
+                    onExcluirPagamento: _excluirPagamento,
+                  )
+                : _buildListagem(),
+            if (_salvando) ...[
+              const ModalBarrier(dismissible: false, color: Colors.black26),
+              const Center(child: CircularProgressIndicator()),
+            ],
           ],
-        ],
+        ),
       ),
     );
   }
@@ -262,12 +372,12 @@ class _TelaPedidosState extends State<TelaPedidos> {
           child: _carregando
               ? const Center(child: CircularProgressIndicator())
               : _erro != null
-                  ? _buildErro()
-                  : ListaPedidos(
-                      pedidos: _pedidos,
-                      onSelecionarPedido: (p) =>
-                          setState(() => _pedidoSelecionado = p),
-                    ),
+              ? _buildErro()
+              : ListaPedidos(
+                  pedidos: _pedidos,
+                  onSelecionarPedido: (p) =>
+                      setState(() => _pedidoSelecionado = p),
+                ),
         ),
       ],
     );

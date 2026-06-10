@@ -9,6 +9,8 @@ class DetalhesPedido extends StatelessWidget {
   final VoidCallback onEmitirPdf;
   final VoidCallback onEditar;
   final VoidCallback onTapCliente;
+  final void Function(Map<String, dynamic> pagamento) onEditarPagamento;
+  final void Function(Map<String, dynamic> pagamento) onExcluirPagamento;
 
   const DetalhesPedido({
     super.key,
@@ -19,6 +21,8 @@ class DetalhesPedido extends StatelessWidget {
     required this.onEmitirPdf,
     required this.onEditar,
     required this.onTapCliente,
+    required this.onEditarPagamento,
+    required this.onExcluirPagamento,
   });
 
   @override
@@ -279,13 +283,56 @@ class DetalhesPedido extends StatelessWidget {
                         leading: const Icon(Icons.payments_outlined),
                         title: Text(forma),
                         subtitle: Text(dataPag),
-                        trailing: Text(
-                          'R\$ ${valor.toStringAsFixed(2)}',
-                          style: TextStyle(
-                            fontWeight: FontWeight.bold,
-                            fontSize: 15,
-                            color: Theme.of(context).colorScheme.primary,
-                          ),
+                        trailing: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              'R\$ ${valor.toStringAsFixed(2)}',
+                              style: TextStyle(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 15,
+                                color: Theme.of(context).colorScheme.primary,
+                              ),
+                            ),
+                            PopupMenuButton<String>(
+                              icon: Icon(Icons.more_vert,
+                                  size: 20,
+                                  color: Theme.of(context)
+                                      .colorScheme
+                                      .onSurfaceVariant),
+                              tooltip: 'Ações',
+                              onSelected: (valor) {
+                                if (valor == 'editar') onEditarPagamento(pag);
+                                if (valor == 'excluir') onExcluirPagamento(pag);
+                              },
+                              itemBuilder: (_) => [
+                                const PopupMenuItem(
+                                  value: 'editar',
+                                  child: ListTile(
+                                    leading: Icon(Icons.edit_outlined),
+                                    title: Text('Editar'),
+                                    contentPadding: EdgeInsets.zero,
+                                    dense: true,
+                                  ),
+                                ),
+                                PopupMenuItem(
+                                  value: 'excluir',
+                                  child: ListTile(
+                                    leading: Icon(Icons.delete_outline,
+                                        color:
+                                            Theme.of(context).colorScheme.error),
+                                    title: Text('Excluir',
+                                        style: TextStyle(
+                                            color: Theme.of(context)
+                                                .colorScheme
+                                                .error)),
+                                    contentPadding: EdgeInsets.zero,
+                                    dense: true,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
                         ),
                       );
                     }).toList(),
