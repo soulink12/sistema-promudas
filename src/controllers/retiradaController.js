@@ -12,7 +12,7 @@ const criarRetirada = async (req, res) => {
 
 const listarRetiradas = async (req, res) => {
     try {
-        const retiradas = await retiradaService.listarRetiradas();
+        const retiradas = await retiradaService.listarRetiradas({ cliente: req.query.cliente });
         res.status(200).json(retiradas);
     } catch (erro) {
         console.error(erro);

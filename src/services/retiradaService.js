@@ -101,19 +101,28 @@ const criarRetirada = async (dadosRetirada) => {
     return novaRetirada.id;
 };
 
-const listarRetiradas = async () => {
+const listarRetiradas = async (filtros = {}) => {
+    const wherePedido = { ativo: true };
+    if (filtros.cliente) {
+        wherePedido.clientes = { nome: { contains: filtros.cliente } };
+    }
+
     return await prisma.retiradas.findMany({
         where: {
-            pedidos: { ativo: true }
+            pedidos: wherePedido
         },
+        orderBy: { criado_em: 'desc' },
         include: {
-            itens_retirada: true,
+            itens_retirada: {
+                include: { produtos: { select: { nome: true } } }
+            },
             pedidos: {
                 select: {
                     id: true,
                     status_geral: true,
                     status_retirada: true,
-                    cliente_id: true
+                    cliente_id: true,
+                    clientes: { select: { id: true, nome: true } }
                 }
             }
         }
