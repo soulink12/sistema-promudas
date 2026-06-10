@@ -37,9 +37,9 @@ class TelaConsultaHub extends StatelessWidget {
           const SizedBox(height: 12),
           _CardConsulta(
             icon: Icons.inventory_2_outlined,
-            titulo: 'Retiradas',
+            titulo: 'Entregas',
             descricao:
-                'Consulte as retiradas já registradas, com itens, local de saída e veículo.',
+                'Consulte as entregas já registradas, com itens, local de saída e veículo.',
             onTap: () => Navigator.push(
               context,
               MaterialPageRoute(builder: (_) => const TelaConsultaRetiradas()),

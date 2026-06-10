@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../../core/services/api_service.dart';
-import '../../vendas/screens/widgets/modal_busca_cliente.dart';
+import '../../../core/widgets/pesquisa_cliente_lista.dart';
 import '../../vendas/screens/widgets/modal_pagamento.dart';
 import 'widgets/lista_pedidos.dart';
 import 'widgets/detalhes_pedido.dart';
@@ -98,32 +98,6 @@ class _TelaPedidosState extends State<TelaPedidos> {
       _pedidoSelecionado = null;
     });
     _carregarPedidos();
-  }
-
-  void _abrirBuscaCliente() {
-    showDialog<void>(
-      context: context,
-      barrierColor: Colors.black26,
-      builder: (context) => Align(
-        alignment: Alignment.topLeft,
-        child: Padding(
-          padding: EdgeInsets.only(
-            top: MediaQuery.of(context).padding.top + kToolbarHeight + 8,
-            left: 8,
-          ),
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 440),
-            child: Material(
-              elevation: 8,
-              borderRadius: BorderRadius.circular(12),
-              child: BuscaClienteModal(
-                onClienteSelecionado: _selecionarClienteFiltro,
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
   }
 
   void _abrirModalPagamento(Map<String, dynamic> pedido) {
@@ -246,84 +220,56 @@ class _TelaPedidosState extends State<TelaPedidos> {
 
   @override
   Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-    final nomeCliente = _clienteFiltro?['nome'] as String?;
-
     return Scaffold(
-      appBar: AppBar(
-        titleSpacing: 8,
-        title: InkWell(
-          onTap: _abrirBuscaCliente,
-          borderRadius: BorderRadius.circular(8),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(
-                      nomeCliente ?? 'Todos os pedidos',
-                      style: const TextStyle(
-                          fontSize: 18, fontWeight: FontWeight.bold),
-                    ),
-                    Text(
-                      nomeCliente != null
-                          ? 'Filtrado por cliente'
-                          : 'Últimos 20 pedidos',
-                      style: TextStyle(fontSize: 12, color: cs.onSurfaceVariant),
-                    ),
-                  ],
-                ),
-                const SizedBox(width: 8),
-                Icon(Icons.search, size: 20, color: cs.onSurfaceVariant),
-              ],
-            ),
-          ),
-        ),
-        actions: [
-          if (_clienteFiltro != null)
-            IconButton(
-              icon: const Icon(Icons.close),
-              tooltip: 'Remover filtro',
-              onPressed: _limparFiltro,
-            ),
-        ],
-      ),
+      appBar: AppBar(title: const Text('Pedidos')),
       body: Stack(
         children: [
-          _carregando
-              ? const Center(child: CircularProgressIndicator())
-              : _erro != null
-                  ? _buildErro()
-                  : _pedidoSelecionado != null
-                      ? DetalhesPedido(
-                          pedido: _pedidoSelecionado!,
-                          salvando: _salvando,
-                          onVoltar: () =>
-                              setState(() => _pedidoSelecionado = null),
-                          onRegistrarPagamento: () =>
-                              _abrirModalPagamento(_pedidoSelecionado!),
-                          onEmitirPdf: () => PdfDownloadService.baixarESalvar(
-                              context, _pedidoSelecionado!['id'] as int),
-                          onEditar: () =>
-                              _abrirEdicaoPedido(_pedidoSelecionado!),
-                          onTapCliente: () =>
-                              _abrirDetalhesCliente(_pedidoSelecionado!),
-                        )
-                      : ListaPedidos(
-                          pedidos: _pedidos,
-                          onSelecionarPedido: (p) =>
-                              setState(() => _pedidoSelecionado = p),
-                        ),
+          // Em modo detalhe, o DetalhesPedido ocupa a tela inteira (tem seu
+          // próprio cabeçalho com voltar). Na listagem, mostramos a busca no topo.
+          _pedidoSelecionado != null
+              ? DetalhesPedido(
+                  pedido: _pedidoSelecionado!,
+                  salvando: _salvando,
+                  onVoltar: () => setState(() => _pedidoSelecionado = null),
+                  onRegistrarPagamento: () =>
+                      _abrirModalPagamento(_pedidoSelecionado!),
+                  onEmitirPdf: () => PdfDownloadService.baixarESalvar(
+                      context, _pedidoSelecionado!['id'] as int),
+                  onEditar: () => _abrirEdicaoPedido(_pedidoSelecionado!),
+                  onTapCliente: () =>
+                      _abrirDetalhesCliente(_pedidoSelecionado!),
+                )
+              : _buildListagem(),
           if (_salvando) ...[
             const ModalBarrier(dismissible: false, color: Colors.black26),
             const Center(child: CircularProgressIndicator()),
           ],
         ],
       ),
+    );
+  }
+
+  Widget _buildListagem() {
+    return Column(
+      children: [
+        // Barra de busca/filtro por cliente — sempre visível no topo da lista
+        PesquisaClienteLista(
+          clienteSelecionado: _clienteFiltro,
+          onSelecionado: _selecionarClienteFiltro,
+          onLimpar: _limparFiltro,
+        ),
+        Expanded(
+          child: _carregando
+              ? const Center(child: CircularProgressIndicator())
+              : _erro != null
+                  ? _buildErro()
+                  : ListaPedidos(
+                      pedidos: _pedidos,
+                      onSelecionarPedido: (p) =>
+                          setState(() => _pedidoSelecionado = p),
+                    ),
+        ),
+      ],
     );
   }
 

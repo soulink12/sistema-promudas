@@ -1,10 +1,18 @@
 import 'package:flutter/material.dart';
 
-/// Card de exibição de uma retirada já registrada (somente leitura).
+/// Card de exibição de uma entrega já registrada.
+/// Quando [onEditar]/[onExcluir] são informados, exibe o menu de ações.
 class CardRetirada extends StatelessWidget {
   final Map<String, dynamic> retirada;
+  final VoidCallback? onEditar;
+  final VoidCallback? onExcluir;
 
-  const CardRetirada({super.key, required this.retirada});
+  const CardRetirada({
+    super.key,
+    required this.retirada,
+    this.onEditar,
+    this.onExcluir,
+  });
 
   String _formatarData(dynamic iso) {
     if (iso == null) return '—';
@@ -66,6 +74,41 @@ class CardRetirada extends StatelessWidget {
                   ),
                 ),
                 _PillLocal(local: local),
+                if (onEditar != null || onExcluir != null) ...[
+                  const SizedBox(width: 4),
+                  PopupMenuButton<String>(
+                    icon: Icon(Icons.more_vert,
+                        size: 20, color: cs.onSurfaceVariant),
+                    tooltip: 'Ações',
+                    onSelected: (valor) {
+                      if (valor == 'editar') onEditar?.call();
+                      if (valor == 'excluir') onExcluir?.call();
+                    },
+                    itemBuilder: (_) => [
+                      if (onEditar != null)
+                        const PopupMenuItem(
+                          value: 'editar',
+                          child: ListTile(
+                            leading: Icon(Icons.edit_outlined),
+                            title: Text('Editar'),
+                            contentPadding: EdgeInsets.zero,
+                            dense: true,
+                          ),
+                        ),
+                      if (onExcluir != null)
+                        PopupMenuItem(
+                          value: 'excluir',
+                          child: ListTile(
+                            leading: Icon(Icons.delete_outline, color: cs.error),
+                            title: Text('Excluir',
+                                style: TextStyle(color: cs.error)),
+                            contentPadding: EdgeInsets.zero,
+                            dense: true,
+                          ),
+                        ),
+                    ],
+                  ),
+                ],
               ],
             ),
             const Divider(height: 20),

@@ -37,6 +37,18 @@ class DetalhesPedido extends StatelessWidget {
     final todosPagamentos = (pedido['pagamentos'] as List? ?? [])
         .map((e) => Map<String, dynamic>.from(e as Map))
         .toList();
+    final retiradas = (pedido['retiradas'] as List? ?? [])
+        .map((e) => Map<String, dynamic>.from(e as Map))
+        .toList();
+
+    // Os itens da retirada não trazem o nome do produto — montamos o mapa
+    // a partir dos itens do pedido (que já vêm com produtos.nome).
+    final nomesPorProduto = <int, String>{};
+    for (final item in itens) {
+      final id = item['produto_id'] as int?;
+      final nome = item['produtos']?['nome'] as String?;
+      if (id != null && nome != null) nomesPorProduto[id] = nome;
+    }
 
     final pagamentosReais =
         todosPagamentos.where((p) => p['pagamento_posterior'] != true).toList();
@@ -187,7 +199,7 @@ class DetalhesPedido extends StatelessWidget {
                     spacing: 8,
                     children: [
                       ChipStatus(status: statusPag),
-                      ChipStatus(status: statusRet, prefixo: 'Retirada: '),
+                      ChipStatus(status: statusRet, prefixo: 'Entrega: '),
                     ],
                   ),
                   if (obs != null && obs.isNotEmpty) ...[
@@ -280,6 +292,29 @@ class DetalhesPedido extends StatelessWidget {
                   ),
           ),
 
+          const SizedBox(height: 16),
+
+          // Entregas do pedido
+          _TituloSecao(titulo: 'Entregas'),
+          Card(
+            child: retiradas.isEmpty
+                ? const Padding(
+                    padding: EdgeInsets.all(16),
+                    child: Text('Nenhuma entrega registrada ainda.'),
+                  )
+                : Column(
+                    children: [
+                      for (int i = 0; i < retiradas.length; i++) ...[
+                        if (i > 0) const Divider(height: 1),
+                        _BlocoRetirada(
+                          retirada: retiradas[i],
+                          nomesPorProduto: nomesPorProduto,
+                        ),
+                      ],
+                    ],
+                  ),
+          ),
+
           // Botão de registrar pagamento
           if (podePagar) ...[
             const SizedBox(height: 16),
@@ -335,6 +370,104 @@ class _TituloSecao extends StatelessWidget {
           color: Colors.green[700],
           letterSpacing: 0.8,
         ),
+      ),
+    );
+  }
+}
+
+class _BlocoRetirada extends StatelessWidget {
+  final Map<String, dynamic> retirada;
+  final Map<int, String> nomesPorProduto;
+
+  const _BlocoRetirada({
+    required this.retirada,
+    required this.nomesPorProduto,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+
+    final data = _formatarDataHora(retirada['data_retirada']) ?? '—';
+    final local = retirada['local_saida'] as String? ?? '—';
+    final motorista = retirada['motorista'] as String?;
+    final placa = retirada['placa_veiculo'] as String?;
+
+    final itens = (retirada['itens_retirada'] as List? ?? [])
+        .map((e) => Map<String, dynamic>.from(e as Map))
+        .toList();
+
+    final temVeiculo = (motorista != null && motorista.isNotEmpty) ||
+        (placa != null && placa.isNotEmpty);
+
+    return Padding(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Cabeçalho: local de saída + data
+          Row(
+            children: [
+              Icon(Icons.local_shipping_outlined, size: 18, color: cs.primary),
+              const SizedBox(width: 8),
+              Text(
+                local,
+                style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
+              ),
+              const Spacer(),
+              Text(
+                data,
+                style: TextStyle(fontSize: 12, color: cs.onSurfaceVariant),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+
+          // Itens retirados
+          ...itens.map((item) {
+            final prodId = item['produto_id'] as int?;
+            final nome = prodId != null ? nomesPorProduto[prodId] : null;
+            final qtd = item['quantidade'] as int? ?? 0;
+            return Padding(
+              padding: const EdgeInsets.only(left: 26, bottom: 4),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Text(nome ?? '—', style: const TextStyle(fontSize: 13)),
+                  ),
+                  Text(
+                    '${qtd}x',
+                    style: const TextStyle(
+                        fontSize: 13, fontWeight: FontWeight.w600),
+                  ),
+                ],
+              ),
+            );
+          }),
+
+          // Veículo (quando informado)
+          if (temVeiculo) ...[
+            const SizedBox(height: 4),
+            Padding(
+              padding: const EdgeInsets.only(left: 26),
+              child: Row(
+                children: [
+                  Icon(Icons.person_outline, size: 14, color: cs.onSurfaceVariant),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: Text(
+                      [
+                        if (motorista != null && motorista.isNotEmpty) motorista,
+                        if (placa != null && placa.isNotEmpty) placa,
+                      ].join(' · '),
+                      style: TextStyle(fontSize: 12, color: cs.onSurfaceVariant),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ],
       ),
     );
   }

@@ -3,14 +3,19 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../../../../core/services/api_service.dart';
 
+/// Modal de entrega — cria uma nova entrega ou edita uma existente.
+/// Quando [retiradaParaEditar] é informado, entra em modo de edição:
+/// pré-preenche os campos e usa PUT /retiradas/:id.
 class ModalRetirada extends StatefulWidget {
   final Map<String, dynamic> pedido;
-  final VoidCallback onRetiradaCriada;
+  final VoidCallback onSalvo;
+  final Map<String, dynamic>? retiradaParaEditar;
 
   const ModalRetirada({
     super.key,
     required this.pedido,
-    required this.onRetiradaCriada,
+    required this.onSalvo,
+    this.retiradaParaEditar,
   });
 
   @override
@@ -30,14 +35,31 @@ class _ModalRetiradaState extends State<ModalRetirada> {
   late final List<Map<String, dynamic>> _itensComSaldo;
   late final List<TextEditingController> _qtdControllers;
 
+  bool get _modoEdicao => widget.retiradaParaEditar != null;
+
   @override
   void initState() {
     super.initState();
     _itensComSaldo = _calcularItensComSaldo();
-    _qtdControllers = List.generate(
-      _itensComSaldo.length,
-      (_) => TextEditingController(text: '0'),
-    );
+    _qtdControllers = _itensComSaldo
+        .map((item) => TextEditingController(
+              text: (item['qtd_atual'] as int? ?? 0).toString(),
+            ))
+        .toList();
+
+    // Pré-preenche os campos quando está editando
+    final retirada = widget.retiradaParaEditar;
+    if (retirada != null) {
+      final local = retirada['local_saida'] as String?;
+      if (local != null && _locaisSaida.contains(local)) _localSaida = local;
+
+      final dataIso = retirada['data_retirada'];
+      final data = DateTime.tryParse(dataIso?.toString() ?? '')?.toLocal();
+      if (data != null) _dataRetirada = data;
+
+      _motoristaCtrl.text = retirada['motorista'] as String? ?? '';
+      _placaCtrl.text = retirada['placa_veiculo'] as String? ?? '';
+    }
   }
 
   @override
@@ -59,28 +81,44 @@ class _ModalRetiradaState extends State<ModalRetirada> {
         [];
 
     final retiradas = (widget.pedido['retiradas'] as List?) ?? [];
+    final idEditando = widget.retiradaParaEditar?['id'] as int?;
 
-    // Acumula total já retirado por produto_id
+    // Acumula total já retirado por produto_id em OUTRAS retiradas
+    // (em modo edição, ignora a própria retirada sendo editada).
     final Map<int, int> totalRetirado = {};
+    // Quantidade que a retirada em edição já possui por produto_id.
+    final Map<int, int> qtdAtualEdicao = {};
+
     for (final ret in retiradas) {
+      final ehRetiradaEditada =
+          idEditando != null && (ret['id'] as int?) == idEditando;
       final itensRet = (ret['itens_retirada'] as List?) ?? [];
       for (final ir in itensRet) {
         final prodId = ir['produto_id'] as int;
         final qtd = ir['quantidade'] as int;
-        totalRetirado[prodId] = (totalRetirado[prodId] ?? 0) + qtd;
+        if (ehRetiradaEditada) {
+          qtdAtualEdicao[prodId] = (qtdAtualEdicao[prodId] ?? 0) + qtd;
+        } else {
+          totalRetirado[prodId] = (totalRetirado[prodId] ?? 0) + qtd;
+        }
       }
     }
 
-    return itens.map((item) {
-      final prodId = item['produto_id'] as int;
-      final qtdPedida = item['quantidade'] as int;
-      final jaRetirado = totalRetirado[prodId] ?? 0;
-      return {
-        ...item,
-        'saldo': qtdPedida - jaRetirado,
-        'ja_retirado': jaRetirado,
-      };
-    }).where((item) => (item['saldo'] as int) > 0).toList();
+    return itens
+        .map((item) {
+          final prodId = item['produto_id'] as int;
+          final qtdPedida = item['quantidade'] as int;
+          final jaRetirado = totalRetirado[prodId] ?? 0;
+          return {
+            ...item,
+            // Saldo disponível para esta retirada (exclui a própria, se editando)
+            'saldo': qtdPedida - jaRetirado,
+            'ja_retirado': jaRetirado,
+            'qtd_atual': qtdAtualEdicao[prodId] ?? 0,
+          };
+        })
+        .where((item) => (item['saldo'] as int) > 0)
+        .toList();
   }
 
   bool get _podeSalvar {
@@ -102,17 +140,29 @@ class _ModalRetiradaState extends State<ModalRetirada> {
 
     setState(() => _salvando = true);
     try {
-      await ApiService.dio.post('/retiradas', data: {
-        'pedido_id': widget.pedido['id'],
-        'local_saida': _localSaida,
-        'data_retirada': _dataRetirada.toUtc().toIso8601String(),
-        if (_motoristaCtrl.text.trim().isNotEmpty)
+      if (_modoEdicao) {
+        final id = widget.retiradaParaEditar!['id'];
+        // Em edição enviamos motorista/placa sempre (mesmo vazios) para permitir limpar
+        await ApiService.dio.put('/retiradas/$id', data: {
+          'local_saida': _localSaida,
+          'data_retirada': _dataRetirada.toUtc().toIso8601String(),
           'motorista': _motoristaCtrl.text.trim(),
-        if (_placaCtrl.text.trim().isNotEmpty)
           'placa_veiculo': _placaCtrl.text.trim(),
-        'itens': itens,
-      });
-      widget.onRetiradaCriada();
+          'itens': itens,
+        });
+      } else {
+        await ApiService.dio.post('/retiradas', data: {
+          'pedido_id': widget.pedido['id'],
+          'local_saida': _localSaida,
+          'data_retirada': _dataRetirada.toUtc().toIso8601String(),
+          if (_motoristaCtrl.text.trim().isNotEmpty)
+            'motorista': _motoristaCtrl.text.trim(),
+          if (_placaCtrl.text.trim().isNotEmpty)
+            'placa_veiculo': _placaCtrl.text.trim(),
+          'itens': itens,
+        });
+      }
+      widget.onSalvo();
     } catch (e) {
       setState(() => _salvando = false);
       if (mounted) {
@@ -127,11 +177,12 @@ class _ModalRetiradaState extends State<ModalRetirada> {
   }
 
   String _extrairErro(Object e) {
+    final acao = _modoEdicao ? 'atualizar' : 'registrar';
     if (e is DioException) {
       final data = e.response?.data;
-      if (data is Map) return data['erro'] as String? ?? 'Erro ao registrar retirada.';
+      if (data is Map) return data['erro'] as String? ?? 'Erro ao $acao entrega.';
     }
-    return 'Erro ao registrar retirada.';
+    return 'Erro ao $acao entrega.';
   }
 
   String _formatarData(DateTime dt) =>
@@ -159,7 +210,7 @@ class _ModalRetiradaState extends State<ModalRetirada> {
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisSize: MainAxisSize.min,
         children: [
-          const Text('Registrar Retirada'),
+          Text(_modoEdicao ? 'Editar Entrega' : 'Registrar Entrega'),
           Text(
             '#$id · $cliente',
             style: TextStyle(
@@ -332,7 +383,7 @@ class _ModalRetiradaState extends State<ModalRetirada> {
                     color: Colors.white,
                   ),
                 )
-              : const Text('Confirmar Retirada'),
+              : Text(_modoEdicao ? 'Salvar Alterações' : 'Confirmar Entrega'),
         ),
       ],
     );

@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../../core/services/api_service.dart';
 import '../../../core/services/auth_service.dart';
-import '../../../core/widgets/campo_busca_cliente.dart';
+import '../../../core/widgets/pesquisa_cliente_lista.dart';
 import '../../auth/screens/login_screen.dart';
 import '../../clientes/screens/clientes_screen.dart';
 import '../../configuracoes/screens/configuracoes_screen.dart';
@@ -71,7 +71,7 @@ class _TelaRetiradasState extends State<TelaRetiradas> {
       context: context,
       builder: (_) => ModalRetirada(
         pedido: pedido,
-        onRetiradaCriada: () {
+        onSalvo: () {
           Navigator.pop(context);
           _carregarPedidos();
         },
@@ -82,43 +82,21 @@ class _TelaRetiradasState extends State<TelaRetiradas> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Retiradas')),
+      appBar: AppBar(title: const Text('Entregas')),
       drawer: _buildDrawer(context),
       body: Column(
         children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
-            child: _clienteSelecionado == null
-                ? CampoBuscaCliente(
-                    labelText: 'Filtrar por cliente',
-                    hintText: 'Buscar por nome, CPF ou telefone',
-                    onSelecionado: (c) {
-                      setState(() => _clienteSelecionado = c);
-                      _carregarPedidos();
-                    },
-                  )
-                : Card(
-                    child: ListTile(
-                      leading: Icon(
-                        Icons.person_outline,
-                        color: Theme.of(context).colorScheme.primary,
-                      ),
-                      title: Text(
-                        _clienteSelecionado!['nome'] as String,
-                        style: const TextStyle(fontWeight: FontWeight.w600),
-                      ),
-                      trailing: IconButton(
-                        icon: const Icon(Icons.close),
-                        tooltip: 'Remover filtro',
-                        onPressed: () {
-                          setState(() => _clienteSelecionado = null);
-                          _carregarPedidos();
-                        },
-                      ),
-                    ),
-                  ),
+          PesquisaClienteLista(
+            clienteSelecionado: _clienteSelecionado,
+            onSelecionado: (c) {
+              setState(() => _clienteSelecionado = c);
+              _carregarPedidos();
+            },
+            onLimpar: () {
+              setState(() => _clienteSelecionado = null);
+              _carregarPedidos();
+            },
           ),
-          const SizedBox(height: 8),
           Expanded(
             child: _carregando
                 ? const Center(child: CircularProgressIndicator())
@@ -134,7 +112,7 @@ class _TelaRetiradasState extends State<TelaRetiradas> {
                             ),
                             const SizedBox(height: 16),
                             Text(
-                              'Nenhum pedido com retirada pendente.',
+                              'Nenhum pedido com entrega pendente.',
                               style: TextStyle(
                                 color: Theme.of(context).colorScheme.onSurfaceVariant,
                               ),
@@ -208,7 +186,7 @@ class _TelaRetiradasState extends State<TelaRetiradas> {
           const Divider(height: 1),
           ListTile(
             leading: const Icon(Icons.inventory_2_outlined),
-            title: const Text('Retiradas'),
+            title: const Text('Entregas'),
             selected: true,
             selectedColor: cs.primary,
             onTap: () => Navigator.pop(context),

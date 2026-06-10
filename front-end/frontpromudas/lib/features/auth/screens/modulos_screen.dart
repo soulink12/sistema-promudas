@@ -55,8 +55,8 @@ class TelaModulos extends StatelessWidget {
                       Expanded(
                         child: _CardModulo(
                           icon: Icons.inventory_2_outlined,
-                          titulo: 'Retiradas',
-                          descricao: 'Registrar retiradas de produtos',
+                          titulo: 'Entregas',
+                          descricao: 'Registrar entregas de produtos',
                           onTap: () => Navigator.push(
                             context,
                             MaterialPageRoute(builder: (_) => const TelaRetiradas()),
