@@ -36,10 +36,10 @@ const buscarPedido = async (req, res) => {
 
 const listarPedidos = async (req, res) => {
     try {
-        const { cliente, statusRetirada } = req.query;
+        const { cliente, statusEntrega } = req.query;
         const filtros = {};
         if (cliente) filtros.cliente = cliente;
-        if (statusRetirada) filtros.statusRetirada = statusRetirada;
+        if (statusEntrega) filtros.statusEntrega = statusEntrega;
         const pedidos = await pedidoService.listarPedidos(filtros);
         return res.status(200).json(pedidos);
     } catch (error) {

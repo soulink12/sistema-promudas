@@ -1,14 +1,14 @@
 const prisma = require('../config/database');
 const BusinessError = require('../utils/BusinessError');
 
-// Recalcula o status de retirada do pedido comparando o total pedido com o total já retirado
-const recalcularStatusRetirada = async (pedido_id) => {
+// Recalcula o status de entrega do pedido comparando o total pedido com o total já entregue
+const recalcularStatusEntrega = async (pedido_id) => {
     const pedido = await prisma.pedidos.findUnique({
         where: { id: parseInt(pedido_id) },
         include: {
             itens_pedido: true,
-            retiradas: {
-                include: { itens_retirada: true }
+            entregas: {
+                include: { itens_entrega: true }
             }
         }
     });
@@ -17,37 +17,37 @@ const recalcularStatusRetirada = async (pedido_id) => {
 
     const totalPedido = pedido.itens_pedido.reduce((soma, item) => soma + item.quantidade, 0);
 
-    let totalRetirado = 0;
-    pedido.retiradas.forEach(retirada => {
-        retirada.itens_retirada.forEach(item => {
-            totalRetirado += item.quantidade;
+    let totalEntregue = 0;
+    pedido.entregas.forEach(entrega => {
+        entrega.itens_entrega.forEach(item => {
+            totalEntregue += item.quantidade;
         });
     });
 
     let novoStatus = 'Pendente';
-    if (totalRetirado >= totalPedido) {
-        novoStatus = 'Retirado';
-    } else if (totalRetirado > 0) {
+    if (totalEntregue >= totalPedido) {
+        novoStatus = 'Entregue';
+    } else if (totalEntregue > 0) {
         novoStatus = 'Parcial';
     }
 
     await prisma.pedidos.update({
         where: { id: parseInt(pedido_id) },
-        data: { status_retirada: novoStatus }
+        data: { status_entrega: novoStatus }
     });
 };
 
 // ============================================================
 
-const criarRetirada = async (dadosRetirada) => {
-    const { itens, pedido_id, ...dadosPrincipais } = dadosRetirada;
+const criarEntrega = async (dadosEntrega) => {
+    const { itens, pedido_id, ...dadosPrincipais } = dadosEntrega;
 
     const pedido = await prisma.pedidos.findUnique({
         where: { id: parseInt(pedido_id) },
         include: {
             itens_pedido: true,
-            retiradas: {
-                include: { itens_retirada: true }
+            entregas: {
+                include: { itens_entrega: true }
             }
         }
     });
@@ -57,7 +57,7 @@ const criarRetirada = async (dadosRetirada) => {
     }
 
     if (pedido.ativo === false) {
-        throw new BusinessError('Não é possível registrar retiradas para um pedido desativado ou cancelado.');
+        throw new BusinessError('Não é possível registrar entregas para um pedido desativado ou cancelado.');
     }
 
     // Validação de saldo por produto
@@ -70,24 +70,24 @@ const criarRetirada = async (dadosRetirada) => {
             throw new BusinessError(`Operação bloqueada: o produto ID ${produtoId} não faz parte deste pedido.`);
         }
 
-        let totalJaRetirado = 0;
-        for (const retiradaAnterior of pedido.retiradas) {
-            const itemRetirado = retiradaAnterior.itens_retirada.find(i => i.produto_id === produtoId);
-            if (itemRetirado) totalJaRetirado += itemRetirado.quantidade;
+        let totalJaEntregue = 0;
+        for (const entregaAnterior of pedido.entregas) {
+            const itemEntregue = entregaAnterior.itens_entrega.find(i => i.produto_id === produtoId);
+            if (itemEntregue) totalJaEntregue += itemEntregue.quantidade;
         }
 
-        const saldoRestante = itemPedido.quantidade - totalJaRetirado;
+        const saldoRestante = itemPedido.quantidade - totalJaEntregue;
 
         if (qtdSaindoAgora > saldoRestante) {
             throw new BusinessError(`Saldo insuficiente para o produto ID ${produtoId}. Restam ${saldoRestante} unidades (tentativa: ${qtdSaindoAgora}).`);
         }
     }
 
-    const novaRetirada = await prisma.retiradas.create({
+    const novaEntrega = await prisma.entregas.create({
         data: {
             pedido_id: parseInt(pedido_id),
             ...dadosPrincipais,
-            itens_retirada: {
+            itens_entrega: {
                 create: itens.map(item => ({
                     produto_id: parseInt(item.produto_id),
                     quantidade: parseInt(item.quantidade)
@@ -96,32 +96,32 @@ const criarRetirada = async (dadosRetirada) => {
         }
     });
 
-    await recalcularStatusRetirada(pedido_id);
+    await recalcularStatusEntrega(pedido_id);
 
-    return novaRetirada.id;
+    return novaEntrega.id;
 };
 
-const listarRetiradas = async (filtros = {}) => {
+const listarEntregas = async (filtros = {}) => {
     const wherePedido = { ativo: true };
     if (filtros.cliente) {
         wherePedido.clientes = { nome: { contains: filtros.cliente } };
     }
 
-    return await prisma.retiradas.findMany({
+    return await prisma.entregas.findMany({
         where: {
             pedidos: wherePedido
         },
         orderBy: { criado_em: 'desc' },
         take: 20,
         include: {
-            itens_retirada: {
+            itens_entrega: {
                 include: { produtos: { select: { nome: true } } }
             },
             pedidos: {
                 select: {
                     id: true,
                     status_geral: true,
-                    status_retirada: true,
+                    status_entrega: true,
                     cliente_id: true,
                     clientes: { select: { id: true, nome: true } }
                 }
@@ -130,38 +130,38 @@ const listarRetiradas = async (filtros = {}) => {
     });
 };
 
-const atualizarRetirada = async (id, dados) => {
-    const retiradaId = parseInt(id);
+const atualizarEntrega = async (id, dados) => {
+    const entregaId = parseInt(id);
 
-    const retiradaOriginal = await prisma.retiradas.findUnique({
-        where: { id: retiradaId },
+    const entregaOriginal = await prisma.entregas.findUnique({
+        where: { id: entregaId },
         select: { pedido_id: true }
     });
 
-    if (!retiradaOriginal) {
-        throw new BusinessError('Retirada não encontrada.', 404);
+    if (!entregaOriginal) {
+        throw new BusinessError('Entrega não encontrada.', 404);
     }
 
     const { itens, ...dadosPrincipais } = dados;
 
     if (itens && Array.isArray(itens)) {
         const pedido = await prisma.pedidos.findUnique({
-            where: { id: retiradaOriginal.pedido_id },
+            where: { id: entregaOriginal.pedido_id },
             include: { itens_pedido: true }
         });
 
-        const outrasRetiradas = await prisma.retiradas.findMany({
+        const outrasEntregas = await prisma.entregas.findMany({
             where: {
-                pedido_id: retiradaOriginal.pedido_id,
-                id: { not: retiradaId }
+                pedido_id: entregaOriginal.pedido_id,
+                id: { not: entregaId }
             },
-            include: { itens_retirada: true }
+            include: { itens_entrega: true }
         });
 
-        const jaRetirado = {};
-        outrasRetiradas.forEach(ret => {
-            ret.itens_retirada.forEach(item => {
-                jaRetirado[item.produto_id] = (jaRetirado[item.produto_id] || 0) + item.quantidade;
+        const jaEntregue = {};
+        outrasEntregas.forEach(ret => {
+            ret.itens_entrega.forEach(item => {
+                jaEntregue[item.produto_id] = (jaEntregue[item.produto_id] || 0) + item.quantidade;
             });
         });
 
@@ -173,7 +173,7 @@ const atualizarRetirada = async (id, dados) => {
                 throw new BusinessError(`O produto ID ${novoItem.produto_id} não faz parte deste pedido.`);
             }
 
-            const saldoDisponivel = totalPedido - (jaRetirado[novoItem.produto_id] || 0);
+            const saldoDisponivel = totalPedido - (jaEntregue[novoItem.produto_id] || 0);
 
             if (novoItem.quantidade > saldoDisponivel) {
                 throw new BusinessError(`Saldo insuficiente para o produto ID ${novoItem.produto_id}. Máximo permitido: ${saldoDisponivel}.`);
@@ -184,7 +184,7 @@ const atualizarRetirada = async (id, dados) => {
     let dataParaAtualizar = { ...dadosPrincipais };
 
     if (itens && Array.isArray(itens)) {
-        dataParaAtualizar.itens_retirada = {
+        dataParaAtualizar.itens_entrega = {
             deleteMany: {},
             create: itens.map(item => ({
                 produto_id: item.produto_id,
@@ -193,37 +193,37 @@ const atualizarRetirada = async (id, dados) => {
         };
     }
 
-    const retiradaAtualizada = await prisma.retiradas.update({
-        where: { id: retiradaId },
+    const entregaAtualizada = await prisma.entregas.update({
+        where: { id: entregaId },
         data: dataParaAtualizar
     });
 
-    await recalcularStatusRetirada(retiradaOriginal.pedido_id);
+    await recalcularStatusEntrega(entregaOriginal.pedido_id);
 
-    return retiradaAtualizada;
+    return entregaAtualizada;
 };
 
-const eliminarRetirada = async (id) => {
-    const retirada = await prisma.retiradas.findUnique({
+const eliminarEntrega = async (id) => {
+    const entrega = await prisma.entregas.findUnique({
         where: { id: parseInt(id) }
     });
 
-    if (!retirada) {
-        throw new BusinessError('Retirada não encontrada.', 404);
+    if (!entrega) {
+        throw new BusinessError('Entrega não encontrada.', 404);
     }
 
-    const resultado = await prisma.retiradas.delete({
+    const resultado = await prisma.entregas.delete({
         where: { id: parseInt(id) }
     });
 
-    await recalcularStatusRetirada(retirada.pedido_id);
+    await recalcularStatusEntrega(entrega.pedido_id);
 
     return resultado;
 };
 
 module.exports = {
-    criarRetirada,
-    listarRetiradas,
-    atualizarRetirada,
-    eliminarRetirada
+    criarEntrega,
+    listarEntregas,
+    atualizarEntrega,
+    eliminarEntrega
 };

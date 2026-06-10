@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../../core/services/auth_service.dart';
 import '../../vendas/screens/venda_screen.dart';
-import '../../retiradas/screens/retirada_screen.dart';
+import '../../entregas/screens/entrega_screen.dart';
 import 'login_screen.dart';
 
 class TelaModulos extends StatelessWidget {
@@ -59,7 +59,7 @@ class TelaModulos extends StatelessWidget {
                           descricao: 'Registrar entregas de produtos',
                           onTap: () => Navigator.push(
                             context,
-                            MaterialPageRoute(builder: (_) => const TelaRetiradas()),
+                            MaterialPageRoute(builder: (_) => const TelaEntregas()),
                           ),
                         ),
                       ),

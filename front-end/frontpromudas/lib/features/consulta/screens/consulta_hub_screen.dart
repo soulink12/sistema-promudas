@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../clientes/screens/clientes_screen.dart';
 import '../../pedidos/screens/pedidos_screen.dart';
-import '../../retiradas/screens/consulta_retiradas_screen.dart';
+import '../../entregas/screens/consulta_entregas_screen.dart';
 
 class TelaConsultaHub extends StatelessWidget {
   const TelaConsultaHub({super.key});
@@ -42,7 +42,7 @@ class TelaConsultaHub extends StatelessWidget {
                 'Consulte as entregas já registradas, com itens, local de saída e veículo.',
             onTap: () => Navigator.push(
               context,
-              MaterialPageRoute(builder: (_) => const TelaConsultaRetiradas()),
+              MaterialPageRoute(builder: (_) => const TelaConsultaEntregas()),
             ),
           ),
         ],

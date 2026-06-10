@@ -34,11 +34,11 @@ model pedidos {
   ajuste           Decimal?       @db.Decimal(10, 2)
   status_geral     String?        @default("Ativa") @db.VarChar(30)
   status_pagamento String?        @default("Pendente") @db.VarChar(30)
-  status_retirada  String?        @default("Pendente") @db.VarChar(30)
+  status_entrega   String?        @default("Pendente") @db.VarChar(30)
   observacoes      String?        @db.Text
   criado_em        DateTime?      @default(now()) @db.Timestamp(0)
   clientes         clientes?      @relation(fields: [cliente_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
-  retiradas        retiradas[]
+  entregas         entregas[]
   itens_pedido     itens_pedido[]
   pagamentos       pagamentos[]
 
@@ -46,12 +46,12 @@ model pedidos {
 }
 
 model produtos {
-  id             Int              @id @default(autoincrement())
-  nome           String           @db.VarChar(50)
-  preco          Decimal          @db.Decimal(10, 2)
-  ativo          Boolean?         @default(true)
+  id             Int             @id @default(autoincrement())
+  nome           String          @db.VarChar(50)
+  preco          Decimal         @db.Decimal(10, 2)
+  ativo          Boolean?        @default(true)
   itens_pedido   itens_pedido[]
-  itens_retirada itens_retirada[]
+  itens_entrega  itens_entrega[]
 }
 
 model itens_pedido {
@@ -67,30 +67,30 @@ model itens_pedido {
   @@index([produto_id])
 }
 
-model retiradas {
-  id              Int              @id @default(autoincrement())
-  pedido_id       Int
-  data_retirada   DateTime?        @db.Date
-  local_saida     String?          @db.VarChar(50)
-  motorista       String?          @db.VarChar(100)
-  placa_veiculo   String?          @db.VarChar(20)
-  status_retirada String?          @default("Realizada") @db.VarChar(30)
-  criado_em       DateTime?        @default(now()) @db.Timestamp(0)
-  pedidos         pedidos          @relation(fields: [pedido_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
-  itens_retirada  itens_retirada[]
+model entregas {
+  id             Int             @id @default(autoincrement())
+  pedido_id      Int
+  data_entrega   DateTime?       @db.Date
+  local_entrega  String?         @db.VarChar(50)
+  motorista      String?         @db.VarChar(100)
+  placa_veiculo  String?         @db.VarChar(20)
+  status_entrega String?         @default("Realizada") @db.VarChar(30)
+  criado_em      DateTime?       @default(now()) @db.Timestamp(0)
+  pedidos        pedidos         @relation(fields: [pedido_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  itens_entrega  itens_entrega[]
 
   @@index([pedido_id])
 }
 
-model itens_retirada {
-  id          Int       @id @default(autoincrement())
-  retirada_id Int
-  produto_id  Int
-  quantidade  Int
-  retiradas   retiradas @relation(fields: [retirada_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
-  produtos    produtos  @relation(fields: [produto_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+model itens_entrega {
+  id         Int      @id @default(autoincrement())
+  entrega_id Int
+  produto_id Int
+  quantidade Int
+  entregas   entregas @relation(fields: [entrega_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  produtos   produtos @relation(fields: [produto_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
 
-  @@index([retirada_id])
+  @@index([entrega_id])
   @@index([produto_id])
 }
 
@@ -126,4 +126,10 @@ model formas_pagamento {
   nome                String  @db.VarChar(50)
   ativo               Boolean @default(true)
   pagamento_posterior Boolean @default(false)
+}
+
+model locais_entrega {
+  id    Int     @id @default(autoincrement())
+  nome  String  @db.VarChar(50)
+  ativo Boolean @default(true)
 }

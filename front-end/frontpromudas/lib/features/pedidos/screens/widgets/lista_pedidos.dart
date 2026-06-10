@@ -32,7 +32,7 @@ class ListaPedidos extends StatelessWidget {
         final total = _toDouble(p['valor_total']);
         final data = _formatarDataHora(p['criado_em']);
         final statusPag = p['status_pagamento'] as String? ?? 'Pendente';
-        final statusEntrega = p['status_retirada'] as String? ?? 'Pendente';
+        final statusEntrega = p['status_entrega'] as String? ?? 'Pendente';
         final statusNota = _statusNotaPedido(p['pagamentos'] as List? ?? []);
 
         return Card(
@@ -114,7 +114,6 @@ class ChipStatus extends StatelessWidget {
     switch (status.toLowerCase()) {
       case 'pago':
       case 'realizada':
-      case 'retirado':
       case 'entregue':
       case 'emitida':
         cor = Colors.green;

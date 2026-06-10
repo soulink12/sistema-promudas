@@ -2,32 +2,33 @@ import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../../../../core/services/api_service.dart';
+import '../../../../core/services/local_entrega_service.dart';
 
 /// Modal de entrega — cria uma nova entrega ou edita uma existente.
-/// Quando [retiradaParaEditar] é informado, entra em modo de edição:
-/// pré-preenche os campos e usa PUT /retiradas/:id.
-class ModalRetirada extends StatefulWidget {
+/// Quando [entregaParaEditar] é informado, entra em modo de edição:
+/// pré-preenche os campos e usa PUT /entregas/:id.
+class ModalEntrega extends StatefulWidget {
   final Map<String, dynamic> pedido;
   final VoidCallback onSalvo;
-  final Map<String, dynamic>? retiradaParaEditar;
+  final Map<String, dynamic>? entregaParaEditar;
 
-  const ModalRetirada({
+  const ModalEntrega({
     super.key,
     required this.pedido,
     required this.onSalvo,
-    this.retiradaParaEditar,
+    this.entregaParaEditar,
   });
 
   @override
-  State<ModalRetirada> createState() => _ModalRetiradaState();
+  State<ModalEntrega> createState() => _ModalEntregaState();
 }
 
-class _ModalRetiradaState extends State<ModalRetirada> {
-  // TODO: criar tabela locais_saida e endpoint GET /api/locais-saida para tornar configurável
-  static const _locaisSaida = ['Paraíso', 'BR', 'Doze'];
+class _ModalEntregaState extends State<ModalEntrega> {
+  // Locais carregados de GET /locais-entrega
+  List<String> _locais = [];
 
   String? _localSaida;
-  DateTime _dataRetirada = DateTime.now();
+  DateTime _dataEntrega = DateTime.now();
   final _motoristaCtrl = TextEditingController();
   final _placaCtrl = TextEditingController();
   bool _salvando = false;
@@ -35,11 +36,12 @@ class _ModalRetiradaState extends State<ModalRetirada> {
   late final List<Map<String, dynamic>> _itensComSaldo;
   late final List<TextEditingController> _qtdControllers;
 
-  bool get _modoEdicao => widget.retiradaParaEditar != null;
+  bool get _modoEdicao => widget.entregaParaEditar != null;
 
   @override
   void initState() {
     super.initState();
+    _carregarLocais();
     _itensComSaldo = _calcularItensComSaldo();
     _qtdControllers = _itensComSaldo
         .map((item) => TextEditingController(
@@ -48,17 +50,17 @@ class _ModalRetiradaState extends State<ModalRetirada> {
         .toList();
 
     // Pré-preenche os campos quando está editando
-    final retirada = widget.retiradaParaEditar;
-    if (retirada != null) {
-      final local = retirada['local_saida'] as String?;
-      if (local != null && _locaisSaida.contains(local)) _localSaida = local;
+    final entrega = widget.entregaParaEditar;
+    if (entrega != null) {
+      final local = entrega['local_entrega'] as String?;
+      if (local != null) _localSaida = local;
 
-      final dataIso = retirada['data_retirada'];
+      final dataIso = entrega['data_entrega'];
       final data = DateTime.tryParse(dataIso?.toString() ?? '')?.toLocal();
-      if (data != null) _dataRetirada = data;
+      if (data != null) _dataEntrega = data;
 
-      _motoristaCtrl.text = retirada['motorista'] as String? ?? '';
-      _placaCtrl.text = retirada['placa_veiculo'] as String? ?? '';
+      _motoristaCtrl.text = entrega['motorista'] as String? ?? '';
+      _placaCtrl.text = entrega['placa_veiculo'] as String? ?? '';
     }
   }
 
@@ -72,6 +74,22 @@ class _ModalRetiradaState extends State<ModalRetirada> {
     super.dispose();
   }
 
+  Future<void> _carregarLocais() async {
+    try {
+      final locais = await LocalEntregaService().listar();
+      if (!mounted) return;
+      setState(() {
+        _locais = locais;
+        // Garante que o local atual (modo edição) esteja na lista de opções
+        if (_localSaida != null && !_locais.contains(_localSaida)) {
+          _locais = [..._locais, _localSaida!];
+        }
+      });
+    } catch (_) {
+      // Em caso de falha, mantém a lista vazia
+    }
+  }
+
   List<Map<String, dynamic>> _calcularItensComSaldo() {
     final itens = (widget.pedido['itens_pedido'] as List?)
             ?.map<Map<String, dynamic>>(
@@ -80,26 +98,26 @@ class _ModalRetiradaState extends State<ModalRetirada> {
             .toList() ??
         [];
 
-    final retiradas = (widget.pedido['retiradas'] as List?) ?? [];
-    final idEditando = widget.retiradaParaEditar?['id'] as int?;
+    final entregas = (widget.pedido['entregas'] as List?) ?? [];
+    final idEditando = widget.entregaParaEditar?['id'] as int?;
 
-    // Acumula total já retirado por produto_id em OUTRAS retiradas
-    // (em modo edição, ignora a própria retirada sendo editada).
-    final Map<int, int> totalRetirado = {};
-    // Quantidade que a retirada em edição já possui por produto_id.
+    // Acumula total já entregue por produto_id em OUTRAS entregas
+    // (em modo edição, ignora a própria entrega sendo editada).
+    final Map<int, int> totalEntregue = {};
+    // Quantidade que a entrega em edição já possui por produto_id.
     final Map<int, int> qtdAtualEdicao = {};
 
-    for (final ret in retiradas) {
-      final ehRetiradaEditada =
+    for (final ret in entregas) {
+      final ehEntregaEditada =
           idEditando != null && (ret['id'] as int?) == idEditando;
-      final itensRet = (ret['itens_retirada'] as List?) ?? [];
+      final itensRet = (ret['itens_entrega'] as List?) ?? [];
       for (final ir in itensRet) {
         final prodId = ir['produto_id'] as int;
         final qtd = ir['quantidade'] as int;
-        if (ehRetiradaEditada) {
+        if (ehEntregaEditada) {
           qtdAtualEdicao[prodId] = (qtdAtualEdicao[prodId] ?? 0) + qtd;
         } else {
-          totalRetirado[prodId] = (totalRetirado[prodId] ?? 0) + qtd;
+          totalEntregue[prodId] = (totalEntregue[prodId] ?? 0) + qtd;
         }
       }
     }
@@ -108,12 +126,12 @@ class _ModalRetiradaState extends State<ModalRetirada> {
         .map((item) {
           final prodId = item['produto_id'] as int;
           final qtdPedida = item['quantidade'] as int;
-          final jaRetirado = totalRetirado[prodId] ?? 0;
+          final jaEntregue = totalEntregue[prodId] ?? 0;
           return {
             ...item,
-            // Saldo disponível para esta retirada (exclui a própria, se editando)
-            'saldo': qtdPedida - jaRetirado,
-            'ja_retirado': jaRetirado,
+            // Saldo disponível para esta entrega (exclui a própria, se editando)
+            'saldo': qtdPedida - jaEntregue,
+            'ja_entregue': jaEntregue,
             'qtd_atual': qtdAtualEdicao[prodId] ?? 0,
           };
         })
@@ -141,20 +159,20 @@ class _ModalRetiradaState extends State<ModalRetirada> {
     setState(() => _salvando = true);
     try {
       if (_modoEdicao) {
-        final id = widget.retiradaParaEditar!['id'];
+        final id = widget.entregaParaEditar!['id'];
         // Em edição enviamos motorista/placa sempre (mesmo vazios) para permitir limpar
-        await ApiService.dio.put('/retiradas/$id', data: {
-          'local_saida': _localSaida,
-          'data_retirada': _dataRetirada.toUtc().toIso8601String(),
+        await ApiService.dio.put('/entregas/$id', data: {
+          'local_entrega': _localSaida,
+          'data_entrega': _dataEntrega.toUtc().toIso8601String(),
           'motorista': _motoristaCtrl.text.trim(),
           'placa_veiculo': _placaCtrl.text.trim(),
           'itens': itens,
         });
       } else {
-        await ApiService.dio.post('/retiradas', data: {
+        await ApiService.dio.post('/entregas', data: {
           'pedido_id': widget.pedido['id'],
-          'local_saida': _localSaida,
-          'data_retirada': _dataRetirada.toUtc().toIso8601String(),
+          'local_entrega': _localSaida,
+          'data_entrega': _dataEntrega.toUtc().toIso8601String(),
           if (_motoristaCtrl.text.trim().isNotEmpty)
             'motorista': _motoristaCtrl.text.trim(),
           if (_placaCtrl.text.trim().isNotEmpty)
@@ -192,11 +210,11 @@ class _ModalRetiradaState extends State<ModalRetirada> {
   Future<void> _selecionarData() async {
     final data = await showDatePicker(
       context: context,
-      initialDate: _dataRetirada,
+      initialDate: _dataEntrega,
       firstDate: DateTime(2020),
       lastDate: DateTime(2100),
     );
-    if (data != null) setState(() => _dataRetirada = data);
+    if (data != null) setState(() => _dataEntrega = data);
   }
 
   @override
@@ -230,7 +248,7 @@ class _ModalRetiradaState extends State<ModalRetirada> {
             mainAxisSize: MainAxisSize.min,
             children: [
               // ── Itens ──────────────────────────────────────────────────
-              _Secao(label: 'ITENS A RETIRAR'),
+              _Secao(label: 'ITENS A ENTREGAR'),
               const SizedBox(height: 10),
               ..._itensComSaldo.asMap().entries.map((entry) {
                 final i = entry.key;
@@ -238,7 +256,7 @@ class _ModalRetiradaState extends State<ModalRetirada> {
                 final nomeProduto =
                     (item['produtos'] as Map?)?['nome'] as String? ?? '—';
                 final saldo = item['saldo'] as int;
-                final jaRetirado = item['ja_retirado'] as int;
+                final jaEntregue = item['ja_entregue'] as int;
                 final qtdPedida = item['quantidade'] as int;
 
                 return Padding(
@@ -258,7 +276,7 @@ class _ModalRetiradaState extends State<ModalRetirada> {
                             ),
                             const SizedBox(height: 2),
                             Text(
-                              'Pedido: $qtdPedida  ·  Retirado: $jaRetirado  ·  Saldo: $saldo',
+                              'Pedido: $qtdPedida  ·  Entregue: $jaEntregue  ·  Saldo: $saldo',
                               style: TextStyle(
                                 fontSize: 11,
                                 color: Theme.of(context)
@@ -298,8 +316,8 @@ class _ModalRetiradaState extends State<ModalRetirada> {
               const Divider(),
               const SizedBox(height: 12),
 
-              // ── Local de saída (obrigatório) ───────────────────────────
-              _Secao(label: 'LOCAL DE SAÍDA *'),
+              // ── Local de entrega (obrigatório) ─────────────────────────
+              _Secao(label: 'LOCAL DE ENTREGA *'),
               const SizedBox(height: 8),
               DropdownButtonFormField<String>(
                 value: _localSaida,
@@ -308,15 +326,15 @@ class _ModalRetiradaState extends State<ModalRetirada> {
                   isDense: true,
                   hintText: 'Selecionar local',
                 ),
-                items: _locaisSaida
+                items: _locais
                     .map((l) => DropdownMenuItem(value: l, child: Text(l)))
                     .toList(),
                 onChanged: (v) => setState(() => _localSaida = v),
               ),
               const SizedBox(height: 16),
 
-              // ── Data da retirada ───────────────────────────────────────
-              _Secao(label: 'DATA DA RETIRADA'),
+              // ── Data da entrega ───────────────────────────────────────
+              _Secao(label: 'DATA DA ENTREGA'),
               const SizedBox(height: 8),
               InkWell(
                 onTap: _selecionarData,
@@ -327,7 +345,7 @@ class _ModalRetiradaState extends State<ModalRetirada> {
                     isDense: true,
                     suffixIcon: Icon(Icons.calendar_today_outlined, size: 18),
                   ),
-                  child: Text(_formatarData(_dataRetirada)),
+                  child: Text(_formatarData(_dataEntrega)),
                 ),
               ),
               const SizedBox(height: 16),

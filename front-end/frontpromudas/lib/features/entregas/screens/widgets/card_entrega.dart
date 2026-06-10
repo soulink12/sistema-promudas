@@ -2,14 +2,14 @@ import 'package:flutter/material.dart';
 
 /// Card de exibição de uma entrega já registrada.
 /// Quando [onEditar]/[onExcluir] são informados, exibe o menu de ações.
-class CardRetirada extends StatelessWidget {
-  final Map<String, dynamic> retirada;
+class CardEntrega extends StatelessWidget {
+  final Map<String, dynamic> entrega;
   final VoidCallback? onEditar;
   final VoidCallback? onExcluir;
 
-  const CardRetirada({
+  const CardEntrega({
     super.key,
-    required this.retirada,
+    required this.entrega,
     this.onEditar,
     this.onExcluir,
   });
@@ -26,18 +26,18 @@ class CardRetirada extends StatelessWidget {
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
 
-    final pedido = retirada['pedidos'] as Map<String, dynamic>?;
+    final pedido = entrega['pedidos'] as Map<String, dynamic>?;
     final pedidoId = pedido?['id'];
     final cliente =
         (pedido?['clientes'] as Map<String, dynamic>?)?['nome'] as String? ??
             '—';
 
-    final data = _formatarData(retirada['data_retirada']);
-    final local = retirada['local_saida'] as String? ?? '—';
-    final motorista = retirada['motorista'] as String?;
-    final placa = retirada['placa_veiculo'] as String?;
+    final data = _formatarData(entrega['data_entrega']);
+    final local = entrega['local_entrega'] as String? ?? '—';
+    final motorista = entrega['motorista'] as String?;
+    final placa = entrega['placa_veiculo'] as String?;
 
-    final itens = (retirada['itens_retirada'] as List? ?? [])
+    final itens = (entrega['itens_entrega'] as List? ?? [])
         .map((e) => Map<String, dynamic>.from(e as Map))
         .toList();
 
@@ -113,7 +113,7 @@ class CardRetirada extends StatelessWidget {
             ),
             const Divider(height: 20),
 
-            // Itens retirados
+            // Itens entregues
             ...itens.map((item) {
               final nomeProduto =
                   (item['produtos'] as Map?)?['nome'] as String? ?? '—';

@@ -7,17 +7,17 @@ import '../../clientes/screens/clientes_screen.dart';
 import '../../configuracoes/screens/configuracoes_screen.dart';
 import '../../pedidos/screens/pedidos_screen.dart';
 import '../../relatorios/screens/relatorios_hub_screen.dart';
-import 'widgets/card_pedido_retirada.dart';
-import 'widgets/modal_retirada.dart';
+import 'widgets/card_pedido_entrega.dart';
+import 'widgets/modal_entrega.dart';
 
-class TelaRetiradas extends StatefulWidget {
-  const TelaRetiradas({super.key});
+class TelaEntregas extends StatefulWidget {
+  const TelaEntregas({super.key});
 
   @override
-  State<TelaRetiradas> createState() => _TelaRetiradasState();
+  State<TelaEntregas> createState() => _TelaEntregasState();
 }
 
-class _TelaRetiradasState extends State<TelaRetiradas> {
+class _TelaEntregasState extends State<TelaEntregas> {
   List<Map<String, dynamic>> _pedidos = [];
   bool _carregando = false;
   Map<String, dynamic>? _clienteSelecionado;
@@ -32,7 +32,7 @@ class _TelaRetiradasState extends State<TelaRetiradas> {
     setState(() => _carregando = true);
     try {
       // Só pedidos com entrega pendente ou parcial; backend já limita a 20
-      final params = <String, dynamic>{'statusRetirada': 'Pendente,Parcial'};
+      final params = <String, dynamic>{'statusEntrega': 'Pendente,Parcial'};
       if (_clienteSelecionado != null) {
         params['cliente'] = _clienteSelecionado!['nome'];
       }
@@ -64,10 +64,10 @@ class _TelaRetiradasState extends State<TelaRetiradas> {
     }
   }
 
-  void _mostrarModalRetirada(Map<String, dynamic> pedido) {
+  void _mostrarModalEntrega(Map<String, dynamic> pedido) {
     showDialog<void>(
       context: context,
-      builder: (_) => ModalRetirada(
+      builder: (_) => ModalEntrega(
         pedido: pedido,
         onSalvo: () {
           Navigator.pop(context);
@@ -124,9 +124,9 @@ class _TelaRetiradasState extends State<TelaRetiradas> {
                           padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
                           itemCount: _pedidos.length,
                           separatorBuilder: (_, __) => const SizedBox(height: 8),
-                          itemBuilder: (_, i) => CardPedidoRetirada(
+                          itemBuilder: (_, i) => CardPedidoEntrega(
                             pedido: _pedidos[i],
-                            onRegistrarRetirada: () => _mostrarModalRetirada(_pedidos[i]),
+                            onRegistrarEntrega: () => _mostrarModalEntrega(_pedidos[i]),
                           ),
                         ),
                       ),

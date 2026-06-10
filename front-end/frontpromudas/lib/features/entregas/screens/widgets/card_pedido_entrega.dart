@@ -1,13 +1,13 @@
 import 'package:flutter/material.dart';
 
-class CardPedidoRetirada extends StatelessWidget {
+class CardPedidoEntrega extends StatelessWidget {
   final Map<String, dynamic> pedido;
-  final VoidCallback onRegistrarRetirada;
+  final VoidCallback onRegistrarEntrega;
 
-  const CardPedidoRetirada({
+  const CardPedidoEntrega({
     super.key,
     required this.pedido,
-    required this.onRegistrarRetirada,
+    required this.onRegistrarEntrega,
   });
 
   String _formatarData(String? iso) {
@@ -23,7 +23,7 @@ class CardPedidoRetirada extends StatelessWidget {
     final id = pedido['id'] as int;
     final clienteMap = pedido['clientes'] as Map<String, dynamic>?;
     final cliente = clienteMap?['nome'] as String? ?? '—';
-    final statusRet = pedido['status_retirada'] as String? ?? '—';
+    final statusRet = pedido['status_entrega'] as String? ?? '—';
     final data = _formatarData(pedido['criado_em'] as String?);
     final itens = pedido['itens_pedido'] as List?;
     final qtdItens = itens?.length ?? 0;
@@ -82,7 +82,7 @@ class CardPedidoRetirada extends StatelessWidget {
             ),
             const SizedBox(width: 12),
             FilledButton.icon(
-              onPressed: onRegistrarRetirada,
+              onPressed: onRegistrarEntrega,
               icon: const Icon(Icons.add_box_outlined, size: 18),
               label: const Text('Registrar'),
             ),

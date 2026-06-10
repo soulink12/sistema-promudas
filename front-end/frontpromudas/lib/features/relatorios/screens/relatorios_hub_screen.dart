@@ -27,7 +27,7 @@ class TelaRelatoriosHub extends StatelessWidget {
             icon: Icons.receipt_long_outlined,
             titulo: 'Pedidos',
             descricao:
-                'Lista de pedidos com filtro por data, status de pagamento, status de retirada e cliente.',
+                'Lista de pedidos com filtro por data, status de pagamento, status de entrega e cliente.',
             onTap: () => Navigator.push(
               context,
               MaterialPageRoute(builder: (_) => const TelaRelatorioPedidos()),

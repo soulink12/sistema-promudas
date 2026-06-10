@@ -18,7 +18,7 @@ class _TelaRelatorioPedidosState extends State<TelaRelatorioPedidos> {
   DateTime? _de;
   DateTime? _ate;
   String? _statusPagamento;
-  String? _statusRetirada;
+  String? _statusEntrega;
   Map<String, dynamic>? _clienteSelecionado;
 
   Map<String, dynamic>? _resultado;
@@ -38,7 +38,7 @@ class _TelaRelatorioPedidosState extends State<TelaRelatorioPedidos> {
         params['ate'] = fim.toIso8601String();
       }
       if (_statusPagamento != null) params['statusPagamento'] = _statusPagamento;
-      if (_statusRetirada != null) params['statusRetirada'] = _statusRetirada;
+      if (_statusEntrega != null) params['statusEntrega'] = _statusEntrega;
       if (_clienteSelecionado != null) {
         params['clienteId'] = _clienteSelecionado!['id'];
       }
@@ -75,7 +75,7 @@ class _TelaRelatorioPedidosState extends State<TelaRelatorioPedidos> {
         params['ate'] = fim.toIso8601String();
       }
       if (_statusPagamento != null) params['statusPagamento'] = _statusPagamento;
-      if (_statusRetirada != null) params['statusRetirada'] = _statusRetirada;
+      if (_statusEntrega != null) params['statusEntrega'] = _statusEntrega;
       if (_clienteSelecionado != null) params['clienteId'] = _clienteSelecionado!['id'];
 
       final response = await ApiService.dio.get(
@@ -202,10 +202,10 @@ class _TelaRelatorioPedidosState extends State<TelaRelatorioPedidos> {
                   ),
                   const SizedBox(height: 12),
                   _FiltroStatus(
-                    label: 'STATUS DE RETIRADA',
-                    opcoes: const ['Retirado', 'Parcial', 'Pendente'],
-                    selecionado: _statusRetirada,
-                    onSelecionar: (v) => setState(() => _statusRetirada = v),
+                    label: 'STATUS DE ENTREGA',
+                    opcoes: const ['Entregue', 'Parcial', 'Pendente'],
+                    selecionado: _statusEntrega,
+                    onSelecionar: (v) => setState(() => _statusEntrega = v),
                   ),
                   const SizedBox(height: 12),
                   Text(
@@ -498,7 +498,7 @@ class _CardPedido extends StatelessWidget {
     final valor = (pedido['valor_total'] as num).toStringAsFixed(2);
     final qtdItens = pedido['qtd_itens'] as int? ?? 0;
     final statusPag = pedido['status_pagamento'] as String? ?? '—';
-    final statusRet = pedido['status_retirada'] as String? ?? '—';
+    final statusRet = pedido['status_entrega'] as String? ?? '—';
     final data = _formatarDataLocal(pedido['criado_em'] as String?);
 
     return Card(
@@ -558,7 +558,7 @@ class _CardPedido extends StatelessWidget {
                 const SizedBox(width: 8),
                 _PillStatus(
                   label: statusRet,
-                  cor: statusRet == 'Retirado'
+                  cor: statusRet == 'Entregue'
                       ? Colors.green[700]!
                       : statusRet == 'Parcial'
                           ? Colors.orange[700]!

@@ -34,7 +34,7 @@ class DetalhesPedido extends StatelessWidget {
     final ajuste = _toDouble(pedido['ajuste']);
     final data = _formatarDataHora(pedido['criado_em']);
     final statusPag = pedido['status_pagamento'] as String? ?? 'Pendente';
-    final statusRet = pedido['status_retirada'] as String? ?? 'Pendente';
+    final statusRet = pedido['status_entrega'] as String? ?? 'Pendente';
     final obs = pedido['observacoes'] as String?;
 
     final itens = (pedido['itens_pedido'] as List? ?? [])
@@ -43,11 +43,11 @@ class DetalhesPedido extends StatelessWidget {
     final todosPagamentos = (pedido['pagamentos'] as List? ?? [])
         .map((e) => Map<String, dynamic>.from(e as Map))
         .toList();
-    final retiradas = (pedido['retiradas'] as List? ?? [])
+    final entregas = (pedido['entregas'] as List? ?? [])
         .map((e) => Map<String, dynamic>.from(e as Map))
         .toList();
 
-    // Os itens da retirada não trazem o nome do produto — montamos o mapa
+    // Os itens da entrega não trazem o nome do produto — montamos o mapa
     // a partir dos itens do pedido (que já vêm com produtos.nome).
     final nomesPorProduto = <int, String>{};
     for (final item in itens) {
@@ -292,17 +292,17 @@ class DetalhesPedido extends StatelessWidget {
           // Entregas do pedido
           _TituloSecao(titulo: 'Entregas'),
           Card(
-            child: retiradas.isEmpty
+            child: entregas.isEmpty
                 ? const Padding(
                     padding: EdgeInsets.all(16),
                     child: Text('Nenhuma entrega registrada ainda.'),
                   )
                 : Column(
                     children: [
-                      for (int i = 0; i < retiradas.length; i++) ...[
+                      for (int i = 0; i < entregas.length; i++) ...[
                         if (i > 0) const Divider(height: 1),
-                        _BlocoRetirada(
-                          retirada: retiradas[i],
+                        _BlocoEntrega(
+                          entrega: entregas[i],
                           nomesPorProduto: nomesPorProduto,
                         ),
                       ],
@@ -501,12 +501,12 @@ class _LinhaPagamento extends StatelessWidget {
   }
 }
 
-class _BlocoRetirada extends StatelessWidget {
-  final Map<String, dynamic> retirada;
+class _BlocoEntrega extends StatelessWidget {
+  final Map<String, dynamic> entrega;
   final Map<int, String> nomesPorProduto;
 
-  const _BlocoRetirada({
-    required this.retirada,
+  const _BlocoEntrega({
+    required this.entrega,
     required this.nomesPorProduto,
   });
 
@@ -514,12 +514,12 @@ class _BlocoRetirada extends StatelessWidget {
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
 
-    final data = _formatarDataHora(retirada['data_retirada']) ?? '—';
-    final local = retirada['local_saida'] as String? ?? '—';
-    final motorista = retirada['motorista'] as String?;
-    final placa = retirada['placa_veiculo'] as String?;
+    final data = _formatarDataHora(entrega['data_entrega']) ?? '—';
+    final local = entrega['local_entrega'] as String? ?? '—';
+    final motorista = entrega['motorista'] as String?;
+    final placa = entrega['placa_veiculo'] as String?;
 
-    final itens = (retirada['itens_retirada'] as List? ?? [])
+    final itens = (entrega['itens_entrega'] as List? ?? [])
         .map((e) => Map<String, dynamic>.from(e as Map))
         .toList();
 
@@ -549,7 +549,7 @@ class _BlocoRetirada extends StatelessWidget {
           ),
           const SizedBox(height: 8),
 
-          // Itens retirados
+          // Itens entregues
           ...itens.map((item) {
             final prodId = item['produto_id'] as int?;
             final nome = prodId != null ? nomesPorProduto[prodId] : null;

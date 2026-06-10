@@ -7,7 +7,8 @@ const clienteRoutes = require('./routes/clienteRoutes');
 const produtoRoutes = require('./routes/produtoRoutes');
 const pedidoRoutes = require('./routes/pedidoRoutes');
 const pagamentoRoutes = require('./routes/pagamentoRoutes');
-const retiradaRoutes = require('./routes/retiradaRoutes');
+const entregaRoutes = require('./routes/entregaRoutes');
+const locaisEntregaRoutes = require('./routes/locaisEntregaRoutes');
 const formaPagamentoRoutes = require('./routes/formaPagamentoRoutes');
 const relatorioRoutes = require('./routes/relatorioRoutes');
 
@@ -33,7 +34,8 @@ app.use('/api/clientes', clienteRoutes);
 app.use('/api/produtos', produtoRoutes);
 app.use('/api/pedidos', pedidoRoutes);
 app.use('/api/pagamentos', pagamentoRoutes);
-app.use('/api/retiradas', retiradaRoutes);
+app.use('/api/entregas', entregaRoutes);
+app.use('/api/locais-entrega', locaisEntregaRoutes);
 
 const PORT = process.env.PORT || 6072;
 app.listen(PORT, () => {

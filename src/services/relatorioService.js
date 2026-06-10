@@ -270,7 +270,7 @@ const gerarRelatorioPDF = async ({ de, ate, forma }) => {
     });
 };
 
-const relatorioPedidos = async ({ de, ate, statusPagamento, statusRetirada, clienteId }) => {
+const relatorioPedidos = async ({ de, ate, statusPagamento, statusEntrega, clienteId }) => {
     const where = {
         ativo: true,
         ...(de || ate ? {
@@ -280,7 +280,7 @@ const relatorioPedidos = async ({ de, ate, statusPagamento, statusRetirada, clie
             }
         } : {}),
         ...(statusPagamento ? { status_pagamento: statusPagamento } : {}),
-        ...(statusRetirada ? { status_retirada: statusRetirada } : {}),
+        ...(statusEntrega ? { status_entrega: statusEntrega } : {}),
         ...(clienteId ? { cliente_id: parseInt(clienteId) } : {}),
     };
 
@@ -290,7 +290,7 @@ const relatorioPedidos = async ({ de, ate, statusPagamento, statusRetirada, clie
             id: true,
             valor_total: true,
             status_pagamento: true,
-            status_retirada: true,
+            status_entrega: true,
             criado_em: true,
             clientes: { select: { nome: true } },
             _count: { select: { itens_pedido: true } },
@@ -311,13 +311,13 @@ const relatorioPedidos = async ({ de, ate, statusPagamento, statusRetirada, clie
             criado_em: p.criado_em,
             valor_total: parseFloat(p.valor_total),
             status_pagamento: p.status_pagamento,
-            status_retirada: p.status_retirada,
+            status_entrega: p.status_entrega,
             qtd_itens: p._count.itens_pedido,
         })),
     };
 };
 
-const gerarRelatorioPedidosPDF = async ({ de, ate, statusPagamento, statusRetirada, clienteId }) => {
+const gerarRelatorioPedidosPDF = async ({ de, ate, statusPagamento, statusEntrega, clienteId }) => {
     const where = {
         ativo: true,
         ...(de || ate ? {
@@ -327,7 +327,7 @@ const gerarRelatorioPedidosPDF = async ({ de, ate, statusPagamento, statusRetira
             }
         } : {}),
         ...(statusPagamento ? { status_pagamento: statusPagamento } : {}),
-        ...(statusRetirada ? { status_retirada: statusRetirada } : {}),
+        ...(statusEntrega ? { status_entrega: statusEntrega } : {}),
         ...(clienteId ? { cliente_id: parseInt(clienteId) } : {}),
     };
 
@@ -343,10 +343,10 @@ const gerarRelatorioPedidosPDF = async ({ de, ate, statusPagamento, statusRetira
             pagamentos: {
                 orderBy: { criado_em: 'asc' },
             },
-            retiradas: {
+            entregas: {
                 orderBy: { criado_em: 'asc' },
                 include: {
-                    itens_retirada: {
+                    itens_entrega: {
                         include: { produtos: { select: { nome: true } } },
                     },
                 },
@@ -377,7 +377,7 @@ const gerarRelatorioPedidosPDF = async ({ de, ate, statusPagamento, statusRetira
         if (ate) periodoParts.push(`Até: ${formatarDataCurta(ate)}`);
         if (!de && !ate) periodoParts.push('Todo o período');
         if (statusPagamento) periodoParts.push(`Pagamento: ${statusPagamento}`);
-        if (statusRetirada) periodoParts.push(`Entrega: ${statusRetirada}`);
+        if (statusEntrega) periodoParts.push(`Entrega: ${statusEntrega}`);
 
         doc.font('Helvetica').fontSize(9).fillColor('#777777')
             .text(periodoParts.join('   '), { align: 'center' });
@@ -428,7 +428,7 @@ const gerarRelatorioPedidosPDF = async ({ de, ate, statusPagamento, statusRetira
             const yStatus = doc.y;
             doc.font('Helvetica').fontSize(8).fillColor('#555555');
             doc.text(`Pagamento: ${pedido.status_pagamento}`, 56, yStatus, { lineBreak: false });
-            doc.text(`Entrega: ${pedido.status_retirada}`, 200, yStatus, { lineBreak: false });
+            doc.text(`Entrega: ${pedido.status_entrega}`, 200, yStatus, { lineBreak: false });
 
             // Valor total e ajuste
             const ajuste = parseFloat(pedido.ajuste ?? 0);
@@ -504,7 +504,7 @@ const gerarRelatorioPedidosPDF = async ({ de, ate, statusPagamento, statusRetira
             }
 
             // ── Entregas ───────────────────────────────────────────────────
-            if (pedido.retiradas.length > 0) {
+            if (pedido.entregas.length > 0) {
                 doc.moveDown(0.3);
                 doc.moveTo(56, doc.y).lineTo(545, doc.y).strokeColor('#dddddd').lineWidth(0.5).stroke();
                 doc.strokeColor('black').lineWidth(1);
@@ -515,10 +515,10 @@ const gerarRelatorioPedidosPDF = async ({ de, ate, statusPagamento, statusRetira
                 doc.fillColor('black');
                 doc.moveDown(0.2);
 
-                pedido.retiradas.forEach((ret) => {
+                pedido.entregas.forEach((ret) => {
                     if (doc.y + 14 > paginaFundo) { doc.addPage(); }
-                    const dataRet = formatarDataCurta(ret.data_retirada || ret.criado_em);
-                    const local = ret.local_saida ?? '—';
+                    const dataRet = formatarDataCurta(ret.data_entrega || ret.criado_em);
+                    const local = ret.local_entrega ?? '—';
                     const veiculo = [ret.motorista, ret.placa_veiculo].filter(Boolean).join(' · ');
                     const cabecalho = `${dataRet}  ·  Local: ${local}${veiculo ? '  ·  ' + veiculo : ''}`;
                     doc.font('Helvetica-Bold').fontSize(8).fillColor('#555555')
@@ -526,7 +526,7 @@ const gerarRelatorioPedidosPDF = async ({ de, ate, statusPagamento, statusRetira
                     doc.fillColor('black');
                     doc.moveDown(0.15);
 
-                    ret.itens_retirada.forEach((it) => {
+                    ret.itens_entrega.forEach((it) => {
                         if (doc.y + 12 > paginaFundo) { doc.addPage(); }
                         const yIt = doc.y;
                         const nomeProd = it.produtos?.nome ?? '—';

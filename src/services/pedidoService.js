@@ -33,8 +33,8 @@ const listarPedidos = async (filtros = {}) => {
         where.clientes = { nome: { contains: filtros.cliente } };
     }
     // Filtra por status de entrega (ex.: 'Pendente,Parcial') quando informado
-    if (filtros.statusRetirada) {
-        where.status_retirada = { in: filtros.statusRetirada.split(',') };
+    if (filtros.statusEntrega) {
+        where.status_entrega = { in: filtros.statusEntrega.split(',') };
     }
 
     const [pedidos, formasPosteriores] = await Promise.all([
@@ -61,8 +61,8 @@ const listarPedidos = async (filtros = {}) => {
                     },
                     orderBy: { criado_em: 'asc' }
                 },
-                retiradas: {
-                    include: { itens_retirada: true }
+                entregas: {
+                    include: { itens_entrega: true }
                 }
             }
         }),
@@ -183,8 +183,8 @@ const buscarPedido = async (id) => {
                     },
                     orderBy: { criado_em: 'asc' }
                 },
-                retiradas: {
-                    include: { itens_retirada: true }
+                entregas: {
+                    include: { itens_entrega: true }
                 }
             }
         }),

@@ -24,8 +24,8 @@ const relatorioPDF = async (req, res) => {
 
 const relatorioPedidos = async (req, res) => {
     try {
-        const { de, ate, statusPagamento, statusRetirada, clienteId } = req.query;
-        const dados = await relatorioService.relatorioPedidos({ de, ate, statusPagamento, statusRetirada, clienteId });
+        const { de, ate, statusPagamento, statusEntrega, clienteId } = req.query;
+        const dados = await relatorioService.relatorioPedidos({ de, ate, statusPagamento, statusEntrega, clienteId });
         res.status(200).json(dados);
     } catch (erro) {
         res.status(erro.status || 500).json({ erro: erro.message || 'Erro ao gerar relatório.' });
@@ -34,8 +34,8 @@ const relatorioPedidos = async (req, res) => {
 
 const relatorioPedidosPDF = async (req, res) => {
     try {
-        const { de, ate, statusPagamento, statusRetirada, clienteId } = req.query;
-        const buffer = await relatorioService.gerarRelatorioPedidosPDF({ de, ate, statusPagamento, statusRetirada, clienteId });
+        const { de, ate, statusPagamento, statusEntrega, clienteId } = req.query;
+        const buffer = await relatorioService.gerarRelatorioPedidosPDF({ de, ate, statusPagamento, statusEntrega, clienteId });
         res.setHeader('Content-Type', 'application/pdf');
         res.setHeader('Content-Disposition', 'attachment; filename="relatorio_pedidos.pdf"');
         res.status(200).send(buffer);

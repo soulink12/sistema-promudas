@@ -2,29 +2,29 @@ import 'package:flutter/material.dart';
 import '../../../core/services/api_service.dart';
 import '../../../core/widgets/pesquisa_cliente_lista.dart';
 import '../../../core/widgets/dialog_confirmacao.dart';
-import 'widgets/card_retirada.dart';
-import 'widgets/modal_retirada.dart';
+import 'widgets/card_entrega.dart';
+import 'widgets/modal_entrega.dart';
 
 /// Consulta das entregas já registradas, com ações de editar e excluir.
-class TelaConsultaRetiradas extends StatefulWidget {
-  const TelaConsultaRetiradas({super.key});
+class TelaConsultaEntregas extends StatefulWidget {
+  const TelaConsultaEntregas({super.key});
 
   @override
-  State<TelaConsultaRetiradas> createState() => _TelaConsultaRetiradasState();
+  State<TelaConsultaEntregas> createState() => _TelaConsultaEntregasState();
 }
 
-class _TelaConsultaRetiradasState extends State<TelaConsultaRetiradas> {
-  List<Map<String, dynamic>> _retiradas = [];
+class _TelaConsultaEntregasState extends State<TelaConsultaEntregas> {
+  List<Map<String, dynamic>> _entregas = [];
   bool _carregando = false;
   Map<String, dynamic>? _clienteSelecionado;
 
   @override
   void initState() {
     super.initState();
-    _carregarRetiradas();
+    _carregarEntregas();
   }
 
-  Future<void> _carregarRetiradas() async {
+  Future<void> _carregarEntregas() async {
     setState(() => _carregando = true);
     try {
       final params = <String, dynamic>{};
@@ -33,7 +33,7 @@ class _TelaConsultaRetiradasState extends State<TelaConsultaRetiradas> {
       }
 
       final response = await ApiService.dio.get(
-        '/retiradas',
+        '/entregas',
         queryParameters: params.isEmpty ? null : params,
       );
 
@@ -42,7 +42,7 @@ class _TelaConsultaRetiradasState extends State<TelaConsultaRetiradas> {
           .toList();
 
       setState(() {
-        _retiradas = lista;
+        _entregas = lista;
         _carregando = false;
       });
     } catch (_) {
@@ -58,11 +58,11 @@ class _TelaConsultaRetiradasState extends State<TelaConsultaRetiradas> {
     }
   }
 
-  Future<void> _editarRetirada(Map<String, dynamic> retirada) async {
-    final pedidoId = (retirada['pedidos'] as Map<String, dynamic>?)?['id'];
+  Future<void> _editarEntrega(Map<String, dynamic> entrega) async {
+    final pedidoId = (entrega['pedidos'] as Map<String, dynamic>?)?['id'];
     if (pedidoId == null) return;
 
-    // Busca o pedido completo (itens_pedido + retiradas) para calcular o saldo
+    // Busca o pedido completo (itens_pedido + entregas) para calcular o saldo
     Map<String, dynamic> pedido;
     try {
       final response = await ApiService.dio.get('/pedidos/$pedidoId');
@@ -82,12 +82,12 @@ class _TelaConsultaRetiradasState extends State<TelaConsultaRetiradas> {
     if (!mounted) return;
     showDialog<void>(
       context: context,
-      builder: (_) => ModalRetirada(
+      builder: (_) => ModalEntrega(
         pedido: pedido,
-        retiradaParaEditar: retirada,
+        entregaParaEditar: entrega,
         onSalvo: () {
           Navigator.pop(context);
-          _carregarRetiradas();
+          _carregarEntregas();
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(content: Text('Entrega atualizada com sucesso.')),
           );
@@ -96,7 +96,7 @@ class _TelaConsultaRetiradasState extends State<TelaConsultaRetiradas> {
     );
   }
 
-  Future<void> _excluirRetirada(Map<String, dynamic> retirada) async {
+  Future<void> _excluirEntrega(Map<String, dynamic> entrega) async {
     final confirmado = await mostrarDialogConfirmacao(
       context: context,
       titulo: 'Excluir entrega',
@@ -107,12 +107,12 @@ class _TelaConsultaRetiradasState extends State<TelaConsultaRetiradas> {
     if (!confirmado) return;
 
     try {
-      await ApiService.dio.delete('/retiradas/${retirada['id']}');
+      await ApiService.dio.delete('/entregas/${entrega['id']}');
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Entrega excluída com sucesso.')),
       );
-      _carregarRetiradas();
+      _carregarEntregas();
     } catch (_) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -137,17 +137,17 @@ class _TelaConsultaRetiradasState extends State<TelaConsultaRetiradas> {
             clienteSelecionado: _clienteSelecionado,
             onSelecionado: (c) {
               setState(() => _clienteSelecionado = c);
-              _carregarRetiradas();
+              _carregarEntregas();
             },
             onLimpar: () {
               setState(() => _clienteSelecionado = null);
-              _carregarRetiradas();
+              _carregarEntregas();
             },
           ),
           Expanded(
             child: _carregando
                 ? const Center(child: CircularProgressIndicator())
-                : _retiradas.isEmpty
+                : _entregas.isEmpty
                     ? Center(
                         child: Column(
                           mainAxisSize: MainAxisSize.min,
@@ -163,15 +163,15 @@ class _TelaConsultaRetiradasState extends State<TelaConsultaRetiradas> {
                         ),
                       )
                     : RefreshIndicator(
-                        onRefresh: _carregarRetiradas,
+                        onRefresh: _carregarEntregas,
                         child: ListView.separated(
                           padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-                          itemCount: _retiradas.length,
+                          itemCount: _entregas.length,
                           separatorBuilder: (_, __) => const SizedBox(height: 8),
-                          itemBuilder: (_, i) => CardRetirada(
-                            retirada: _retiradas[i],
-                            onEditar: () => _editarRetirada(_retiradas[i]),
-                            onExcluir: () => _excluirRetirada(_retiradas[i]),
+                          itemBuilder: (_, i) => CardEntrega(
+                            entrega: _entregas[i],
+                            onEditar: () => _editarEntrega(_entregas[i]),
+                            onExcluir: () => _excluirEntrega(_entregas[i]),
                           ),
                         ),
                       ),
