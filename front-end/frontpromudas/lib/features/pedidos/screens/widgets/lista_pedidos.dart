@@ -21,26 +21,69 @@ class ListaPedidos extends StatelessWidget {
       );
     }
     return ListView.separated(
+      padding: const EdgeInsets.all(16),
       itemCount: pedidos.length,
-      separatorBuilder: (_, __) => const Divider(height: 1),
+      separatorBuilder: (_, __) => const SizedBox(height: 8),
       itemBuilder: (context, index) {
         final p = pedidos[index];
+        final cs = Theme.of(context).colorScheme;
         final nomeCliente =
             p['clientes']?['nome'] as String? ?? 'Cliente desconhecido';
         final total = _toDouble(p['valor_total']);
         final data = _formatarDataHora(p['criado_em']);
         final statusPag = p['status_pagamento'] as String? ?? 'Pendente';
 
-        return ListTile(
-          leading: _BadgeId(id: p['id'] as int),
-          title: Text(nomeCliente,
-              style: const TextStyle(fontWeight: FontWeight.w600)),
-          subtitle: Text(
-            '${data ?? '—'}  •  R\$ ${total.toStringAsFixed(2)}',
-            style: const TextStyle(fontSize: 13),
+        return Card(
+          child: InkWell(
+            borderRadius: BorderRadius.circular(12),
+            onTap: () => onSelecionarPedido(p),
+            child: Padding(
+              padding: const EdgeInsets.all(14),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          nomeCliente,
+                          style: const TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 15,
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          'Pedido #${p['id']} · ${data ?? '—'}',
+                          style: TextStyle(
+                            color: cs.onSurfaceVariant,
+                            fontSize: 12,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      Text(
+                        'R\$ ${total.toStringAsFixed(2)}',
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 15,
+                          color: cs.primary,
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      ChipStatus(status: statusPag),
+                    ],
+                  ),
+                ],
+              ),
+            ),
           ),
-          trailing: ChipStatus(status: statusPag),
-          onTap: () => onSelecionarPedido(p),
         );
       },
     );
@@ -48,33 +91,6 @@ class ListaPedidos extends StatelessWidget {
 }
 
 // ── Widgets auxiliares ────────────────────────────────────────────────────────
-
-class _BadgeId extends StatelessWidget {
-  final int id;
-  const _BadgeId({required this.id});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: 44,
-      height: 44,
-      decoration: BoxDecoration(
-        color: Colors.green[50],
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: Colors.green.shade200),
-      ),
-      child: Center(
-        child: Text(
-          '#$id',
-          style: TextStyle(
-              fontSize: 11,
-              fontWeight: FontWeight.bold,
-              color: Colors.green[800]),
-        ),
-      ),
-    );
-  }
-}
 
 class ChipStatus extends StatelessWidget {
   final String status;
