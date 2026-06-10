@@ -32,6 +32,8 @@ class ListaPedidos extends StatelessWidget {
         final total = _toDouble(p['valor_total']);
         final data = _formatarDataHora(p['criado_em']);
         final statusPag = p['status_pagamento'] as String? ?? 'Pendente';
+        final statusEntrega = p['status_retirada'] as String? ?? 'Pendente';
+        final statusNota = _statusNotaPedido(p['pagamentos'] as List? ?? []);
 
         return Card(
           child: InkWell(
@@ -39,35 +41,35 @@ class ListaPedidos extends StatelessWidget {
             onTap: () => onSelecionarPedido(p),
             child: Padding(
               padding: const EdgeInsets.all(14),
-              child: Row(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          nomeCliente,
-                          style: const TextStyle(
-                            fontWeight: FontWeight.bold,
-                            fontSize: 15,
-                          ),
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          'Pedido #${p['id']} · ${data ?? '—'}',
-                          style: TextStyle(
-                            color: cs.onSurfaceVariant,
-                            fontSize: 12,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.end,
+                  Row(
                     children: [
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              nomeCliente,
+                              style: const TextStyle(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 15,
+                              ),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              'Pedido #${p['id']} · ${data ?? '—'}',
+                              style: TextStyle(
+                                color: cs.onSurfaceVariant,
+                                fontSize: 12,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(width: 12),
                       Text(
                         'R\$ ${total.toStringAsFixed(2)}',
                         style: TextStyle(
@@ -76,8 +78,16 @@ class ListaPedidos extends StatelessWidget {
                           color: cs.primary,
                         ),
                       ),
-                      const SizedBox(height: 6),
+                    ],
+                  ),
+                  const SizedBox(height: 10),
+                  Wrap(
+                    spacing: 6,
+                    runSpacing: 6,
+                    children: [
                       ChipStatus(status: statusPag),
+                      ChipStatus(status: statusEntrega, prefixo: 'Entrega: '),
+                      ChipStatus(status: statusNota, prefixo: 'Nota: '),
                     ],
                   ),
                 ],
@@ -104,16 +114,23 @@ class ChipStatus extends StatelessWidget {
     switch (status.toLowerCase()) {
       case 'pago':
       case 'realizada':
+      case 'retirado':
+      case 'entregue':
+      case 'emitida':
         cor = Colors.green;
         break;
       case 'crédito':
+      case 'processando':
         cor = Colors.blue;
         break;
       case 'parcial':
         cor = Colors.orange;
         break;
+      case 'rejeitada':
+        cor = Colors.red;
+        break;
       default:
-        cor = Colors.grey;
+        cor = Colors.grey; // Pendente / não informado
     }
     return Chip(
       label: Text('$prefixo$status', style: const TextStyle(fontSize: 11)),
@@ -126,6 +143,28 @@ class ChipStatus extends StatelessWidget {
 }
 
 // ── Funções utilitárias ───────────────────────────────────────────────────────
+
+/// Status da nota fiscal do pedido, agregado a partir dos pagamentos reais
+/// (crediário/"a receber" não conta — ainda não há nota). Prioridade:
+/// Rejeitada > Processando > Emitida (todas) > Parcial (algumas) > Pendente.
+String _statusNotaPedido(List pagamentos) {
+  final reais = pagamentos
+      .where((p) => (p as Map)['pagamento_posterior'] != true)
+      .toList();
+  if (reais.isEmpty) return 'Pendente';
+
+  final statuses = reais
+      .map((p) => (p as Map)['status_nota'] as String? ?? 'Pendente')
+      .toList();
+
+  if (statuses.contains('Rejeitada')) return 'Rejeitada';
+  if (statuses.contains('Processando')) return 'Processando';
+
+  final emitidas = statuses.where((s) => s == 'Emitida').length;
+  if (emitidas == 0) return 'Pendente';
+  if (emitidas == statuses.length) return 'Emitida';
+  return 'Parcial';
+}
 
 double _toDouble(dynamic v) =>
     v == null ? 0.0 : double.tryParse(v.toString()) ?? 0.0;
