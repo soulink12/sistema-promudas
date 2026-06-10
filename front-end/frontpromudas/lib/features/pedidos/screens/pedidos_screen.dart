@@ -6,6 +6,7 @@ import 'widgets/lista_pedidos.dart';
 import 'widgets/detalhes_pedido.dart';
 import '../../../core/services/pdf_download_service.dart';
 import '../../vendas/screens/venda_screen.dart';
+import '../../clientes/screens/clientes_screen.dart';
 
 
 class TelaPedidos extends StatefulWidget {
@@ -142,6 +143,17 @@ class _TelaPedidosState extends State<TelaPedidos> {
         totalPedido: saldoRestante,
         parcialPermitido: true,
         onConfirmar: (pags) => _registrarPagamento(pedidoId, saldoRestante, pags),
+      ),
+    );
+  }
+
+  void _abrirDetalhesCliente(Map<String, dynamic> pedido) {
+    final clienteId = pedido['clientes']?['id'] as int?;
+    if (clienteId == null) return;
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => TelaListaClientes(clienteInicialId: clienteId),
       ),
     );
   }
@@ -298,6 +310,8 @@ class _TelaPedidosState extends State<TelaPedidos> {
                               context, _pedidoSelecionado!['id'] as int),
                           onEditar: () =>
                               _abrirEdicaoPedido(_pedidoSelecionado!),
+                          onTapCliente: () =>
+                              _abrirDetalhesCliente(_pedidoSelecionado!),
                         )
                       : ListaPedidos(
                           pedidos: _pedidos,

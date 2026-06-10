@@ -8,6 +8,7 @@ class DetalhesPedido extends StatelessWidget {
   final VoidCallback onRegistrarPagamento;
   final VoidCallback onEmitirPdf;
   final VoidCallback onEditar;
+  final VoidCallback onTapCliente;
 
   const DetalhesPedido({
     super.key,
@@ -17,6 +18,7 @@ class DetalhesPedido extends StatelessWidget {
     required this.onRegistrarPagamento,
     required this.onEmitirPdf,
     required this.onEditar,
+    required this.onTapCliente,
   });
 
   @override
@@ -86,9 +88,39 @@ class DetalhesPedido extends StatelessWidget {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text(nomeCliente,
-                                style: const TextStyle(
-                                    fontSize: 18, fontWeight: FontWeight.bold)),
+                            // Nome do cliente clicável → abre os detalhes do cliente
+                            InkWell(
+                              onTap: onTapCliente,
+                              borderRadius: BorderRadius.circular(6),
+                              child: Padding(
+                                padding: const EdgeInsets.symmetric(vertical: 2),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Flexible(
+                                      child: Text(
+                                        nomeCliente,
+                                        style: TextStyle(
+                                          fontSize: 18,
+                                          fontWeight: FontWeight.bold,
+                                          color: Theme.of(context)
+                                              .colorScheme
+                                              .primary,
+                                        ),
+                                      ),
+                                    ),
+                                    const SizedBox(width: 4),
+                                    Icon(
+                                      Icons.chevron_right,
+                                      size: 20,
+                                      color: Theme.of(context)
+                                          .colorScheme
+                                          .primary,
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
                             const SizedBox(height: 4),
                             Text(data ?? '—',
                                 style: TextStyle(

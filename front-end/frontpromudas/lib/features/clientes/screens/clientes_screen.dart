@@ -7,7 +7,10 @@ import 'widgets/form_edicao_cliente.dart';
 import 'widgets/dialog_cadastro_cliente.dart';
 
 class TelaListaClientes extends StatefulWidget {
-  const TelaListaClientes({super.key});
+  /// Quando informado, a tela abre já exibindo os detalhes deste cliente.
+  final int? clienteInicialId;
+
+  const TelaListaClientes({super.key, this.clienteInicialId});
 
   @override
   State<TelaListaClientes> createState() => _TelaListaClientesState();
@@ -30,6 +33,9 @@ class _TelaListaClientesState extends State<TelaListaClientes> {
 
   bool _editando = false;
   bool _salvandoEdicao = false;
+
+  // Garante que a pré-seleção por id ocorra apenas no primeiro carregamento
+  bool _selecaoInicialFeita = false;
 
   @override
   void initState() {
@@ -58,6 +64,16 @@ class _TelaListaClientesState extends State<TelaListaClientes> {
             .toList();
         _carregando = false;
       });
+
+      // Abre direto nos detalhes do cliente quando veio um id inicial
+      if (!_selecaoInicialFeita && widget.clienteInicialId != null) {
+        _selecaoInicialFeita = true;
+        final inicial = _clientes.firstWhere(
+          (c) => c['id'] == widget.clienteInicialId,
+          orElse: () => {},
+        );
+        if (inicial.isNotEmpty) _selecionarCliente(inicial);
+      }
     } catch (_) {
       setState(() {
         _erroCarregamento = 'Não foi possível carregar os clientes.';
