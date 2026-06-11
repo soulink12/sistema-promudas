@@ -16,6 +16,7 @@ async function main() {
     await prisma.clientes.deleteMany();
     await prisma.formas_pagamento.deleteMany();
     await prisma.locais_entrega.deleteMany();
+    await prisma.contas.deleteMany();
     await prisma.usuarios.deleteMany();
 
     // ── Usuário (login do sistema) ──────────────────────────────────────────
@@ -45,6 +46,16 @@ async function main() {
         data: [{ nome: 'Paraíso' }, { nome: 'BR' }, { nome: 'Doze' }],
     });
 
+    // ── Contas (para onde o pagamento entra) ────────────────────────────────
+    await prisma.contas.createMany({
+        data: [
+            { nome: 'Fernando Antônio' },
+            { nome: 'Fernando de Sousa' },
+            { nome: 'Lucas' },
+            { nome: 'Fábio' },
+        ],
+    });
+
     // ── Clientes (id=1 = Consumidor Padrão / venda balcão) ──────────────────
     await prisma.clientes.create({ data: { id: 1, nome: 'Consumidor' } });
     await prisma.clientes.createMany({
@@ -55,7 +66,7 @@ async function main() {
         ],
     });
 
-    console.log('✓ Seed concluído: 1 usuário (admin@promudas.com / admin123), 5 formas de pagamento, 3 locais de entrega, 4 clientes.');
+    console.log('✓ Seed concluído: 1 usuário (admin@promudas.com / admin123), 5 formas de pagamento, 3 locais de entrega, 4 contas, 4 clientes.');
 }
 
 main()

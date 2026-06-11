@@ -169,6 +169,7 @@ class _TelaPedidosState extends State<TelaPedidos> {
             'valor_pago': valorPago,
             'forma_pagamento': p['forma'],
             'data_pagamento': DateTime.now().toUtc().toIso8601String(),
+            if (p['conta'] != null) 'conta': p['conta'],
             if (p['nomePagador'] != null) 'nome_pagador': p['nomePagador'],
             if (p['cpfPagador'] != null) 'cpf_cnpj_pagador': p['cpfPagador'],
           },
@@ -252,6 +253,7 @@ class _TelaPedidosState extends State<TelaPedidos> {
         data: {
           'valor_pago': resultado['valor_pago'],
           'forma_pagamento': resultado['forma_pagamento'],
+          'conta': resultado['conta'],
           'nome_pagador': resultado['nome_pagador'],
           'cpf_cnpj_pagador': resultado['cpf_cnpj_pagador'],
         },

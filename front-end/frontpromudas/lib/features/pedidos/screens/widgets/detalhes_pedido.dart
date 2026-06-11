@@ -392,6 +392,8 @@ class _LinhaPagamento extends StatelessWidget {
     final dataPag = _formatarDataHora(pag['criado_em']) ?? '—';
     final forma = pag['forma_pagamento'] as String? ?? '—';
     final valor = _toDouble(pag['valor_pago']);
+    final conta = pag['conta'] as String?;
+    final temConta = conta != null && conta.isNotEmpty;
     final nomePagador = pag['nome_pagador'] as String?;
     final temPagador = nomePagador != null && nomePagador.isNotEmpty;
 
@@ -420,6 +422,11 @@ class _LinhaPagamento extends StatelessWidget {
                 const SizedBox(height: 2),
                 Text(dataPag,
                     style: TextStyle(fontSize: 12, color: cs.onSurfaceVariant)),
+                if (temConta) ...[
+                  const SizedBox(height: 2),
+                  Text('Conta: $conta',
+                      style: TextStyle(fontSize: 12, color: cs.onSurfaceVariant)),
+                ],
                 if (temPagador) ...[
                   const SizedBox(height: 2),
                   Text('Pago por: $nomePagador',

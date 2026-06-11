@@ -228,6 +228,14 @@ const gerarPedidoPDF = async (pedidoId) => {
                 ]);
                 doc.moveDown(0.45);
 
+                // Conta para a qual o pagamento entrou
+                if (pag.conta) {
+                    doc.font('Helvetica-Oblique').fontSize(8).fillColor('#666666')
+                        .text(`Conta: ${pag.conta}`, 60, doc.y, { width: 470 });
+                    doc.fillColor('black');
+                    doc.moveDown(0.4);
+                }
+
                 // Pagador, quando diferente do cliente
                 if (pag.nome_pagador) {
                     const detalhePagador = pag.cpf_cnpj_pagador

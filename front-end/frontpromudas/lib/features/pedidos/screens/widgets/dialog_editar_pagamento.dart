@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../../../../core/services/forma_pagamento_service.dart';
+import '../../../../core/services/conta_service.dart';
 
-/// Diálogo para editar um pagamento (valor e forma).
-/// Retorna via `Navigator.pop` um mapa `{valor_pago, forma_pagamento}` ao salvar,
+/// Diálogo para editar um pagamento (valor, forma e conta).
+/// Retorna via `Navigator.pop` um mapa `{valor_pago, forma_pagamento, conta}` ao salvar,
 /// ou `null` se cancelado. Não faz a chamada à API — quem chama persiste.
 class DialogEditarPagamento extends StatefulWidget {
   final Map<String, dynamic> pagamento;
@@ -19,7 +20,9 @@ class _DialogEditarPagamentoState extends State<DialogEditarPagamento> {
   late final TextEditingController _nomePagadorCtrl;
   late final TextEditingController _cpfPagadorCtrl;
   String? _formaSelecionada;
+  String? _contaSelecionada;
   List<Map<String, dynamic>> _formas = [];
+  List<String> _contas = [];
   bool _carregando = true;
   String? _erro;
 
@@ -33,7 +36,8 @@ class _DialogEditarPagamentoState extends State<DialogEditarPagamento> {
     _cpfPagadorCtrl = TextEditingController(
         text: widget.pagamento['cpf_cnpj_pagador'] as String? ?? '');
     _formaSelecionada = widget.pagamento['forma_pagamento'] as String?;
-    _carregarFormas();
+    _contaSelecionada = widget.pagamento['conta'] as String?;
+    _carregarDados();
   }
 
   @override
@@ -44,7 +48,7 @@ class _DialogEditarPagamentoState extends State<DialogEditarPagamento> {
     super.dispose();
   }
 
-  Future<void> _carregarFormas() async {
+  Future<void> _carregarDados() async {
     try {
       final todas = await FormaPagamentoService().listar();
       // Só formas reais (crediário/posterior não aparece na lista de pagamentos)
@@ -57,8 +61,17 @@ class _DialogEditarPagamentoState extends State<DialogEditarPagamento> {
         reais.add({'nome': _formaSelecionada});
       }
 
+      final contas = await ContaService().listar();
+      // Garante que a conta atual esteja disponível mesmo se inativa/removida
+      if (_contaSelecionada != null &&
+          _contaSelecionada!.isNotEmpty &&
+          !contas.contains(_contaSelecionada)) {
+        contas.add(_contaSelecionada!);
+      }
+
       setState(() {
         _formas = reais;
+        _contas = contas;
         _carregando = false;
       });
     } catch (_) {
@@ -80,6 +93,7 @@ class _DialogEditarPagamentoState extends State<DialogEditarPagamento> {
     Navigator.pop(context, <String, dynamic>{
       'valor_pago': valor,
       'forma_pagamento': _formaSelecionada,
+      'conta': _contaSelecionada,
       // null limpa o campo; valor preenchido atualiza
       'nome_pagador': nomePagador.isEmpty ? null : nomePagador,
       'cpf_cnpj_pagador': cpfPagador.isEmpty ? null : cpfPagador,
@@ -140,6 +154,22 @@ class _DialogEditarPagamentoState extends State<DialogEditarPagamento> {
                             .toList(),
                         onChanged: (v) =>
                             setState(() => _formaSelecionada = v),
+                      ),
+                      const SizedBox(height: 16),
+                      DropdownButtonFormField<String>(
+                        initialValue: _contaSelecionada,
+                        decoration: const InputDecoration(
+                          labelText: 'Conta',
+                          border: OutlineInputBorder(),
+                        ),
+                        items: _contas
+                            .map((c) => DropdownMenuItem(
+                                  value: c,
+                                  child: Text(c),
+                                ))
+                            .toList(),
+                        onChanged: (v) =>
+                            setState(() => _contaSelecionada = v),
                       ),
                       const SizedBox(height: 16),
                       TextField(

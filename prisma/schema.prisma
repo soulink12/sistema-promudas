@@ -100,6 +100,7 @@ model pagamentos {
   valor_pago        Decimal   @db.Decimal(10, 2)
   data_pagamento    DateTime? @db.Date
   forma_pagamento   String?   @db.VarChar(50)
+  conta             String?   @db.VarChar(50)
   recebedor         String?   @db.VarChar(50)
   nome_pagador      String?   @db.VarChar(100)
   cpf_cnpj_pagador  String?   @db.VarChar(20)
@@ -129,6 +130,12 @@ model formas_pagamento {
 }
 
 model locais_entrega {
+  id    Int     @id @default(autoincrement())
+  nome  String  @db.VarChar(50)
+  ativo Boolean @default(true)
+}
+
+model contas {
   id    Int     @id @default(autoincrement())
   nome  String  @db.VarChar(50)
   ativo Boolean @default(true)

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../../../core/services/forma_pagamento_service.dart';
+import '../../../../core/services/conta_service.dart';
 
 /// Modal de registro de pagamento do pedido.
 /// Suporta pagamento dividido em múltiplas formas.
@@ -42,21 +43,27 @@ class _ModalPagamentoState extends State<ModalPagamento> {
   List<Map<String, dynamic>> _formasPagamento = [];
   // Nome da forma selecionada no dropdown
   String? _formaSelecionada;
+  // Contas disponíveis (para onde o pagamento entra) + a selecionada
+  List<String> _contas = [];
+  String? _contaSelecionada;
   bool _carregando = true;
   String? _erroCarregamento;
 
   @override
   void initState() {
     super.initState();
-    _carregarFormas();
+    _carregarDados();
   }
 
-  Future<void> _carregarFormas() async {
+  Future<void> _carregarDados() async {
     try {
       final formas = await FormaPagamentoService().listar();
+      final contas = await ContaService().listar();
       setState(() {
         _formasPagamento = formas;
         _formaSelecionada = formas.isNotEmpty ? formas.first['nome'] as String : null;
+        _contas = contas;
+        _contaSelecionada = contas.isNotEmpty ? contas.first : null;
         _valorCtrl.text = widget.totalPedido.toStringAsFixed(2);
         _carregando = false;
       });
@@ -106,11 +113,16 @@ class _ModalPagamentoState extends State<ModalPagamento> {
         double.tryParse(_valorCtrl.text.trim().replaceAll(',', '.'));
     if (valor == null || valor <= 0) return;
 
+    // Crediário (a receber) não entra em conta; pagamento real exige conta.
+    final posterior = _formaSelecionadaPosterior;
+    if (!posterior && _contaSelecionada == null) return;
+
     setState(() {
       _pagamentos.add({
         'forma': _formaSelecionada,
         'valor': valor,
-        'pagamentoPosterior': _formaSelecionadaPosterior,
+        'pagamentoPosterior': posterior,
+        if (!posterior) 'conta': _contaSelecionada,
       });
       final restante = _restante;
       _valorCtrl.text =
@@ -194,12 +206,25 @@ class _ModalPagamentoState extends State<ModalPagamento> {
                                 size: 16, color: Colors.green[700]),
                         const SizedBox(width: 8),
                         Expanded(
-                          child: Text(
-                            p['forma'] as String,
-                            style: TextStyle(
-                              fontSize: 14,
-                              color: isPosterior ? Colors.orange[800] : null,
-                            ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                p['forma'] as String,
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  color: isPosterior ? Colors.orange[800] : null,
+                                ),
+                              ),
+                              if (p['conta'] != null)
+                                Text(
+                                  'Conta: ${p['conta']}',
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    color: Colors.grey[600],
+                                  ),
+                                ),
+                            ],
                           ),
                         ),
                         if (isPosterior)
@@ -297,7 +322,7 @@ class _ModalPagamentoState extends State<ModalPagamento> {
                             _carregando = true;
                             _erroCarregamento = null;
                           });
-                          _carregarFormas();
+                          _carregarDados();
                         },
                         child: const Text('Tentar novamente'),
                       ),
@@ -305,41 +330,73 @@ class _ModalPagamentoState extends State<ModalPagamento> {
                   ),
                 )
               else
-                DropdownButtonFormField<String>(
-                  value: _formaSelecionada,
-                  decoration: const InputDecoration(
-                    labelText: 'Forma de pagamento',
-                    border: OutlineInputBorder(),
-                    isDense: true,
-                  ),
-                  items: _formasPagamento.map((f) {
-                    final nome = f['nome'] as String;
-                    final isPosterior = f['pagamentoPosterior'] as bool;
-                    return DropdownMenuItem<String>(
-                      value: nome,
-                      child: Row(
-                        children: [
-                          Text(nome),
-                          if (isPosterior) ...[
-                            const SizedBox(width: 8),
-                            Icon(Icons.access_time,
-                                size: 14, color: Colors.orange[700]),
-                            const SizedBox(width: 4),
-                            Text(
-                              'a receber',
-                              style: TextStyle(
-                                  fontSize: 12, color: Colors.orange[700]),
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(
+                      child: DropdownButtonFormField<String>(
+                        value: _formaSelecionada,
+                        decoration: const InputDecoration(
+                          labelText: 'Forma de pagamento',
+                          border: OutlineInputBorder(),
+                          isDense: true,
+                        ),
+                        items: _formasPagamento.map((f) {
+                          final nome = f['nome'] as String;
+                          final isPosterior = f['pagamentoPosterior'] as bool;
+                          return DropdownMenuItem<String>(
+                            value: nome,
+                            child: Row(
+                              children: [
+                                Text(nome),
+                                if (isPosterior) ...[
+                                  const SizedBox(width: 8),
+                                  Icon(Icons.access_time,
+                                      size: 14, color: Colors.orange[700]),
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    'a receber',
+                                    style: TextStyle(
+                                        fontSize: 12, color: Colors.orange[700]),
+                                  ),
+                                ],
+                              ],
                             ),
-                          ],
-                        ],
+                          );
+                        }).toList(),
+                        onChanged: (v) {
+                          if (v == null) return;
+                          setState(() => _formaSelecionada = v);
+                          _valorFocusNode.requestFocus();
+                        },
                       ),
-                    );
-                  }).toList(),
-                  onChanged: (v) {
-                    if (v == null) return;
-                    setState(() => _formaSelecionada = v);
-                    _valorFocusNode.requestFocus();
-                  },
+                    ),
+                    // Conta só se aplica a pagamento real (crediário não entra em conta)
+                    if (!_formaSelecionadaPosterior) ...[
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: DropdownButtonFormField<String>(
+                          value: _contaSelecionada,
+                          decoration: const InputDecoration(
+                            labelText: 'Conta',
+                            border: OutlineInputBorder(),
+                            isDense: true,
+                          ),
+                          items: _contas
+                              .map((c) => DropdownMenuItem<String>(
+                                    value: c,
+                                    child: Text(c),
+                                  ))
+                              .toList(),
+                          onChanged: (v) {
+                            if (v == null) return;
+                            setState(() => _contaSelecionada = v);
+                            _valorFocusNode.requestFocus();
+                          },
+                        ),
+                      ),
+                    ],
+                  ],
                 ),
               const SizedBox(height: 12),
 
