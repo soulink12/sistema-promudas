@@ -293,12 +293,13 @@ class _TelaVendaState extends State<TelaVenda> {
   Widget _buildDrawer(BuildContext context) {
     final nomeUsuario =
         AuthService.usuario?['nome'] as String? ?? 'Usuário';
+    final cs = Theme.of(context).colorScheme;
 
     return Drawer(
       child: Column(
         children: [
           DrawerHeader(
-            decoration: BoxDecoration(color: Colors.green[700]),
+            decoration: BoxDecoration(color: cs.primary),
             child: Stack(
               children: [
                 Align(
@@ -307,21 +308,21 @@ class _TelaVendaState extends State<TelaVenda> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      const Icon(Icons.storefront,
-                          color: Colors.white, size: 36),
+                      Icon(Icons.storefront, color: cs.onPrimary, size: 36),
                       const SizedBox(height: 8),
-                      const Text(
+                      Text(
                         'Sistema Promudas',
                         style: TextStyle(
-                            color: Colors.white,
+                            color: cs.onPrimary,
                             fontSize: 18,
                             fontWeight: FontWeight.bold),
                       ),
                       const SizedBox(height: 2),
                       Text(
                         nomeUsuario,
-                        style:
-                            const TextStyle(color: Colors.white70, fontSize: 13),
+                        style: TextStyle(
+                            color: cs.onPrimary.withValues(alpha: 0.7),
+                            fontSize: 13),
                       ),
                     ],
                   ),
@@ -341,7 +342,7 @@ class _TelaVendaState extends State<TelaVenda> {
                         _pendentesSemConta > 0
                             ? Icons.notifications_active
                             : Icons.notifications_none,
-                        color: Colors.white,
+                        color: cs.onPrimary,
                       ),
                     ),
                     onPressed: _abrirPagamentosSemConta,
@@ -363,7 +364,7 @@ class _TelaVendaState extends State<TelaVenda> {
             leading: const Icon(Icons.point_of_sale),
             title: const Text('PDV'),
             selected: true,
-            selectedColor: Colors.green[700],
+            selectedColor: cs.primary,
             onTap: () => Navigator.pop(context),
           ),
           ListTile(
