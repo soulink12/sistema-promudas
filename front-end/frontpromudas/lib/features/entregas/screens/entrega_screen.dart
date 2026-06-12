@@ -3,9 +3,9 @@ import '../../../core/services/api_service.dart';
 import '../../../core/services/auth_service.dart';
 import '../../../core/widgets/pesquisa_cliente_lista.dart';
 import '../../auth/screens/login_screen.dart';
-import '../../clientes/screens/clientes_screen.dart';
 import '../../configuracoes/screens/configuracoes_screen.dart';
-import '../../pedidos/screens/pedidos_screen.dart';
+import '../../consulta/screens/consulta_hub_screen.dart';
+import '../../pagamentos/screens/pagamentos_sem_conta_screen.dart';
 import '../../relatorios/screens/relatorios_hub_screen.dart';
 import 'widgets/card_pedido_entrega.dart';
 import 'widgets/modal_entrega.dart';
@@ -22,10 +22,37 @@ class _TelaEntregasState extends State<TelaEntregas> {
   bool _carregando = false;
   Map<String, dynamic>? _clienteSelecionado;
 
+  // Quantidade de pagamentos reais sem conta definida (sino do drawer)
+  int _pendentesSemConta = 0;
+
   @override
   void initState() {
     super.initState();
     _carregarPedidos();
+    _carregarPendentesSemConta();
+  }
+
+  /// Conta os pagamentos sem conta definida para alimentar o sino do drawer.
+  /// Falha silenciosa — o badge simplesmente não aparece se a chamada falhar.
+  Future<void> _carregarPendentesSemConta() async {
+    try {
+      final response = await ApiService.dio.get('/pagamentos/pendentes-conta');
+      final qtd = (response.data as List).length;
+      if (mounted) setState(() => _pendentesSemConta = qtd);
+    } catch (_) {
+      // Ignora — não atrapalha o módulo
+    }
+  }
+
+  /// Abre a tela de pagamentos sem conta (acionada pelo sino do drawer).
+  Future<void> _abrirPagamentosSemConta() async {
+    Navigator.pop(context); // fecha o drawer
+    await Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => const TelaPagamentosSemConta()),
+    );
+    // Ao voltar, atualiza o sino (uma conta pode ter sido definida)
+    _carregarPendentesSemConta();
   }
 
   Future<void> _carregarPedidos() async {
@@ -82,6 +109,10 @@ class _TelaEntregasState extends State<TelaEntregas> {
     return Scaffold(
       appBar: AppBar(title: const Text('Entregas')),
       drawer: _buildDrawer(context),
+      // Atualiza o sino de pagamentos sem conta sempre que o drawer abre
+      onDrawerChanged: (aberto) {
+        if (aberto) _carregarPendentesSemConta();
+      },
       body: Column(
         children: [
           PesquisaClienteLista(
@@ -145,32 +176,57 @@ class _TelaEntregasState extends State<TelaEntregas> {
         children: [
           DrawerHeader(
             decoration: BoxDecoration(color: cs.primary),
-            child: Align(
-              alignment: Alignment.bottomLeft,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(Icons.storefront, color: cs.onPrimary, size: 36),
-                  const SizedBox(height: 8),
-                  Text(
-                    'Sistema Promudas',
-                    style: TextStyle(
-                      color: cs.onPrimary,
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                    ),
+            child: Stack(
+              children: [
+                Align(
+                  alignment: Alignment.bottomLeft,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.storefront, color: cs.onPrimary, size: 36),
+                      const SizedBox(height: 8),
+                      Text(
+                        'Sistema Promudas',
+                        style: TextStyle(
+                          color: cs.onPrimary,
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        nomeUsuario,
+                        style: TextStyle(
+                          color: cs.onPrimary.withValues(alpha: 0.7),
+                          fontSize: 13,
+                        ),
+                      ),
+                    ],
                   ),
-                  const SizedBox(height: 2),
-                  Text(
-                    nomeUsuario,
-                    style: TextStyle(
-                      color: cs.onPrimary.withValues(alpha: 0.7),
-                      fontSize: 13,
+                ),
+                // Sino de notificações (canto superior direito do header).
+                // FUTURO: centro de notificações geral, agregando todos os tipos
+                // de alerta. Hoje a única fonte é "pagamentos sem conta".
+                Positioned(
+                  top: 0,
+                  right: 0,
+                  child: IconButton(
+                    tooltip: 'Pagamentos sem conta',
+                    icon: Badge(
+                      isLabelVisible: _pendentesSemConta > 0,
+                      label: Text('$_pendentesSemConta'),
+                      child: Icon(
+                        _pendentesSemConta > 0
+                            ? Icons.notifications_active
+                            : Icons.notifications_none,
+                        color: cs.onPrimary,
+                      ),
                     ),
+                    onPressed: _abrirPagamentosSemConta,
                   ),
-                ],
-              ),
+                ),
+              ],
             ),
           ),
           ListTile(
@@ -190,24 +246,13 @@ class _TelaEntregasState extends State<TelaEntregas> {
             onTap: () => Navigator.pop(context),
           ),
           ListTile(
-            leading: const Icon(Icons.people_outline),
-            title: const Text('Clientes'),
+            leading: const Icon(Icons.search),
+            title: const Text('Consulta'),
             onTap: () {
               Navigator.pop(context);
               Navigator.push(
                 context,
-                MaterialPageRoute(builder: (_) => const TelaListaClientes()),
-              );
-            },
-          ),
-          ListTile(
-            leading: const Icon(Icons.receipt_long_outlined),
-            title: const Text('Pedidos'),
-            onTap: () {
-              Navigator.pop(context);
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => const TelaPedidos()),
+                MaterialPageRoute(builder: (_) => const TelaConsultaHub()),
               );
             },
           ),
