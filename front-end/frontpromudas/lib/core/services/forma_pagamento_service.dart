@@ -11,6 +11,7 @@ class FormaPagamentoService {
               'id': item['id'] as int,
               'nome': item['nome'] as String,
               'pagamentoPosterior': item['pagamento_posterior'] as bool? ?? false,
+              'contaPosterior': item['conta_posterior'] as bool? ?? false,
             })
         .toList();
   }

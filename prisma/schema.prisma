@@ -127,6 +127,7 @@ model formas_pagamento {
   nome                String  @db.VarChar(50)
   ativo               Boolean @default(true)
   pagamento_posterior Boolean @default(false)
+  conta_posterior     Boolean @default(false)
 }
 
 model locais_entrega {

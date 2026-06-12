@@ -96,6 +96,22 @@ class _ModalPagamentoState extends State<ModalPagamento> {
     return false;
   }
 
+  // Retorna true se a conta da forma selecionada é definida depois (ex: Dinheiro,
+  // Cheque) — nesses casos o pagamento fica com conta pendente, sem escolher no PDV.
+  bool get _formaSelecionadaContaPosterior {
+    if (_formaSelecionada == null) return false;
+    for (final f in _formasPagamento) {
+      if (f['nome'] == _formaSelecionada) {
+        return f['contaPosterior'] == true;
+      }
+    }
+    return false;
+  }
+
+  // Conta não se aplica: crediário (a receber) ou formas de conta definida depois.
+  bool get _semContaNoPdv =>
+      _formaSelecionadaPosterior || _formaSelecionadaContaPosterior;
+
   double get _totalPago =>
       _pagamentos.fold(0.0, (s, p) => s + (p['valor'] as double));
 
@@ -113,16 +129,18 @@ class _ModalPagamentoState extends State<ModalPagamento> {
         double.tryParse(_valorCtrl.text.trim().replaceAll(',', '.'));
     if (valor == null || valor <= 0) return;
 
-    // Crediário (a receber) não entra em conta; pagamento real exige conta.
+    // Crediário e formas de conta posterior (Dinheiro/Cheque) não escolhem conta
+    // aqui — ficam pendentes. As demais exigem conta.
     final posterior = _formaSelecionadaPosterior;
-    if (!posterior && _contaSelecionada == null) return;
+    final semConta = _semContaNoPdv;
+    if (!semConta && _contaSelecionada == null) return;
 
     setState(() {
       _pagamentos.add({
         'forma': _formaSelecionada,
         'valor': valor,
         'pagamentoPosterior': posterior,
-        if (!posterior) 'conta': _contaSelecionada,
+        if (!semConta) 'conta': _contaSelecionada,
       });
       final restante = _restante;
       _valorCtrl.text =
@@ -222,6 +240,14 @@ class _ModalPagamentoState extends State<ModalPagamento> {
                                   style: TextStyle(
                                     fontSize: 11,
                                     color: Colors.grey[600],
+                                  ),
+                                )
+                              else if (!isPosterior)
+                                Text(
+                                  'Conta: pendente',
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    color: Colors.orange[800],
                                   ),
                                 ),
                             ],
@@ -371,8 +397,9 @@ class _ModalPagamentoState extends State<ModalPagamento> {
                         },
                       ),
                     ),
-                    // Conta só se aplica a pagamento real (crediário não entra em conta)
-                    if (!_formaSelecionadaPosterior) ...[
+                    // Conta só aparece quando é escolhida no PDV (não para crediário
+                    // nem para formas de conta definida depois, como Dinheiro/Cheque)
+                    if (!_semContaNoPdv) ...[
                       const SizedBox(width: 12),
                       Expanded(
                         child: DropdownButtonFormField<String>(

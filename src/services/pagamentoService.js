@@ -122,6 +122,45 @@ const listarPagamentos = async () => {
     });
 };
 
+// Lista pagamentos reais que ainda não foram colocados em uma conta (conta pendente).
+// Ex: pagamentos em dinheiro (e futuramente cheque) que entram no PDV sem conta definida.
+// Exclui crediário/posterior (esses são "a receber", não dinheiro recebido sem conta).
+const listarPagamentosPendentesDeConta = async () => {
+    const formasPosteriores = await prisma.formas_pagamento.findMany({
+        where: { pagamento_posterior: true },
+        select: { nome: true }
+    });
+    const nomesPosteriores = formasPosteriores.map(f => f.nome);
+
+    const where = {
+        OR: [{ conta: null }, { conta: '' }],
+        pedidos: { ativo: true },
+    };
+    if (nomesPosteriores.length > 0) {
+        where.forma_pagamento = { notIn: nomesPosteriores };
+    }
+
+    return await prisma.pagamentos.findMany({
+        where,
+        select: {
+            id: true,
+            valor_pago: true,
+            forma_pagamento: true,
+            conta: true,
+            data_pagamento: true,
+            criado_em: true,
+            nome_pagador: true,
+            pedidos: {
+                select: {
+                    id: true,
+                    clientes: { select: { id: true, nome: true } }
+                }
+            }
+        },
+        orderBy: { criado_em: 'desc' }
+    });
+};
+
 const atualizarPagamento = async (id, dados) => {
     const pagamentoAtual = await prisma.pagamentos.findUnique({
         where: { id: parseInt(id) },
@@ -183,6 +222,7 @@ const eliminarPagamento = async (id) => {
 module.exports = {
     criarPagamento,
     listarPagamentos,
+    listarPagamentosPendentesDeConta,
     atualizarPagamento,
     eliminarPagamento,
     recalcularStatusPedido

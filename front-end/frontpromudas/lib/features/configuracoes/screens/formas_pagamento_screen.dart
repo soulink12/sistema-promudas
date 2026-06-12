@@ -101,6 +101,11 @@ class _TelaFormasPagamentoState extends State<TelaFormasPagamento> {
                     final ativo = f['ativo'] as bool? ?? true;
                     final posterior =
                         f['pagamento_posterior'] as bool? ?? false;
+                    final contaPosterior =
+                        f['conta_posterior'] as bool? ?? false;
+                    final legenda = posterior
+                        ? 'Crediário'
+                        : (contaPosterior ? 'Conta definida depois' : null);
 
                     return ListTile(
                       leading: Icon(
@@ -116,9 +121,9 @@ class _TelaFormasPagamentoState extends State<TelaFormasPagamento> {
                               : TextDecoration.lineThrough,
                         ),
                       ),
-                      subtitle: posterior
+                      subtitle: legenda != null
                           ? Text(
-                              'Crediário',
+                              legenda,
                               style: TextStyle(
                                   color: Colors.orange[700], fontSize: 12),
                             )
@@ -163,6 +168,7 @@ class _DialogFormaState extends State<_DialogForma> {
   final _nomeController = TextEditingController();
   final _formKey = GlobalKey<FormState>();
   bool _posterior = false;
+  bool _contaPosterior = false;
   bool _salvando = false;
   String? _erro;
 
@@ -174,6 +180,7 @@ class _DialogFormaState extends State<_DialogForma> {
     if (_editando) {
       _nomeController.text = widget.forma!['nome'] as String? ?? '';
       _posterior = widget.forma!['pagamento_posterior'] as bool? ?? false;
+      _contaPosterior = widget.forma!['conta_posterior'] as bool? ?? false;
     }
   }
 
@@ -193,6 +200,7 @@ class _DialogFormaState extends State<_DialogForma> {
       final body = {
         'nome': _nomeController.text.trim(),
         'pagamento_posterior': _posterior,
+        'conta_posterior': _contaPosterior,
       };
       if (_editando) {
         await ApiService.dio
@@ -239,7 +247,24 @@ class _DialogFormaState extends State<_DialogForma> {
                 style: TextStyle(fontSize: 12),
               ),
               value: _posterior,
-              onChanged: (v) => setState(() => _posterior = v),
+              onChanged: (v) => setState(() {
+                _posterior = v;
+                if (v) _contaPosterior = false; // mutuamente exclusivos
+              }),
+            ),
+            SwitchListTile(
+              contentPadding: EdgeInsets.zero,
+              title: const Text('Conta definida depois'),
+              subtitle: const Text(
+                'Sem conta no PDV (ex: Dinheiro, Cheque) — fica pendente até ser '
+                'colocado numa conta na consulta.',
+                style: TextStyle(fontSize: 12),
+              ),
+              value: _contaPosterior,
+              onChanged: (v) => setState(() {
+                _contaPosterior = v;
+                if (v) _posterior = false; // mutuamente exclusivos
+              }),
             ),
             if (_erro != null)
               Padding(

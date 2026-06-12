@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../../clientes/screens/clientes_screen.dart';
 import '../../pedidos/screens/pedidos_screen.dart';
 import '../../entregas/screens/consulta_entregas_screen.dart';
+import '../../pagamentos/screens/pagamentos_pendentes_screen.dart';
 
 class TelaConsultaHub extends StatelessWidget {
   const TelaConsultaHub({super.key});
@@ -43,6 +44,18 @@ class TelaConsultaHub extends StatelessWidget {
             onTap: () => Navigator.push(
               context,
               MaterialPageRoute(builder: (_) => const TelaConsultaEntregas()),
+            ),
+          ),
+          const SizedBox(height: 12),
+          _CardConsulta(
+            icon: Icons.account_balance_wallet_outlined,
+            titulo: 'Pagamentos pendentes',
+            descricao:
+                'Pagamentos sem conta definida (ex: dinheiro, cheque). Defina a conta de cada um.',
+            onTap: () => Navigator.push(
+              context,
+              MaterialPageRoute(
+                  builder: (_) => const TelaPagamentosPendentes()),
             ),
           ),
         ],

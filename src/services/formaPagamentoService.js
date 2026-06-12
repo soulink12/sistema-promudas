@@ -4,13 +4,13 @@ const BusinessError = require('../utils/BusinessError');
 const listarFormasPagamento = async () => {
     return await prisma.formas_pagamento.findMany({
         orderBy: { nome: 'asc' },
-        select: { id: true, nome: true, ativo: true, pagamento_posterior: true }
+        select: { id: true, nome: true, ativo: true, pagamento_posterior: true, conta_posterior: true }
     });
 };
 
-const criarForma = async (nome, pagamentoPosterior = false) => {
+const criarForma = async (nome, pagamentoPosterior = false, contaPosterior = false) => {
     return await prisma.formas_pagamento.create({
-        data: { nome, pagamento_posterior: pagamentoPosterior }
+        data: { nome, pagamento_posterior: pagamentoPosterior, conta_posterior: contaPosterior }
     });
 };
 

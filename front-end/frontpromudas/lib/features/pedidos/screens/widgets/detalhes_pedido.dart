@@ -394,6 +394,9 @@ class _LinhaPagamento extends StatelessWidget {
     final valor = _toDouble(pag['valor_pago']);
     final conta = pag['conta'] as String?;
     final temConta = conta != null && conta.isNotEmpty;
+    final posterior = pag['pagamento_posterior'] == true;
+    // Pagamento real sem conta = conta ainda pendente (ex: dinheiro/cheque)
+    final contaPendente = !temConta && !posterior;
     final nomePagador = pag['nome_pagador'] as String?;
     final temPagador = nomePagador != null && nomePagador.isNotEmpty;
 
@@ -426,6 +429,11 @@ class _LinhaPagamento extends StatelessWidget {
                   const SizedBox(height: 2),
                   Text('Conta: $conta',
                       style: TextStyle(fontSize: 12, color: cs.onSurfaceVariant)),
+                ] else if (contaPendente) ...[
+                  const SizedBox(height: 2),
+                  Text('Conta: pendente',
+                      style: TextStyle(
+                          fontSize: 12, color: Colors.orange[800])),
                 ],
                 if (temPagador) ...[
                   const SizedBox(height: 2),

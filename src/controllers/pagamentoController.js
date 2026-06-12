@@ -20,6 +20,16 @@ const listarPagamentos = async (req, res) => {
     }
 };
 
+const listarPagamentosPendentesDeConta = async (req, res) => {
+    try {
+        const pagamentos = await pagamentoService.listarPagamentosPendentesDeConta();
+        res.status(200).json(pagamentos);
+    } catch (erro) {
+        console.error(erro);
+        res.status(500).json({ erro: 'Erro ao listar pagamentos pendentes de conta' });
+    }
+};
+
 const atualizarPagamento = async (req, res) => {
     try {
         const { id } = req.params;
@@ -46,6 +56,7 @@ const eliminarPagamento = async (req, res) => {
 module.exports = {
     criarPagamento,
     listarPagamentos,
+    listarPagamentosPendentesDeConta,
     atualizarPagamento,
     eliminarPagamento
 };

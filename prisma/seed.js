@@ -33,11 +33,12 @@ async function main() {
     // ── Formas de pagamento ─────────────────────────────────────────────────
     await prisma.formas_pagamento.createMany({
         data: [
-            { nome: 'Dinheiro', pagamento_posterior: false },
-            { nome: 'PIX', pagamento_posterior: false },
-            { nome: 'Cartão de Débito', pagamento_posterior: false },
-            { nome: 'Cartão de Crédito', pagamento_posterior: false },
-            { nome: 'Crediário', pagamento_posterior: true },
+            // conta_posterior = a conta é definida depois (não no PDV); fica "pendente"
+            { nome: 'Dinheiro', pagamento_posterior: false, conta_posterior: true },
+            { nome: 'PIX', pagamento_posterior: false, conta_posterior: false },
+            { nome: 'Cartão de Débito', pagamento_posterior: false, conta_posterior: false },
+            { nome: 'Cartão de Crédito', pagamento_posterior: false, conta_posterior: false },
+            { nome: 'Crediário', pagamento_posterior: true, conta_posterior: false },
         ],
     });
 
