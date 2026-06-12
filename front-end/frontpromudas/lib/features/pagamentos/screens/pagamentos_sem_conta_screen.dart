@@ -4,16 +4,15 @@ import '../../../core/services/conta_service.dart';
 
 /// Consulta dos pagamentos que ainda não foram colocados em uma conta.
 /// Ex: pagamentos em dinheiro (e futuramente cheque) registrados no PDV sem
-/// conta definida — ficam "pendentes" até serem atribuídos a uma conta aqui.
-class TelaPagamentosPendentes extends StatefulWidget {
-  const TelaPagamentosPendentes({super.key});
+/// conta definida — ficam "sem conta" até serem atribuídos a uma conta aqui.
+class TelaPagamentosSemConta extends StatefulWidget {
+  const TelaPagamentosSemConta({super.key});
 
   @override
-  State<TelaPagamentosPendentes> createState() =>
-      _TelaPagamentosPendentesState();
+  State<TelaPagamentosSemConta> createState() => _TelaPagamentosSemContaState();
 }
 
-class _TelaPagamentosPendentesState extends State<TelaPagamentosPendentes> {
+class _TelaPagamentosSemContaState extends State<TelaPagamentosSemConta> {
   List<Map<String, dynamic>> _pagamentos = [];
   bool _carregando = false;
 
@@ -84,7 +83,7 @@ class _TelaPagamentosPendentesState extends State<TelaPagamentosPendentes> {
     final cs = Theme.of(context).colorScheme;
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Pagamentos Pendentes')),
+      appBar: AppBar(title: const Text('Pagamentos sem conta')),
       body: _carregando
           ? const Center(child: CircularProgressIndicator())
           : _pagamentos.isEmpty
@@ -96,7 +95,7 @@ class _TelaPagamentosPendentesState extends State<TelaPagamentosPendentes> {
                           size: 64, color: cs.outlineVariant),
                       const SizedBox(height: 16),
                       Text(
-                        'Nenhum pagamento pendente de conta.',
+                        'Nenhum pagamento sem conta.',
                         style: TextStyle(color: cs.onSurfaceVariant),
                       ),
                     ],
@@ -108,7 +107,7 @@ class _TelaPagamentosPendentesState extends State<TelaPagamentosPendentes> {
                     padding: const EdgeInsets.all(16),
                     itemCount: _pagamentos.length,
                     separatorBuilder: (_, __) => const SizedBox(height: 8),
-                    itemBuilder: (_, i) => _CardPagamentoPendente(
+                    itemBuilder: (_, i) => _CardPagamentoSemConta(
                       pagamento: _pagamentos[i],
                       onDefinirConta: () => _definirConta(_pagamentos[i]),
                     ),
@@ -118,13 +117,13 @@ class _TelaPagamentosPendentesState extends State<TelaPagamentosPendentes> {
   }
 }
 
-// ── Card de um pagamento pendente ───────────────────────────────────────────
+// ── Card de um pagamento sem conta ──────────────────────────────────────────
 
-class _CardPagamentoPendente extends StatelessWidget {
+class _CardPagamentoSemConta extends StatelessWidget {
   final Map<String, dynamic> pagamento;
   final VoidCallback onDefinirConta;
 
-  const _CardPagamentoPendente({
+  const _CardPagamentoSemConta({
     required this.pagamento,
     required this.onDefinirConta,
   });
@@ -198,7 +197,7 @@ class _CardPagamentoPendente extends StatelessWidget {
                           color: cs.primary),
                     ),
                     const SizedBox(height: 6),
-                    _PillPendente(),
+                    _PillSemConta(),
                   ],
                 ),
               ],
@@ -224,7 +223,7 @@ class _CardPagamentoPendente extends StatelessWidget {
   }
 }
 
-class _PillPendente extends StatelessWidget {
+class _PillSemConta extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final cor = Colors.orange[800]!;
@@ -236,7 +235,7 @@ class _PillPendente extends StatelessWidget {
         border: Border.all(color: cor.withValues(alpha: 0.4)),
       ),
       child: Text(
-        'Conta pendente',
+        'Sem conta',
         style: TextStyle(color: cor, fontSize: 11, fontWeight: FontWeight.w600),
       ),
     );

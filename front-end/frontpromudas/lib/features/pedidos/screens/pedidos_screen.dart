@@ -15,8 +15,19 @@ import '../../clientes/screens/clientes_screen.dart';
 class TelaPedidos extends StatefulWidget {
   final Map<String, dynamic>? clienteInicial;
   final Map<String, dynamic>? pedidoInicial;
+  // Filtra a lista por status de pagamento (ex.: 'Pendente,Parcial').
+  // Quando informado, a tela mostra só pedidos com pagamento faltando.
+  final String? statusPagamentoFiltro;
+  // Título do AppBar — permite reaproveitar a tela como "Pagamentos pendentes".
+  final String titulo;
 
-  const TelaPedidos({super.key, this.clienteInicial, this.pedidoInicial});
+  const TelaPedidos({
+    super.key,
+    this.clienteInicial,
+    this.pedidoInicial,
+    this.statusPagamentoFiltro,
+    this.titulo = 'Pedidos',
+  });
 
   @override
   State<TelaPedidos> createState() => _TelaPedidosState();
@@ -51,11 +62,16 @@ class _TelaPedidosState extends State<TelaPedidos> {
       _erro = null;
     });
     try {
+      final params = <String, dynamic>{};
+      if (clienteNome != null && clienteNome.isNotEmpty) {
+        params['cliente'] = clienteNome;
+      }
+      if (widget.statusPagamentoFiltro != null) {
+        params['statusPagamento'] = widget.statusPagamentoFiltro;
+      }
       final response = await ApiService.dio.get(
         '/pedidos',
-        queryParameters: clienteNome != null && clienteNome.isNotEmpty
-            ? {'cliente': clienteNome}
-            : null,
+        queryParameters: params.isEmpty ? null : params,
       );
       final dados = response.data as List;
       setState(() {
@@ -364,7 +380,7 @@ class _TelaPedidosState extends State<TelaPedidos> {
         setState(() => _pedidoSelecionado = null);
       },
       child: Scaffold(
-        appBar: AppBar(title: const Text('Pedidos')),
+        appBar: AppBar(title: Text(widget.titulo)),
         body: Stack(
           children: [
             // Em modo detalhe, o DetalhesPedido ocupa a tela inteira (tem seu

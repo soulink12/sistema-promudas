@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import '../../clientes/screens/clientes_screen.dart';
 import '../../pedidos/screens/pedidos_screen.dart';
 import '../../entregas/screens/consulta_entregas_screen.dart';
-import '../../pagamentos/screens/pagamentos_pendentes_screen.dart';
+import '../../pagamentos/screens/pagamentos_sem_conta_screen.dart';
 
 class TelaConsultaHub extends StatelessWidget {
   const TelaConsultaHub({super.key});
@@ -51,11 +51,27 @@ class TelaConsultaHub extends StatelessWidget {
             icon: Icons.account_balance_wallet_outlined,
             titulo: 'Pagamentos pendentes',
             descricao:
+                'Pedidos que ainda têm pagamento a receber (pendente ou parcial).',
+            onTap: () => Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => const TelaPedidos(
+                  titulo: 'Pagamentos pendentes',
+                  statusPagamentoFiltro: 'Pendente,Parcial',
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(height: 12),
+          _CardConsulta(
+            icon: Icons.account_balance_outlined,
+            titulo: 'Pagamentos sem conta',
+            descricao:
                 'Pagamentos sem conta definida (ex: dinheiro, cheque). Defina a conta de cada um.',
             onTap: () => Navigator.push(
               context,
               MaterialPageRoute(
-                  builder: (_) => const TelaPagamentosPendentes()),
+                  builder: (_) => const TelaPagamentosSemConta()),
             ),
           ),
         ],

@@ -6,6 +6,7 @@ import '../../../core/services/carrinho_service.dart';
 import '../../auth/screens/login_screen.dart';
 import '../../clientes/screens/widgets/dialog_cadastro_cliente.dart';
 import '../../consulta/screens/consulta_hub_screen.dart';
+import '../../pagamentos/screens/pagamentos_sem_conta_screen.dart';
 import '../../configuracoes/screens/configuracoes_screen.dart';
 import '../../relatorios/screens/relatorios_hub_screen.dart';
 import 'widgets/detalhes_app_bar.dart';
@@ -46,6 +47,9 @@ class _TelaVendaState extends State<TelaVenda> {
   // Total pago em pagamentos reais antes da edição (somente modo edição)
   double _totalPagoReal = 0.0;
 
+  // Quantidade de pagamentos reais sem conta definida (badge no drawer)
+  int _pendentesSemConta = 0;
+
   @override
   void initState() {
     super.initState();
@@ -54,6 +58,30 @@ class _TelaVendaState extends State<TelaVenda> {
     if (widget.pedidoParaEditar != null) {
       _preencherCarrinhoComPedido(widget.pedidoParaEditar!);
     }
+    _carregarPendentesSemConta();
+  }
+
+  /// Conta os pagamentos sem conta definida para alimentar o sino do drawer.
+  /// Falha silenciosa — o badge simplesmente não aparece se a chamada falhar.
+  Future<void> _carregarPendentesSemConta() async {
+    try {
+      final response = await ApiService.dio.get('/pagamentos/pendentes-conta');
+      final qtd = (response.data as List).length;
+      if (mounted) setState(() => _pendentesSemConta = qtd);
+    } catch (_) {
+      // Ignora — não atrapalha o PDV
+    }
+  }
+
+  /// Abre a tela de pagamentos sem conta (acionada pelo sino do drawer).
+  Future<void> _abrirPagamentosSemConta() async {
+    Navigator.pop(context); // fecha o drawer
+    await Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => const TelaPagamentosSemConta()),
+    );
+    // Ao voltar, atualiza o sino (uma conta pode ter sido definida)
+    _carregarPendentesSemConta();
   }
 
   void _preencherCarrinhoComPedido(Map<String, dynamic> pedido) {
@@ -150,6 +178,10 @@ class _TelaVendaState extends State<TelaVenda> {
         ),
       ),
       drawer: modoEdicao ? null : _buildDrawer(context),
+      // Atualiza o badge de pagamentos sem conta sempre que o drawer abre
+      onDrawerChanged: (aberto) {
+        if (aberto) _carregarPendentesSemConta();
+      },
       body: Stack(
         children: [
           Padding(
@@ -267,28 +299,55 @@ class _TelaVendaState extends State<TelaVenda> {
         children: [
           DrawerHeader(
             decoration: BoxDecoration(color: Colors.green[700]),
-            child: Align(
-              alignment: Alignment.bottomLeft,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const Icon(Icons.storefront, color: Colors.white, size: 36),
-                  const SizedBox(height: 8),
-                  const Text(
-                    'Sistema Promudas',
-                    style: TextStyle(
+            child: Stack(
+              children: [
+                Align(
+                  alignment: Alignment.bottomLeft,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(Icons.storefront,
+                          color: Colors.white, size: 36),
+                      const SizedBox(height: 8),
+                      const Text(
+                        'Sistema Promudas',
+                        style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        nomeUsuario,
+                        style:
+                            const TextStyle(color: Colors.white70, fontSize: 13),
+                      ),
+                    ],
+                  ),
+                ),
+                // Sino de notificações (canto superior direito do header).
+                // FUTURO: centro de notificações geral, agregando todos os tipos
+                // de alerta. Hoje a única fonte é "pagamentos sem conta".
+                Positioned(
+                  top: 0,
+                  right: 0,
+                  child: IconButton(
+                    tooltip: 'Pagamentos sem conta',
+                    icon: Badge(
+                      isLabelVisible: _pendentesSemConta > 0,
+                      label: Text('$_pendentesSemConta'),
+                      child: Icon(
+                        _pendentesSemConta > 0
+                            ? Icons.notifications_active
+                            : Icons.notifications_none,
                         color: Colors.white,
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold),
+                      ),
+                    ),
+                    onPressed: _abrirPagamentosSemConta,
                   ),
-                  const SizedBox(height: 2),
-                  Text(
-                    nomeUsuario,
-                    style: const TextStyle(color: Colors.white70, fontSize: 13),
-                  ),
-                ],
-              ),
+                ),
+              ],
             ),
           ),
           ListTile(

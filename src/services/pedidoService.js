@@ -36,12 +36,16 @@ const listarPedidos = async (filtros = {}) => {
     if (filtros.statusEntrega) {
         where.status_entrega = { in: filtros.statusEntrega.split(',') };
     }
+    // Filtra por status de pagamento (ex.: 'Pendente,Parcial') quando informado
+    if (filtros.statusPagamento) {
+        where.status_pagamento = { in: filtros.statusPagamento.split(',') };
+    }
 
     const [pedidos, formasPosteriores] = await Promise.all([
         prisma.pedidos.findMany({
             where,
             orderBy: { criado_em: 'desc' },
-            take: filtros.cliente ? 100 : 20,
+            take: (filtros.cliente || filtros.statusPagamento) ? 100 : 20,
             include: {
                 clientes: { select: { id: true, nome: true } },
                 itens_pedido: {
