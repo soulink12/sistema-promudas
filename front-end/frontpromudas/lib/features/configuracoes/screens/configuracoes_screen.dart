@@ -38,6 +38,30 @@ class _TelaConfiguracoesState extends State<TelaConfiguracoes> {
               );
             },
           ),
+          ValueListenableBuilder<TamanhoFonte>(
+            valueListenable: ThemeService.tamanhoFonte,
+            builder: (context, tamanho, _) {
+              return ListTile(
+                leading: const Icon(Icons.format_size),
+                title: const Text('Tamanho da fonte'),
+                subtitle: Padding(
+                  padding: const EdgeInsets.only(top: 10),
+                  child: SegmentedButton<TamanhoFonte>(
+                    segments: TamanhoFonte.values
+                        .map((t) => ButtonSegment<TamanhoFonte>(
+                              value: t,
+                              label: Text(t.label),
+                            ))
+                        .toList(),
+                    selected: {tamanho},
+                    showSelectedIcon: false,
+                    onSelectionChanged: (selecao) =>
+                        ThemeService.definirTamanhoFonte(selecao.first),
+                  ),
+                ),
+              );
+            },
+          ),
           _buildSecao('Cadastros'),
           ListTile(
             leading: const Icon(Icons.eco_outlined),

@@ -24,10 +24,24 @@ class MeuViveiroApp extends StatelessWidget {
           title: 'Sistema Promudas',
           debugShowCheckedModeBanner: false,
           navigatorKey: _navigatorKey,
-          // Envolve toda a aplicação para tratar o Backspace como "voltar"
-          builder: (context, child) => _AtalhoVoltarTeclado(
-            child: child ?? const SizedBox.shrink(),
-          ),
+          // Envolve toda a aplicação: trata o Backspace como "voltar" e aplica
+          // o tamanho de fonte global escolhido nas configurações.
+          builder: (context, child) {
+            final conteudo = _AtalhoVoltarTeclado(
+              child: child ?? const SizedBox.shrink(),
+            );
+            return ValueListenableBuilder<TamanhoFonte>(
+              valueListenable: ThemeService.tamanhoFonte,
+              builder: (context, tamanho, _) {
+                return MediaQuery(
+                  data: MediaQuery.of(context).copyWith(
+                    textScaler: TextScaler.linear(tamanho.escala),
+                  ),
+                  child: conteudo,
+                );
+              },
+            );
+          },
           theme: ThemeData(
             colorScheme: ColorScheme.fromSeed(seedColor: Colors.green),
             useMaterial3: true,
