@@ -135,33 +135,27 @@ class _ModalPagamentoState extends State<ModalPagamento> {
     final semConta = _semContaNoPdv;
     if (!semConta && _contaSelecionada == null) return;
 
+    // Pagador (se informado) é capturado por parcela no momento de adicionar —
+    // assim cada pagamento pode ter um pagador diferente. Crediário não tem pagador.
+    final nomePagador = _nomePagadorCtrl.text.trim();
+    final cpfPagador = _cpfPagadorCtrl.text.trim();
+
     setState(() {
       _pagamentos.add({
         'forma': _formaSelecionada,
         'valor': valor,
         'pagamentoPosterior': posterior,
         if (!semConta) 'conta': _contaSelecionada,
+        if (!posterior && nomePagador.isNotEmpty) 'nomePagador': nomePagador,
+        if (!posterior && cpfPagador.isNotEmpty) 'cpfPagador': cpfPagador,
       });
       final restante = _restante;
       _valorCtrl.text =
           restante > 0.005 ? restante.toStringAsFixed(2) : '';
+      _nomePagadorCtrl.clear();
+      _cpfPagadorCtrl.clear();
     });
     _valorFocusNode.requestFocus();
-  }
-
-  /// Anexa o pagador (se informado) a cada parcela antes de confirmar.
-  List<Map<String, dynamic>> _pagamentosComPagador() {
-    final nome = _nomePagadorCtrl.text.trim();
-    final cpf = _cpfPagadorCtrl.text.trim();
-    return _pagamentos.map((p) {
-      // Crediário (a receber) não tem pagador
-      final posterior = p['pagamentoPosterior'] == true;
-      return {
-        ...p,
-        if (!posterior && nome.isNotEmpty) 'nomePagador': nome,
-        if (!posterior && cpf.isNotEmpty) 'cpfPagador': cpf,
-      };
-    }).toList();
   }
 
   @override
@@ -248,6 +242,14 @@ class _ModalPagamentoState extends State<ModalPagamento> {
                                   style: TextStyle(
                                     fontSize: 11,
                                     color: Colors.orange[800],
+                                  ),
+                                ),
+                              if (p['nomePagador'] != null)
+                                Text(
+                                  'Pago por: ${p['nomePagador']}',
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    color: Colors.grey[600],
                                   ),
                                 ),
                             ],
@@ -524,7 +526,7 @@ class _ModalPagamentoState extends State<ModalPagamento> {
                     onPressed: _podeFinalizar
                         ? () {
                             Navigator.pop(context);
-                            widget.onConfirmar(_pagamentosComPagador());
+                            widget.onConfirmar(List.of(_pagamentos));
                           }
                         : null,
                     icon: const Icon(Icons.check_circle_outline, size: 18),
