@@ -41,6 +41,14 @@ const gerarPedidoPDF = async (pedidoId) => {
                 },
                 pagamentos: {
                     orderBy: { criado_em: 'asc' }
+                },
+                entregas: {
+                    orderBy: { criado_em: 'asc' },
+                    include: {
+                        itens_entrega: {
+                            include: { produtos: { select: { nome: true } } }
+                        }
+                    }
                 }
             }
         }),
@@ -205,6 +213,20 @@ const gerarPedidoPDF = async (pedidoId) => {
         linhaValor('TOTAL', total, true, '#1b5e20');
         doc.moveDown(0.5);
 
+        // ── OBSERVAÇÕES ─────────────────────────────────────────────────────────
+
+        if (pedido.observacoes && pedido.observacoes.trim()) {
+            linha(doc);
+            doc.moveDown(0.5);
+            doc.font('Helvetica-Bold').fontSize(10).fillColor('#1b5e20').text('OBSERVAÇÕES', { align: 'right' });
+            doc.fillColor('black');
+            doc.moveDown(0.3);
+            doc.font('Helvetica').fontSize(9).fillColor('#333333')
+                .text(pedido.observacoes.trim(), 50, doc.y, { width: 495, align: 'right' });
+            doc.fillColor('black');
+            doc.moveDown(0.5);
+        }
+
         // ── PAGAMENTOS ──────────────────────────────────────────────────────────
 
         linha(doc);
@@ -260,6 +282,52 @@ const gerarPedidoPDF = async (pedidoId) => {
                 .text('A receber (crediário):', 50, y, { lineBreak: false });
             doc.text(moeda(saldoCredito), 460, y, { width: 85, align: 'right' });
             doc.fillColor('black');
+        }
+
+        // ── ENTREGAS ────────────────────────────────────────────────────────────
+
+        if (pedido.entregas.length > 0) {
+            doc.moveDown(0.8);
+            linha(doc);
+            doc.moveDown(0.5);
+            doc.font('Helvetica-Bold').fontSize(10).fillColor('#1b5e20').text('ENTREGAS');
+            doc.fillColor('black');
+            doc.moveDown(0.4);
+
+            pedido.entregas.forEach((entrega, idx) => {
+                // Espaçamento entre entregas múltiplas
+                if (idx > 0) doc.moveDown(0.4);
+
+                // Cabeçalho: local de saída (esquerda) + data (direita)
+                const y = doc.y;
+                doc.font('Helvetica-Bold').fontSize(9).fillColor('black')
+                    .text(entrega.local_entrega || '—', 50, y, { width: 300, lineBreak: false });
+                doc.font('Helvetica').fontSize(9).fillColor('#555555')
+                    .text(formatarData(entrega.data_entrega), 360, y, { width: 185, align: 'right' });
+                doc.fillColor('black');
+                doc.moveDown(0.4);
+
+                // Itens entregues: nome + quantidade
+                entrega.itens_entrega.forEach(item => {
+                    const nome = item.produtos?.nome || '—';
+                    const yItem = doc.y;
+                    doc.font('Helvetica').fontSize(9).fillColor('#333333')
+                        .text(nome, 60, yItem, { width: 400, lineBreak: false });
+                    doc.text(`${item.quantidade}x`, 460, yItem, { width: 85, align: 'right' });
+                    doc.fillColor('black');
+                    doc.moveDown(0.4);
+                });
+
+                // Veículo (motorista / placa), quando informado
+                const veiculo = [entrega.motorista, entrega.placa_veiculo]
+                    .filter(v => v && v.trim()).join(' · ');
+                if (veiculo) {
+                    doc.font('Helvetica-Oblique').fontSize(8).fillColor('#666666')
+                        .text(veiculo, 60, doc.y, { width: 470 });
+                    doc.fillColor('black');
+                    doc.moveDown(0.4);
+                }
+            });
         }
 
         // ── RODAPÉ ──────────────────────────────────────────────────────────────
