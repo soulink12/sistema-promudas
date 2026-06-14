@@ -19,16 +19,21 @@ async function main() {
     await prisma.contas.deleteMany();
     await prisma.usuarios.deleteMany();
 
-    // ── Usuário (login do sistema) ──────────────────────────────────────────
-    const senhaHash = await bcrypt.hash('987741', 10);
-    await prisma.usuarios.create({
-        data: {
-            nome: 'Lucas Albuquerque',
-            email: 'lucasgsalbuquerque@gmail.com',
-            senha_hash: senhaHash,
-            ativo: true,
-        },
-    });
+    // ── Usuários (login do sistema) ─────────────────────────────────────────
+    const usuarios = [
+        { nome: 'Lucas Albuquerque', email: 'lucasgsalbuquerque@gmail.com', senha: '987741' },
+        { nome: 'Elionai', email: 'elionai@promudas.com', senha: '1980' },
+    ];
+    for (const u of usuarios) {
+        await prisma.usuarios.create({
+            data: {
+                nome: u.nome,
+                email: u.email,
+                senha_hash: await bcrypt.hash(u.senha, 10),
+                ativo: true,
+            },
+        });
+    }
 
     // ── Formas de pagamento ─────────────────────────────────────────────────
     await prisma.formas_pagamento.createMany({
