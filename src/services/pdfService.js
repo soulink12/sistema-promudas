@@ -221,8 +221,11 @@ const gerarPedidoPDF = async (pedidoId) => {
             pagamentosReais.forEach(pag => {
                 const y = doc.y;
                 doc.font('Helvetica').fontSize(9).fillColor('black');
+                const formaTexto = pag.parcelas > 1
+                    ? `${pag.forma_pagamento} (${pag.parcelas}x)`
+                    : pag.forma_pagamento;
                 linhaTabela(doc, y, [
-                    { x: 50, largura: 220, texto: pag.forma_pagamento },
+                    { x: 50, largura: 220, texto: formaTexto },
                     { x: 280, largura: 170, texto: formatarData(pag.criado_em), alinhamento: 'left' },
                     { x: 460, largura: 85, texto: moeda(pag.valor_pago), alinhamento: 'right' },
                 ]);

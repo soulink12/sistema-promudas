@@ -103,9 +103,17 @@ class _TelaFormasPagamentoState extends State<TelaFormasPagamento> {
                         f['pagamento_posterior'] as bool? ?? false;
                     final contaPosterior =
                         f['conta_posterior'] as bool? ?? false;
-                    final legenda = posterior
-                        ? 'Crediário'
-                        : (contaPosterior ? 'Conta definida depois' : null);
+                    final parceladoEmAte = f['parcelado_em_ate'] as int? ?? 1;
+                    final partes = <String>[];
+                    if (posterior) {
+                      partes.add('Crediário');
+                    } else if (contaPosterior) {
+                      partes.add('Conta definida depois');
+                    }
+                    if (parceladoEmAte > 1) {
+                      partes.add('Parcela em até ${parceladoEmAte}x');
+                    }
+                    final legenda = partes.isEmpty ? null : partes.join(' · ');
 
                     return ListTile(
                       leading: Icon(
@@ -166,6 +174,7 @@ class _DialogForma extends StatefulWidget {
 
 class _DialogFormaState extends State<_DialogForma> {
   final _nomeController = TextEditingController();
+  final _parceladoController = TextEditingController(text: '1');
   final _formKey = GlobalKey<FormState>();
   bool _posterior = false;
   bool _contaPosterior = false;
@@ -181,12 +190,15 @@ class _DialogFormaState extends State<_DialogForma> {
       _nomeController.text = widget.forma!['nome'] as String? ?? '';
       _posterior = widget.forma!['pagamento_posterior'] as bool? ?? false;
       _contaPosterior = widget.forma!['conta_posterior'] as bool? ?? false;
+      _parceladoController.text =
+          (widget.forma!['parcelado_em_ate'] as int? ?? 1).toString();
     }
   }
 
   @override
   void dispose() {
     _nomeController.dispose();
+    _parceladoController.dispose();
     super.dispose();
   }
 
@@ -201,6 +213,8 @@ class _DialogFormaState extends State<_DialogForma> {
         'nome': _nomeController.text.trim(),
         'pagamento_posterior': _posterior,
         'conta_posterior': _contaPosterior,
+        'parcelado_em_ate':
+            (int.tryParse(_parceladoController.text.trim()) ?? 1).clamp(1, 99),
       };
       if (_editando) {
         await ApiService.dio
@@ -237,6 +251,24 @@ class _DialogFormaState extends State<_DialogForma> {
               ),
               validator: (v) =>
                   (v == null || v.trim().isEmpty) ? 'Campo obrigatório' : null,
+            ),
+            const SizedBox(height: 16),
+            TextFormField(
+              controller: _parceladoController,
+              keyboardType: TextInputType.number,
+              decoration: const InputDecoration(
+                labelText: 'Parcelar em até (vezes)',
+                helperText: '1 = à vista. Acima de 1 libera a escolha de '
+                    'parcelas no pagamento (ex.: crédito 6x).',
+                helperMaxLines: 2,
+                border: OutlineInputBorder(),
+                isDense: true,
+              ),
+              validator: (v) {
+                final n = int.tryParse((v ?? '').trim());
+                if (n == null || n < 1) return 'Informe um número ≥ 1';
+                return null;
+              },
             ),
             const SizedBox(height: 16),
             SwitchListTile(

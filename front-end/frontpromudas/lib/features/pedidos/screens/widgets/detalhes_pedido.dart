@@ -390,7 +390,9 @@ class _LinhaPagamento extends StatelessWidget {
     final cs = Theme.of(context).colorScheme;
 
     final dataPag = _formatarDataHora(pag['criado_em']) ?? '—';
-    final forma = pag['forma_pagamento'] as String? ?? '—';
+    final formaBase = pag['forma_pagamento'] as String? ?? '—';
+    final parcelas = pag['parcelas'] as int? ?? 1;
+    final forma = parcelas > 1 ? '$formaBase ($parcelas' 'x)' : formaBase;
     final valor = _toDouble(pag['valor_pago']);
     final conta = pag['conta'] as String?;
     final temConta = conta != null && conta.isNotEmpty;

@@ -46,6 +46,8 @@ class _ModalPagamentoState extends State<ModalPagamento> {
   // Contas disponíveis (para onde o pagamento entra) + a selecionada
   List<String> _contas = [];
   String? _contaSelecionada;
+  // Nº de parcelas escolhido (só relevante para formas com parceladoEmAte > 1)
+  int _parcelasSelecionadas = 1;
   bool _carregando = true;
   String? _erroCarregamento;
 
@@ -112,6 +114,20 @@ class _ModalPagamentoState extends State<ModalPagamento> {
   bool get _semContaNoPdv =>
       _formaSelecionadaPosterior || _formaSelecionadaContaPosterior;
 
+  // Máximo de parcelas permitido pela forma selecionada (1 = à vista).
+  int get _maxParcelasSelecionada {
+    if (_formaSelecionada == null) return 1;
+    for (final f in _formasPagamento) {
+      if (f['nome'] == _formaSelecionada) {
+        return (f['parceladoEmAte'] as int? ?? 1).clamp(1, 99);
+      }
+    }
+    return 1;
+  }
+
+  // Forma selecionada permite parcelar (libera o dropdown de parcelas).
+  bool get _permiteParcelar => _maxParcelasSelecionada > 1;
+
   double get _totalPago =>
       _pagamentos.fold(0.0, (s, p) => s + (p['valor'] as double));
 
@@ -140,11 +156,15 @@ class _ModalPagamentoState extends State<ModalPagamento> {
     final nomePagador = _nomePagadorCtrl.text.trim();
     final cpfPagador = _cpfPagadorCtrl.text.trim();
 
+    // Parcelas só fazem sentido para formas que permitem parcelar (ex.: crédito).
+    final parcelas = _permiteParcelar ? _parcelasSelecionadas : 1;
+
     setState(() {
       _pagamentos.add({
         'forma': _formaSelecionada,
         'valor': valor,
         'pagamentoPosterior': posterior,
+        'parcelas': parcelas,
         if (!semConta) 'conta': _contaSelecionada,
         if (!posterior && nomePagador.isNotEmpty) 'nomePagador': nomePagador,
         if (!posterior && cpfPagador.isNotEmpty) 'cpfPagador': cpfPagador,
@@ -152,6 +172,7 @@ class _ModalPagamentoState extends State<ModalPagamento> {
       final restante = _restante;
       _valorCtrl.text =
           restante > 0.005 ? restante.toStringAsFixed(2) : '';
+      _parcelasSelecionadas = 1;
       _nomePagadorCtrl.clear();
       _cpfPagadorCtrl.clear();
     });
@@ -222,7 +243,9 @@ class _ModalPagamentoState extends State<ModalPagamento> {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(
-                                p['forma'] as String,
+                                (p['parcelas'] as int? ?? 1) > 1
+                                    ? '${p['forma']} (${p['parcelas']}x)'
+                                    : p['forma'] as String,
                                 style: TextStyle(
                                   fontSize: 14,
                                   color: isPosterior ? Colors.orange[800] : null,
@@ -398,7 +421,10 @@ class _ModalPagamentoState extends State<ModalPagamento> {
                         }).toList(),
                         onChanged: (v) {
                           if (v == null) return;
-                          setState(() => _formaSelecionada = v);
+                          setState(() {
+                            _formaSelecionada = v;
+                            _parcelasSelecionadas = 1; // reinicia ao trocar de forma
+                          });
                           _valorFocusNode.requestFocus();
                         },
                       ),
@@ -432,6 +458,30 @@ class _ModalPagamentoState extends State<ModalPagamento> {
                     ],
                   ],
                 ),
+
+              // Parcelas — só aparece para formas que permitem (ex.: crédito até 6x)
+              if (!_carregando && _erroCarregamento == null && _permiteParcelar) ...[
+                const SizedBox(height: 12),
+                DropdownButtonFormField<int>(
+                  value: _parcelasSelecionadas,
+                  isExpanded: true,
+                  decoration: const InputDecoration(
+                    labelText: 'Parcelas',
+                    border: OutlineInputBorder(),
+                    isDense: true,
+                  ),
+                  items: List.generate(_maxParcelasSelecionada, (i) => i + 1)
+                      .map((n) => DropdownMenuItem<int>(
+                            value: n,
+                            child: Text('${n}x'),
+                          ))
+                      .toList(),
+                  onChanged: (v) {
+                    if (v == null) return;
+                    setState(() => _parcelasSelecionadas = v);
+                  },
+                ),
+              ],
               const SizedBox(height: 12),
 
               // Campo de valor + botão adicionar

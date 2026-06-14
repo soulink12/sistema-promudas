@@ -100,6 +100,7 @@ model pagamentos {
   valor_pago        Decimal   @db.Decimal(10, 2)
   data_pagamento    DateTime? @db.Date
   forma_pagamento   String?   @db.VarChar(50)
+  parcelas          Int       @default(1)
   conta             String?   @db.VarChar(50)
   recebedor         String?   @db.VarChar(50)
   nome_pagador      String?   @db.VarChar(100)
@@ -128,6 +129,7 @@ model formas_pagamento {
   ativo               Boolean @default(true)
   pagamento_posterior Boolean @default(false)
   conta_posterior     Boolean @default(false)
+  parcelado_em_ate    Int     @default(1)
 }
 
 model locais_entrega {
