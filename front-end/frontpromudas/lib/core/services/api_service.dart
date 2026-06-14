@@ -1,12 +1,16 @@
 import 'package:dio/dio.dart';
 import 'auth_service.dart';
+import 'app_config.dart';
 
 /// Instância central do Dio para todas as chamadas à API.
-/// Base URL aponta para o servidor local na porta configurada no backend.
+/// A base URL vem de [AppConfig], carregado de `config.txt` no `main()` antes
+/// do primeiro acesso ao Dio.
 class ApiService {
-  static const String baseUrl = 'http://localhost:6072/api';
+  static String get baseUrl => AppConfig.apiBaseUrl;
 
-  static final Dio dio = _criarDio();
+  // Criado de forma preguiçosa para garantir que [AppConfig.carregar] já rodou.
+  static Dio? _dio;
+  static Dio get dio => _dio ??= _criarDio();
 
   static Dio _criarDio() {
     final d = Dio(

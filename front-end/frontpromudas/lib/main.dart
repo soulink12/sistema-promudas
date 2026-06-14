@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'core/services/app_config.dart';
 import 'core/services/theme_service.dart';
 import 'features/auth/screens/login_screen.dart';
 
@@ -8,6 +9,7 @@ final _navigatorKey = GlobalKey<NavigatorState>();
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  await AppConfig.carregar();
   await ThemeService.carregar();
   runApp(const MeuViveiroApp());
 }
