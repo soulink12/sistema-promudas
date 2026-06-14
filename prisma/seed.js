@@ -20,11 +20,11 @@ async function main() {
     await prisma.usuarios.deleteMany();
 
     // ── Usuário (login do sistema) ──────────────────────────────────────────
-    const senhaHash = await bcrypt.hash('admin123', 10);
+    const senhaHash = await bcrypt.hash('987741', 10);
     await prisma.usuarios.create({
         data: {
-            nome: 'Administrador',
-            email: 'admin@promudas.com',
+            nome: 'Lucas Albuquerque',
+            email: 'lucasgsalbuquerque@gmail.com',
             senha_hash: senhaHash,
             ativo: true,
         },
@@ -59,15 +59,8 @@ async function main() {
 
     // ── Clientes (id=1 = Consumidor Padrão / venda balcão) ──────────────────
     await prisma.clientes.create({ data: { id: 1, nome: 'Consumidor' } });
-    await prisma.clientes.createMany({
-        data: [
-            { nome: 'João da Silva', cpf_cnpj: '123.456.789-00', telefone_1: '(94) 99999-0001', cidade: 'Parauapebas', estado: 'PA' },
-            { nome: 'Maria Oliveira', cpf_cnpj: '987.654.321-00', telefone_1: '(94) 99999-0002', cidade: 'Parauapebas', estado: 'PA' },
-            { nome: 'Sítio Boa Esperança', cpf_cnpj: '12.345.678/0001-90', telefone_1: '(94) 98888-0003', cidade: 'Canaã dos Carajás', estado: 'PA' },
-        ],
-    });
 
-    console.log('✓ Seed concluído: 1 usuário (admin@promudas.com / admin123), 5 formas de pagamento, 3 locais de entrega, 4 contas, 4 clientes.');
+    console.log('✓ Seed concluído');
 }
 
 main()
