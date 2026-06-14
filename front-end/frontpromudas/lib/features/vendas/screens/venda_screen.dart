@@ -131,11 +131,14 @@ class _TelaVendaState extends State<TelaVenda> {
     super.dispose();
   }
 
-  /// Intercepta atalhos globais da tela, independente de qual campo tem foco:
+  /// Intercepta atalhos da tela, independente de qual campo tem foco:
   /// F5 (buscar cliente), F12 (finalizar) e Ctrl+C (cadastrar novo cliente).
+  /// Só responde quando a TelaVenda é a rota atual — assim os atalhos não
+  /// vazam para telas empilhadas por cima (Clientes, Pedidos, etc.).
   bool _onTecla(KeyEvent event) {
     if (event is! KeyDownEvent) return false;
     if (_salvando) return false;
+    if (ModalRoute.of(context)?.isCurrent != true) return false;
     if (event.logicalKey == LogicalKeyboardKey.f5) {
       _mostrarBuscaClienteModal(context);
       return true;
@@ -146,10 +149,23 @@ class _TelaVendaState extends State<TelaVenda> {
     }
     if (HardwareKeyboard.instance.isControlPressed &&
         event.logicalKey == LogicalKeyboardKey.keyC) {
+      // Se houver texto selecionado, deixa o "copiar" nativo funcionar.
+      if (_temTextoSelecionado()) return false;
       _mostrarCadastroCliente();
       return true;
     }
     return false;
+  }
+
+  /// Verifica se há texto selecionado no campo que está com foco no momento.
+  /// Usado para não sobrescrever o "copiar" (Ctrl+C) quando há seleção ativa.
+  bool _temTextoSelecionado() {
+    final contextoFoco = FocusManager.instance.primaryFocus?.context;
+    if (contextoFoco == null) return false;
+    final editableText =
+        contextoFoco.findAncestorStateOfType<EditableTextState>();
+    final selecao = editableText?.textEditingValue.selection;
+    return selecao != null && selecao.isValid && !selecao.isCollapsed;
   }
 
   /// Abre o modal de cadastro de novo cliente (atalho Ctrl+C).
