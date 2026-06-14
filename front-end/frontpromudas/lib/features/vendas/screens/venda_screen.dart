@@ -14,6 +14,7 @@ import 'widgets/modal_busca_cliente.dart';
 import 'widgets/formulario_venda.dart';
 import 'widgets/rodape_venda.dart';
 import 'widgets/modal_pagamento.dart';
+import 'widgets/dialog_observacoes.dart';
 import '../../../core/services/pdf_download_service.dart';
 import '../../../core/widgets/dialog_confirmacao.dart';
 
@@ -40,6 +41,9 @@ class _TelaVendaState extends State<TelaVenda> {
 
   Map<String, dynamic>? _clienteSelecionado;
   final _carrinhoService = CarrinhoService();
+
+  // Observações do pedido (campo livre, opcional) — enviado no POST/PUT
+  String _observacoes = '';
 
   // Bloqueia interações enquanto o pedido está sendo enviado à API
   bool _salvando = false;
@@ -85,6 +89,7 @@ class _TelaVendaState extends State<TelaVenda> {
   }
 
   void _preencherCarrinhoComPedido(Map<String, dynamic> pedido) {
+    _observacoes = pedido['observacoes'] as String? ?? '';
     final cliente = pedido['clientes'];
     if (cliente != null) {
       _clienteSelecionado = {
@@ -229,6 +234,8 @@ class _TelaVendaState extends State<TelaVenda> {
                       });
                     },
                     onFinalizarPedido: _finalizarPedido,
+                    onAdicionarObservacoes: _editarObservacoes,
+                    temObservacoes: _observacoes.isNotEmpty,
                     onAplicarAjuste: (valor, descricao,
                         {ehPercentual = false}) {
                       setState(() {
@@ -473,6 +480,17 @@ class _TelaVendaState extends State<TelaVenda> {
     });
   }
 
+  /// Abre o diálogo de observações do pedido e guarda o resultado no estado.
+  Future<void> _editarObservacoes() async {
+    final resultado = await showDialog<String>(
+      context: context,
+      builder: (_) => DialogObservacoes(observacoesAtuais: _observacoes),
+    );
+    if (resultado != null && mounted) {
+      setState(() => _observacoes = resultado);
+    }
+  }
+
   void _finalizarPedido() {
     if (_carrinhoService.itens.isEmpty || _salvando) return;
 
@@ -518,6 +536,7 @@ class _TelaVendaState extends State<TelaVenda> {
                 })
             .toList(),
         'ajuste': ajuste != 0.0 ? ajuste : null,
+        'observacoes': _observacoes.isNotEmpty ? _observacoes : null,
       });
 
       final creditoGerado = _toDouble(response.data['creditoGerado']);
@@ -566,6 +585,7 @@ class _TelaVendaState extends State<TelaVenda> {
         'cliente_id': cliente['id'],
         'valor_total': _carrinhoService.totalComAjuste,
         if (ajuste != 0.0) 'ajuste': ajuste,
+        if (_observacoes.isNotEmpty) 'observacoes': _observacoes,
         'itens': itens
             .map((item) => {
                   'produto_id': item['id'],
@@ -600,6 +620,7 @@ class _TelaVendaState extends State<TelaVenda> {
       setState(() {
         _carrinhoService.limpar();
         _clienteSelecionado = _consumidorPadrao;
+        _observacoes = '';
         _salvando = false;
       });
 

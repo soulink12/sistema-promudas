@@ -14,6 +14,10 @@ class FormularioVendaWidget extends StatefulWidget {
   final Function(Map<String, dynamic>, double novoPreco) onAlterarPreco;
   // Callback acionado ao pressionar o botão ou F12 para finalizar o pedido
   final VoidCallback onFinalizarPedido;
+  // Callback para abrir o diálogo de observações do pedido
+  final VoidCallback onAdicionarObservacoes;
+  // Indica se já há observações preenchidas (muda o rótulo/ícone do botão)
+  final bool temObservacoes;
   // Valor do ajuste em R$ (negativo = desconto, positivo = acréscimo)
   final double ajuste;
   // Descrição exibida na tela (ex: "Desconto 10%")
@@ -34,6 +38,8 @@ class FormularioVendaWidget extends StatefulWidget {
     required this.onAlterarQuantidade,
     required this.onAlterarPreco,
     required this.onFinalizarPedido,
+    required this.onAdicionarObservacoes,
+    this.temObservacoes = false,
     this.ajuste = 0.0,
     this.descricaoAjuste,
     this.ehPercentualAjuste = false,
@@ -410,24 +416,39 @@ class _FormularioVendaWidgetState extends State<FormularioVendaWidget> {
     );
   }
 
-  /// Botão de finalização do pedido, com atalho F12 indicado na label.
+  /// Linha de ações do rodapé: observações à esquerda e finalizar à direita.
+  /// O botão de finalização indica o atalho F12 na label.
   Widget _botaoFinalizar(BuildContext context) {
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 4, 16, 12),
-      child: Align(
-        alignment: Alignment.centerRight,
-        child: FilledButton.icon(
-          onPressed: widget.onFinalizarPedido,
-          icon: const Icon(Icons.check_circle_outline),
-          label: const Text('Finalizar Pedido  •  F12'),
-          style: FilledButton.styleFrom(
-            padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 24),
-            textStyle: const TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.bold,
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          OutlinedButton.icon(
+            onPressed: widget.onAdicionarObservacoes,
+            icon: Icon(widget.temObservacoes
+                ? Icons.edit_note
+                : Icons.note_add_outlined),
+            label: Text(widget.temObservacoes
+                ? 'Editar observações'
+                : 'Adicionar observações'),
+            style: OutlinedButton.styleFrom(
+              padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 20),
             ),
           ),
-        ),
+          FilledButton.icon(
+            onPressed: widget.onFinalizarPedido,
+            icon: const Icon(Icons.check_circle_outline),
+            label: const Text('Finalizar Pedido  •  F12'),
+            style: FilledButton.styleFrom(
+              padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 24),
+              textStyle: const TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
