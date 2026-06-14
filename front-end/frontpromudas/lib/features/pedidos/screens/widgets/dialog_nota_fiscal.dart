@@ -84,6 +84,7 @@ class _DialogNotaFiscalState extends State<DialogNotaFiscal> {
           children: [
             DropdownButtonFormField<String>(
               initialValue: _status,
+              isExpanded: true,
               decoration: const InputDecoration(
                 labelText: 'Status da nota',
                 border: OutlineInputBorder(),

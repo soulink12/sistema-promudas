@@ -364,6 +364,7 @@ class _ModalPagamentoState extends State<ModalPagamento> {
                     Expanded(
                       child: DropdownButtonFormField<String>(
                         value: _formaSelecionada,
+                        isExpanded: true,
                         decoration: const InputDecoration(
                           labelText: 'Forma de pagamento',
                           border: OutlineInputBorder(),
@@ -376,7 +377,10 @@ class _ModalPagamentoState extends State<ModalPagamento> {
                             value: nome,
                             child: Row(
                               children: [
-                                Text(nome),
+                                Flexible(
+                                  child: Text(nome,
+                                      overflow: TextOverflow.ellipsis),
+                                ),
                                 if (isPosterior) ...[
                                   const SizedBox(width: 8),
                                   Icon(Icons.access_time,
@@ -406,6 +410,7 @@ class _ModalPagamentoState extends State<ModalPagamento> {
                       Expanded(
                         child: DropdownButtonFormField<String>(
                           value: _contaSelecionada,
+                          isExpanded: true,
                           decoration: const InputDecoration(
                             labelText: 'Conta',
                             border: OutlineInputBorder(),
@@ -414,7 +419,7 @@ class _ModalPagamentoState extends State<ModalPagamento> {
                           items: _contas
                               .map((c) => DropdownMenuItem<String>(
                                     value: c,
-                                    child: Text(c),
+                                    child: Text(c, overflow: TextOverflow.ellipsis),
                                   ))
                               .toList(),
                           onChanged: (v) {

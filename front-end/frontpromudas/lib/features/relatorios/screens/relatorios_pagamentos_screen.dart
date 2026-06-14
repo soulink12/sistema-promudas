@@ -221,6 +221,7 @@ class _TelaRelatorioPagamentosState extends State<TelaRelatorioPagamentos> {
                       ? const LinearProgressIndicator()
                       : DropdownButtonFormField<String?>(
                           initialValue: _formaSelecionada,
+                          isExpanded: true,
                           decoration: const InputDecoration(
                             labelText: 'Forma de pagamento',
                             border: OutlineInputBorder(),

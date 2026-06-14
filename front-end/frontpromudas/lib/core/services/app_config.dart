@@ -39,8 +39,10 @@ class AppConfig {
 
       final linhas = arquivo.readAsLinesSync();
       for (final linha in linhas) {
-        final l = linha.trim();
-        if (l.isEmpty || l.startsWith('#')) continue;
+        // Remove comentário inline (tudo a partir do '#') e espaços nas pontas.
+        // Cobre tanto a linha "# comentário" quanto "url # comentário".
+        final l = linha.split('#').first.trim();
+        if (l.isEmpty) continue;
         apiBaseUrl = l;
         break;
       }

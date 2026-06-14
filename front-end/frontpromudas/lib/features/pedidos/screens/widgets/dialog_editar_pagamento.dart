@@ -142,6 +142,7 @@ class _DialogEditarPagamentoState extends State<DialogEditarPagamento> {
                       const SizedBox(height: 16),
                       DropdownButtonFormField<String>(
                         initialValue: _formaSelecionada,
+                        isExpanded: true,
                         decoration: const InputDecoration(
                           labelText: 'Forma de pagamento',
                           border: OutlineInputBorder(),
@@ -158,6 +159,7 @@ class _DialogEditarPagamentoState extends State<DialogEditarPagamento> {
                       const SizedBox(height: 16),
                       DropdownButtonFormField<String>(
                         initialValue: _contaSelecionada,
+                        isExpanded: true,
                         decoration: const InputDecoration(
                           labelText: 'Conta',
                           border: OutlineInputBorder(),

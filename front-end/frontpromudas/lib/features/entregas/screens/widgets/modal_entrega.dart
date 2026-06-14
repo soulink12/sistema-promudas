@@ -321,6 +321,7 @@ class _ModalEntregaState extends State<ModalEntrega> {
               const SizedBox(height: 8),
               DropdownButtonFormField<String>(
                 value: _localSaida,
+                isExpanded: true,
                 decoration: const InputDecoration(
                   border: OutlineInputBorder(),
                   isDense: true,

@@ -294,6 +294,7 @@ class _DialogDefinirContaState extends State<_DialogDefinirConta> {
                 ? Text(_erro!)
                 : DropdownButtonFormField<String>(
                     value: _selecionada,
+                    isExpanded: true,
                     decoration: const InputDecoration(
                       labelText: 'Conta',
                       border: OutlineInputBorder(),
