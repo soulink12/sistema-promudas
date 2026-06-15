@@ -63,7 +63,9 @@ class _ModalPagamentoState extends State<ModalPagamento> {
       final contas = await ContaService().listar();
       setState(() {
         _formasPagamento = formas;
-        _formaSelecionada = formas.isNotEmpty ? formas.first['nome'] as String : null;
+        _formaSelecionada = formas.isNotEmpty
+            ? formas.first['nome'] as String
+            : null;
         _contas = contas;
         _contaSelecionada = contas.isNotEmpty ? contas.first : null;
         _valorCtrl.text = widget.totalPedido.toStringAsFixed(2);
@@ -134,15 +136,13 @@ class _ModalPagamentoState extends State<ModalPagamento> {
   double get _restante => widget.totalPedido - _totalPago;
 
   // Tolerância para imprecisão de ponto flutuante
-  bool get _podeFinalizar => widget.parcialPermitido
-      ? _pagamentos.isNotEmpty
-      : _restante < 0.005;
+  bool get _podeFinalizar =>
+      widget.parcialPermitido ? _pagamentos.isNotEmpty : _restante < 0.005;
 
   /// Registra a parcela atual e prepara o campo para a próxima entrada.
   void _adicionarPagamento() {
     if (_formaSelecionada == null) return;
-    final valor =
-        double.tryParse(_valorCtrl.text.trim().replaceAll(',', '.'));
+    final valor = double.tryParse(_valorCtrl.text.trim().replaceAll(',', '.'));
     if (valor == null || valor <= 0) return;
 
     // Crediário e formas de conta posterior (Dinheiro/Cheque) não escolhem conta
@@ -170,8 +170,7 @@ class _ModalPagamentoState extends State<ModalPagamento> {
         if (!posterior && cpfPagador.isNotEmpty) 'cpfPagador': cpfPagador,
       });
       final restante = _restante;
-      _valorCtrl.text =
-          restante > 0.005 ? restante.toStringAsFixed(2) : '';
+      _valorCtrl.text = restante > 0.005 ? restante.toStringAsFixed(2) : '';
       _parcelasSelecionadas = 1;
       _nomePagadorCtrl.clear();
       _cpfPagadorCtrl.clear();
@@ -195,406 +194,459 @@ class _ModalPagamentoState extends State<ModalPagamento> {
 
     return Dialog(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      // Margem mínima para o modal poder se expandir e usar a altura disponível
+      // da janela (o padrão reserva 24px no topo/base, limitando o crescimento)
+      insetPadding: const EdgeInsets.symmetric(horizontal: 40, vertical: 8),
       child: SizedBox(
         width: 520,
         child: Padding(
           padding: const EdgeInsets.all(24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Cabeçalho
-              Row(
-                children: const [
-                  Icon(Icons.payments_outlined, size: 22),
-                  SizedBox(width: 8),
-                  Text(
-                    'Pagamento do Pedido',
-                    style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 4),
-              Text(
-                'Total: R\$ ${widget.totalPedido.toStringAsFixed(2)}',
-                style: TextStyle(fontSize: 14, color: Colors.grey[600]),
-              ),
-              const Divider(height: 24),
+          // O modal expande até o limite da janela (insetPadding mínimo) e, se
+          // o conteúdo ainda passar disso, rola em vez de estourar.
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Cabeçalho
+                Row(
+                  children: const [
+                    Icon(Icons.payments_outlined, size: 22),
+                    SizedBox(width: 8),
+                    Text(
+                      'Pagamento do Pedido',
+                      style: TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  'Total: R\$ ${widget.totalPedido.toStringAsFixed(2)}',
+                  style: TextStyle(fontSize: 14, color: Colors.grey[600]),
+                ),
+                const Divider(height: 24),
 
-              // Parcelas já registradas
-              if (_pagamentos.isNotEmpty) ...[
-                ..._pagamentos.asMap().entries.map((e) {
-                  final i = e.key;
-                  final p = e.value;
-                  final isPosterior = p['pagamentoPosterior'] as bool;
-                  return Padding(
-                    padding: const EdgeInsets.only(bottom: 6),
-                    child: Row(
-                      children: [
-                        // Ícone diferente para pagamentos posteriores (crediário)
-                        isPosterior
-                            ? Icon(Icons.access_time,
-                                size: 16, color: Colors.orange[700])
-                            : Icon(Icons.check_circle_outline,
-                                size: 16, color: Colors.green[700]),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                (p['parcelas'] as int? ?? 1) > 1
-                                    ? '${p['forma']} (${p['parcelas']}x)'
-                                    : p['forma'] as String,
+                // Parcelas já registradas
+                if (_pagamentos.isNotEmpty) ...[
+                  ..._pagamentos.asMap().entries.map((e) {
+                    final i = e.key;
+                    final p = e.value;
+                    final isPosterior = p['pagamentoPosterior'] as bool;
+                    return Padding(
+                      padding: const EdgeInsets.only(bottom: 6),
+                      child: Row(
+                        children: [
+                          // Ícone diferente para pagamentos posteriores (crediário)
+                          isPosterior
+                              ? Icon(
+                                  Icons.access_time,
+                                  size: 16,
+                                  color: Colors.orange[700],
+                                )
+                              : Icon(
+                                  Icons.check_circle_outline,
+                                  size: 16,
+                                  color: Colors.green[700],
+                                ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  (p['parcelas'] as int? ?? 1) > 1
+                                      ? '${p['forma']} (${p['parcelas']}x)'
+                                      : p['forma'] as String,
+                                  style: TextStyle(
+                                    fontSize: 14,
+                                    color: isPosterior
+                                        ? Colors.orange[800]
+                                        : null,
+                                  ),
+                                ),
+                                if (p['conta'] != null)
+                                  Text(
+                                    'Conta: ${p['conta']}',
+                                    style: TextStyle(
+                                      fontSize: 11,
+                                      color: Colors.grey[600],
+                                    ),
+                                  )
+                                else if (!isPosterior)
+                                  Text(
+                                    'Conta: pendente',
+                                    style: TextStyle(
+                                      fontSize: 11,
+                                      color: Colors.orange[800],
+                                    ),
+                                  ),
+                                if (p['nomePagador'] != null)
+                                  Text(
+                                    'Pago por: ${p['nomePagador']}',
+                                    style: TextStyle(
+                                      fontSize: 11,
+                                      color: Colors.grey[600],
+                                    ),
+                                  ),
+                              ],
+                            ),
+                          ),
+                          if (isPosterior)
+                            Padding(
+                              padding: const EdgeInsets.only(right: 8),
+                              child: Text(
+                                'a receber',
                                 style: TextStyle(
-                                  fontSize: 14,
-                                  color: isPosterior ? Colors.orange[800] : null,
+                                  fontSize: 11,
+                                  color: Colors.orange[700],
+                                  fontStyle: FontStyle.italic,
                                 ),
                               ),
-                              if (p['conta'] != null)
-                                Text(
-                                  'Conta: ${p['conta']}',
-                                  style: TextStyle(
-                                    fontSize: 11,
-                                    color: Colors.grey[600],
-                                  ),
-                                )
-                              else if (!isPosterior)
-                                Text(
-                                  'Conta: pendente',
-                                  style: TextStyle(
-                                    fontSize: 11,
-                                    color: Colors.orange[800],
-                                  ),
-                                ),
-                              if (p['nomePagador'] != null)
-                                Text(
-                                  'Pago por: ${p['nomePagador']}',
-                                  style: TextStyle(
-                                    fontSize: 11,
-                                    color: Colors.grey[600],
-                                  ),
-                                ),
-                            ],
+                            ),
+                          Text(
+                            'R\$ ${(p['valor'] as double).toStringAsFixed(2)}',
+                            style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w600,
+                              color: isPosterior ? Colors.orange[800] : null,
+                            ),
                           ),
-                        ),
-                        if (isPosterior)
-                          Padding(
-                            padding: const EdgeInsets.only(right: 8),
-                            child: Text(
-                              'a receber',
-                              style: TextStyle(
-                                fontSize: 11,
-                                color: Colors.orange[700],
-                                fontStyle: FontStyle.italic,
+                          const SizedBox(width: 4),
+                          InkWell(
+                            onTap: () =>
+                                setState(() => _pagamentos.removeAt(i)),
+                            borderRadius: BorderRadius.circular(12),
+                            child: const Padding(
+                              padding: EdgeInsets.all(4),
+                              child: Icon(
+                                Icons.close,
+                                size: 15,
+                                color: Colors.redAccent,
                               ),
                             ),
                           ),
+                        ],
+                      ),
+                    );
+                  }),
+                  const SizedBox(height: 8),
+
+                  // Indicador de restante ou troco
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 8,
+                    ),
+                    decoration: BoxDecoration(
+                      color: corFundo,
+                      borderRadius: BorderRadius.circular(6),
+                      border: Border.all(color: corBorda),
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
                         Text(
-                          'R\$ ${(p['valor'] as double).toStringAsFixed(2)}',
+                          temTroco ? 'Troco:' : 'Restante:',
                           style: TextStyle(
-                            fontSize: 14,
                             fontWeight: FontWeight.w600,
-                            color: isPosterior ? Colors.orange[800] : null,
+                            color: corDestaque,
                           ),
                         ),
-                        const SizedBox(width: 4),
-                        InkWell(
-                          onTap: () =>
-                              setState(() => _pagamentos.removeAt(i)),
-                          borderRadius: BorderRadius.circular(12),
-                          child: const Padding(
-                            padding: EdgeInsets.all(4),
-                            child: Icon(Icons.close,
-                                size: 15, color: Colors.redAccent),
+                        Text(
+                          'R\$ ${valorDestaque.toStringAsFixed(2)}',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                            color: corDestaque,
                           ),
                         ),
                       ],
                     ),
-                  );
-                }),
-                const SizedBox(height: 8),
+                  ),
+                  const SizedBox(height: 20),
+                ],
 
-                // Indicador de restante ou troco
-                Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: 12, vertical: 8),
-                  decoration: BoxDecoration(
-                    color: corFundo,
-                    borderRadius: BorderRadius.circular(6),
-                    border: Border.all(color: corBorda),
-                  ),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(
-                        temTroco ? 'Troco:' : 'Restante:',
-                        style: TextStyle(
-                            fontWeight: FontWeight.w600, color: corDestaque),
-                      ),
-                      Text(
-                        'R\$ ${valorDestaque.toStringAsFixed(2)}',
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                          color: corDestaque,
+                // Seletor de forma de pagamento
+                if (_carregando)
+                  const Padding(
+                    padding: EdgeInsets.symmetric(vertical: 8),
+                    child: LinearProgressIndicator(),
+                  )
+                else if (_erroCarregamento != null)
+                  Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 8),
+                    child: Row(
+                      children: [
+                        const Icon(
+                          Icons.error_outline,
+                          color: Colors.red,
+                          size: 18,
                         ),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 20),
-              ],
-
-              // Seletor de forma de pagamento
-              if (_carregando)
-                const Padding(
-                  padding: EdgeInsets.symmetric(vertical: 8),
-                  child: LinearProgressIndicator(),
-                )
-              else if (_erroCarregamento != null)
-                Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 8),
-                  child: Row(
-                    children: [
-                      const Icon(Icons.error_outline,
-                          color: Colors.red, size: 18),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Text(
-                          _erroCarregamento!,
-                          style: const TextStyle(color: Colors.red, fontSize: 13),
-                        ),
-                      ),
-                      TextButton(
-                        onPressed: () {
-                          setState(() {
-                            _carregando = true;
-                            _erroCarregamento = null;
-                          });
-                          _carregarDados();
-                        },
-                        child: const Text('Tentar novamente'),
-                      ),
-                    ],
-                  ),
-                )
-              else
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Expanded(
-                      child: DropdownButtonFormField<String>(
-                        value: _formaSelecionada,
-                        isExpanded: true,
-                        decoration: const InputDecoration(
-                          labelText: 'Forma de pagamento',
-                          border: OutlineInputBorder(),
-                          isDense: true,
-                        ),
-                        items: _formasPagamento.map((f) {
-                          final nome = f['nome'] as String;
-                          final isPosterior = f['pagamentoPosterior'] as bool;
-                          return DropdownMenuItem<String>(
-                            value: nome,
-                            child: Row(
-                              children: [
-                                Flexible(
-                                  child: Text(nome,
-                                      overflow: TextOverflow.ellipsis),
-                                ),
-                                if (isPosterior) ...[
-                                  const SizedBox(width: 8),
-                                  Icon(Icons.access_time,
-                                      size: 14, color: Colors.orange[700]),
-                                  const SizedBox(width: 4),
-                                  Text(
-                                    'a receber',
-                                    style: TextStyle(
-                                        fontSize: 12, color: Colors.orange[700]),
-                                  ),
-                                ],
-                              ],
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            _erroCarregamento!,
+                            style: const TextStyle(
+                              color: Colors.red,
+                              fontSize: 13,
                             ),
-                          );
-                        }).toList(),
-                        onChanged: (v) {
-                          if (v == null) return;
-                          setState(() {
-                            _formaSelecionada = v;
-                            _parcelasSelecionadas = 1; // reinicia ao trocar de forma
-                          });
-                          _valorFocusNode.requestFocus();
-                        },
-                      ),
+                          ),
+                        ),
+                        TextButton(
+                          onPressed: () {
+                            setState(() {
+                              _carregando = true;
+                              _erroCarregamento = null;
+                            });
+                            _carregarDados();
+                          },
+                          child: const Text('Tentar novamente'),
+                        ),
+                      ],
                     ),
-                    // Conta só aparece quando é escolhida no PDV (não para crediário
-                    // nem para formas de conta definida depois, como Dinheiro/Cheque)
-                    if (!_semContaNoPdv) ...[
-                      const SizedBox(width: 12),
+                  )
+                else
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
                       Expanded(
                         child: DropdownButtonFormField<String>(
-                          value: _contaSelecionada,
+                          value: _formaSelecionada,
                           isExpanded: true,
                           decoration: const InputDecoration(
-                            labelText: 'Conta',
+                            labelText: 'Forma de pagamento',
                             border: OutlineInputBorder(),
                             isDense: true,
                           ),
-                          items: _contas
-                              .map((c) => DropdownMenuItem<String>(
-                                    value: c,
-                                    child: Text(c, overflow: TextOverflow.ellipsis),
-                                  ))
-                              .toList(),
+                          items: _formasPagamento.map((f) {
+                            final nome = f['nome'] as String;
+                            final isPosterior = f['pagamentoPosterior'] as bool;
+                            return DropdownMenuItem<String>(
+                              value: nome,
+                              child: Row(
+                                children: [
+                                  Flexible(
+                                    child: Text(
+                                      nome,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ),
+                                  if (isPosterior) ...[
+                                    const SizedBox(width: 8),
+                                    Icon(
+                                      Icons.access_time,
+                                      size: 14,
+                                      color: Colors.orange[700],
+                                    ),
+                                    const SizedBox(width: 4),
+                                    Text(
+                                      'a receber',
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        color: Colors.orange[700],
+                                      ),
+                                    ),
+                                  ],
+                                ],
+                              ),
+                            );
+                          }).toList(),
                           onChanged: (v) {
                             if (v == null) return;
-                            setState(() => _contaSelecionada = v);
+                            setState(() {
+                              _formaSelecionada = v;
+                              _parcelasSelecionadas =
+                                  1; // reinicia ao trocar de forma
+                            });
                             _valorFocusNode.requestFocus();
                           },
                         ),
                       ),
+                      // Conta só aparece quando é escolhida no PDV (não para crediário
+                      // nem para formas de conta definida depois, como Dinheiro/Cheque)
+                      if (!_semContaNoPdv) ...[
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: DropdownButtonFormField<String>(
+                            value: _contaSelecionada,
+                            isExpanded: true,
+                            decoration: const InputDecoration(
+                              labelText: 'Conta',
+                              border: OutlineInputBorder(),
+                              isDense: true,
+                            ),
+                            items: _contas
+                                .map(
+                                  (c) => DropdownMenuItem<String>(
+                                    value: c,
+                                    child: Text(
+                                      c,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ),
+                                )
+                                .toList(),
+                            onChanged: (v) {
+                              if (v == null) return;
+                              setState(() => _contaSelecionada = v);
+                              _valorFocusNode.requestFocus();
+                            },
+                          ),
+                        ),
+                      ],
                     ],
-                  ],
-                ),
-
-              // Parcelas — só aparece para formas que permitem (ex.: crédito até 6x)
-              if (!_carregando && _erroCarregamento == null && _permiteParcelar) ...[
-                const SizedBox(height: 12),
-                DropdownButtonFormField<int>(
-                  value: _parcelasSelecionadas,
-                  isExpanded: true,
-                  decoration: const InputDecoration(
-                    labelText: 'Parcelas',
-                    border: OutlineInputBorder(),
-                    isDense: true,
                   ),
-                  items: List.generate(_maxParcelasSelecionada, (i) => i + 1)
-                      .map((n) => DropdownMenuItem<int>(
+
+                // Parcelas — só aparece para formas que permitem (ex.: crédito até 6x)
+                if (!_carregando &&
+                    _erroCarregamento == null &&
+                    _permiteParcelar) ...[
+                  const SizedBox(height: 12),
+                  DropdownButtonFormField<int>(
+                    value: _parcelasSelecionadas,
+                    isExpanded: true,
+                    decoration: const InputDecoration(
+                      labelText: 'Parcelas',
+                      border: OutlineInputBorder(),
+                      isDense: true,
+                    ),
+                    items: List.generate(_maxParcelasSelecionada, (i) => i + 1)
+                        .map(
+                          (n) => DropdownMenuItem<int>(
                             value: n,
                             child: Text('${n}x'),
-                          ))
-                      .toList(),
-                  onChanged: (v) {
-                    if (v == null) return;
-                    setState(() => _parcelasSelecionadas = v);
-                  },
-                ),
-              ],
-              const SizedBox(height: 12),
-
-              // Campo de valor + botão adicionar
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.center,
-                children: [
-                  Expanded(
-                    child: TextField(
-                      controller: _valorCtrl,
-                      focusNode: _valorFocusNode,
-                      autofocus: true,
-                      keyboardType: const TextInputType.numberWithOptions(
-                          decimal: true),
-                      decoration: const InputDecoration(
-                        labelText: 'Valor',
-                        prefixText: 'R\$ ',
-                        border: OutlineInputBorder(),
-                        isDense: true,
-                      ),
-                      // Enter registra a parcela
-                      onSubmitted: (_) => _adicionarPagamento(),
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  FilledButton.icon(
-                    onPressed: (!_carregando && _erroCarregamento == null)
-                        ? _adicionarPagamento
-                        : null,
-                    icon: const Icon(Icons.add, size: 18),
-                    label: const Text('Adicionar'),
-                    style: FilledButton.styleFrom(
-                      backgroundColor: Colors.blueGrey[700],
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(
-                          vertical: 14, horizontal: 16),
-                    ),
+                          ),
+                        )
+                        .toList(),
+                    onChanged: (v) {
+                      if (v == null) return;
+                      setState(() => _parcelasSelecionadas = v);
+                    },
                   ),
                 ],
-              ),
+                const SizedBox(height: 12),
 
-              // Pagador (opcional) — escondido quando a forma é crediário
-              // (pagamento posterior), pois ainda não há quem pagou.
-              if (!_formaSelecionadaPosterior) ...[
-                const SizedBox(height: 16),
-                Text(
-                  'PAGADOR (SE DIFERENTE DO CLIENTE)',
-                  style: TextStyle(
-                    fontSize: 11,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.grey[600],
-                    letterSpacing: 0.8,
-                  ),
-                ),
-                const SizedBox(height: 8),
+                // Campo de valor + botão adicionar
                 Row(
+                  crossAxisAlignment: CrossAxisAlignment.center,
                   children: [
                     Expanded(
-                      flex: 2,
                       child: TextField(
-                        controller: _nomePagadorCtrl,
+                        controller: _valorCtrl,
+                        focusNode: _valorFocusNode,
+                        autofocus: true,
+                        keyboardType: const TextInputType.numberWithOptions(
+                          decimal: true,
+                        ),
                         decoration: const InputDecoration(
-                          labelText: 'Nome do pagador',
+                          labelText: 'Valor',
+                          prefixText: 'R\$ ',
                           border: OutlineInputBorder(),
                           isDense: true,
                         ),
+                        // Enter registra a parcela
+                        onSubmitted: (_) => _adicionarPagamento(),
                       ),
                     ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      flex: 1,
-                      child: TextField(
-                        controller: _cpfPagadorCtrl,
-                        keyboardType: TextInputType.number,
-                        decoration: const InputDecoration(
-                          labelText: 'CPF/CNPJ',
-                          border: OutlineInputBorder(),
-                          isDense: true,
+                    const SizedBox(width: 8),
+                    FilledButton.icon(
+                      onPressed: (!_carregando && _erroCarregamento == null)
+                          ? _adicionarPagamento
+                          : null,
+                      icon: const Icon(Icons.add, size: 18),
+                      label: const Text('Adicionar'),
+                      style: FilledButton.styleFrom(
+                        backgroundColor: Colors.blueGrey[700],
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(
+                          vertical: 14,
+                          horizontal: 16,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+
+                // Pagador (opcional) — escondido quando a forma é crediário
+                // (pagamento posterior), pois ainda não há quem pagou.
+                if (!_formaSelecionadaPosterior) ...[
+                  const SizedBox(height: 16),
+                  Text(
+                    'PAGADOR (SE DIFERENTE DO CLIENTE)',
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.grey[600],
+                      letterSpacing: 0.8,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      Expanded(
+                        flex: 2,
+                        child: TextField(
+                          controller: _nomePagadorCtrl,
+                          decoration: const InputDecoration(
+                            labelText: 'Nome do pagador',
+                            border: OutlineInputBorder(),
+                            isDense: true,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        flex: 1,
+                        child: TextField(
+                          controller: _cpfPagadorCtrl,
+                          keyboardType: TextInputType.number,
+                          decoration: const InputDecoration(
+                            labelText: 'CPF/CNPJ',
+                            border: OutlineInputBorder(),
+                            isDense: true,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+
+                const SizedBox(height: 20),
+
+                // Ações
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    TextButton(
+                      onPressed: () => Navigator.pop(context),
+                      child: const Text('Cancelar'),
+                    ),
+                    const SizedBox(width: 8),
+                    FilledButton.icon(
+                      onPressed: _podeFinalizar
+                          ? () {
+                              Navigator.pop(context);
+                              widget.onConfirmar(List.of(_pagamentos));
+                            }
+                          : null,
+                      icon: const Icon(Icons.check_circle_outline, size: 18),
+                      label: const Text('Finalizar Pagamento'),
+                      style: FilledButton.styleFrom(
+                        backgroundColor: Colors.green[700],
+                        padding: const EdgeInsets.symmetric(
+                          vertical: 12,
+                          horizontal: 20,
                         ),
                       ),
                     ),
                   ],
                 ),
               ],
-
-              const SizedBox(height: 20),
-
-              // Ações
-              Row(
-                mainAxisAlignment: MainAxisAlignment.end,
-                children: [
-                  TextButton(
-                    onPressed: () => Navigator.pop(context),
-                    child: const Text('Cancelar'),
-                  ),
-                  const SizedBox(width: 8),
-                  FilledButton.icon(
-                    onPressed: _podeFinalizar
-                        ? () {
-                            Navigator.pop(context);
-                            widget.onConfirmar(List.of(_pagamentos));
-                          }
-                        : null,
-                    icon: const Icon(Icons.check_circle_outline, size: 18),
-                    label: const Text('Finalizar Pagamento'),
-                    style: FilledButton.styleFrom(
-                      backgroundColor: Colors.green[700],
-                      padding: const EdgeInsets.symmetric(
-                          vertical: 12, horizontal: 20),
-                    ),
-                  ),
-                ],
-              ),
-            ],
+            ),
           ),
         ),
       ),
