@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'lista_pedidos.dart' show ChipStatus;
+import '../../../../core/widgets/seletor_data_hora.dart';
 
 class DetalhesPedido extends StatelessWidget {
   final Map<String, dynamic> pedido;
@@ -9,6 +10,8 @@ class DetalhesPedido extends StatelessWidget {
   final VoidCallback onEmitirPdf;
   final VoidCallback onEditar;
   final VoidCallback onTapCliente;
+  // Recebe a nova data/hora escolhida para o pedido (data_pedido)
+  final void Function(DateTime novaData) onEditarData;
   final void Function(Map<String, dynamic> pagamento) onEditarPagamento;
   final void Function(Map<String, dynamic> pagamento) onExcluirPagamento;
   final void Function(Map<String, dynamic> pagamento) onNotaFiscalPagamento;
@@ -22,6 +25,7 @@ class DetalhesPedido extends StatelessWidget {
     required this.onEmitirPdf,
     required this.onEditar,
     required this.onTapCliente,
+    required this.onEditarData,
     required this.onEditarPagamento,
     required this.onExcluirPagamento,
     required this.onNotaFiscalPagamento,
@@ -32,7 +36,8 @@ class DetalhesPedido extends StatelessWidget {
     final nomeCliente = pedido['clientes']?['nome'] as String? ?? '—';
     final total = _toDouble(pedido['valor_total']);
     final ajuste = _toDouble(pedido['ajuste']);
-    final data = _formatarDataHora(pedido['criado_em']);
+    final dataPedidoRaw = pedido['data_pedido'] ?? pedido['criado_em'];
+    final data = _formatarDataHora(dataPedidoRaw);
     final statusPag = pedido['status_pagamento'] as String? ?? 'Pendente';
     final statusRet = pedido['status_entrega'] as String? ?? 'Pendente';
     final obs = pedido['observacoes'] as String?;
@@ -140,12 +145,39 @@ class DetalhesPedido extends StatelessWidget {
                               ),
                             ),
                             const SizedBox(height: 4),
-                            Text(data ?? '—',
-                                style: TextStyle(
-                                    fontSize: 13,
-                                    color: Theme.of(context)
-                                        .colorScheme
-                                        .onSurfaceVariant)),
+                            // Data/hora do pedido — clicável para editar (consulta)
+                            InkWell(
+                              onTap: () async {
+                                final inicial = DateTime.tryParse(
+                                            dataPedidoRaw?.toString() ?? '')
+                                        ?.toLocal() ??
+                                    DateTime.now();
+                                final nova =
+                                    await selecionarDataHora(context, inicial);
+                                if (nova != null) onEditarData(nova);
+                              },
+                              borderRadius: BorderRadius.circular(6),
+                              child: Padding(
+                                padding: const EdgeInsets.symmetric(vertical: 2),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Text(data ?? '—',
+                                        style: TextStyle(
+                                            fontSize: 13,
+                                            color: Theme.of(context)
+                                                .colorScheme
+                                                .onSurfaceVariant)),
+                                    const SizedBox(width: 4),
+                                    Icon(Icons.edit_calendar_outlined,
+                                        size: 14,
+                                        color: Theme.of(context)
+                                            .colorScheme
+                                            .onSurfaceVariant),
+                                  ],
+                                ),
+                              ),
+                            ),
                           ],
                         ),
                       ),
@@ -389,7 +421,8 @@ class _LinhaPagamento extends StatelessWidget {
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
 
-    final dataPag = _formatarDataHora(pag['criado_em']) ?? '—';
+    final dataPag =
+        _formatarDataHora(pag['data_pagamento'] ?? pag['criado_em']) ?? '—';
     final formaBase = pag['forma_pagamento'] as String? ?? '—';
     final parcelas = pag['parcelas'] as int? ?? 1;
     final forma = parcelas > 1 ? '$formaBase ($parcelas' 'x)' : formaBase;

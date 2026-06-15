@@ -30,7 +30,7 @@ class ListaPedidos extends StatelessWidget {
         final nomeCliente =
             p['clientes']?['nome'] as String? ?? 'Cliente desconhecido';
         final total = _toDouble(p['valor_total']);
-        final data = _formatarDataHora(p['criado_em']);
+        final data = _formatarDataHora(p['data_pedido'] ?? p['criado_em']);
         final statusPag = p['status_pagamento'] as String? ?? 'Pendente';
         final statusEntrega = p['status_entrega'] as String? ?? 'Pendente';
         final statusNota = _statusNotaPedido(p['pagamentos'] as List? ?? []);

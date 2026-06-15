@@ -255,6 +255,29 @@ class _TelaPedidosState extends State<TelaPedidos> {
     }
   }
 
+  Future<void> _editarDataPedido(DateTime novaData) async {
+    final pedidoId = _pedidoSelecionado!['id'] as int;
+    setState(() => _salvando = true);
+    try {
+      await ApiService.dio.put('/pedidos/$pedidoId', data: {
+        'data_pedido': novaData.toUtc().toIso8601String(),
+      });
+      await _recarregarSilencioso(pedidoId);
+      setState(() => _salvando = false);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Data do pedido atualizada com sucesso!'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+    } catch (e) {
+      setState(() => _salvando = false);
+      _mostrarErro(_extrairErro(e, 'Erro ao atualizar a data do pedido.'));
+    }
+  }
+
   Future<void> _editarPagamento(Map<String, dynamic> pagamento) async {
     final resultado = await showDialog<Map<String, dynamic>>(
       context: context,
@@ -271,6 +294,7 @@ class _TelaPedidosState extends State<TelaPedidos> {
           'valor_pago': resultado['valor_pago'],
           'forma_pagamento': resultado['forma_pagamento'],
           'conta': resultado['conta'],
+          'data_pagamento': resultado['data_pagamento'],
           'nome_pagador': resultado['nome_pagador'],
           'cpf_cnpj_pagador': resultado['cpf_cnpj_pagador'],
         },
@@ -400,6 +424,7 @@ class _TelaPedidosState extends State<TelaPedidos> {
                     onEditar: () => _abrirEdicaoPedido(_pedidoSelecionado!),
                     onTapCliente: () =>
                         _abrirDetalhesCliente(_pedidoSelecionado!),
+                    onEditarData: _editarDataPedido,
                     onEditarPagamento: _editarPagamento,
                     onExcluirPagamento: _excluirPagamento,
                     onNotaFiscalPagamento: _editarNotaFiscal,

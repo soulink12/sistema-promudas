@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../../core/widgets/seletor_data_hora.dart';
 
 /// Card de exibição de uma entrega já registrada.
 /// Quando [onEditar]/[onExcluir] são informados, exibe o menu de ações.
@@ -14,14 +15,6 @@ class CardEntrega extends StatelessWidget {
     this.onExcluir,
   });
 
-  String _formatarData(dynamic iso) {
-    if (iso == null) return '—';
-    final dt = DateTime.tryParse(iso.toString())?.toLocal();
-    if (dt == null) return '—';
-    return '${dt.day.toString().padLeft(2, '0')}/'
-        '${dt.month.toString().padLeft(2, '0')}/${dt.year}';
-  }
-
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
@@ -32,7 +25,7 @@ class CardEntrega extends StatelessWidget {
         (pedido?['clientes'] as Map<String, dynamic>?)?['nome'] as String? ??
             '—';
 
-    final data = _formatarData(entrega['data_entrega']);
+    final data = formatarDataHora(entrega['data_entrega']);
     final local = entrega['local_entrega'] as String? ?? '—';
     final motorista = entrega['motorista'] as String?;
     final placa = entrega['placa_veiculo'] as String?;

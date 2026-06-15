@@ -10,6 +10,9 @@ const criarPedido = async (dados) => {
             valor_total: dados.valor_total,
             ajuste: dados.ajuste ?? null,
             observacoes: dados.observacoes,
+            // Na criação, a data do pedido é o momento atual (= criado_em).
+            // Pode ser alterada depois na consulta (PUT /pedidos/:id).
+            data_pedido: dados.data_pedido ?? new Date(),
             status_geral: 'Ativa',
             ativo: true,
 
@@ -55,6 +58,7 @@ const listarPedidos = async (filtros = {}) => {
                     select: {
                         id: true,
                         valor_pago: true,
+                        data_pagamento: true,
                         forma_pagamento: true,
                         parcelas: true,
                         conta: true,
@@ -179,6 +183,7 @@ const buscarPedido = async (id) => {
                     select: {
                         id: true,
                         valor_pago: true,
+                        data_pagamento: true,
                         forma_pagamento: true,
                         parcelas: true,
                         conta: true,

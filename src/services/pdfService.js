@@ -88,7 +88,7 @@ const gerarPedidoPDF = async (pedidoId) => {
         doc.moveDown(0.5);
 
         // Número e data
-        const dataPedido = formatarData(pedido.criado_em);
+        const dataPedido = formatarData(pedido.data_pedido || pedido.criado_em);
         doc.font('Helvetica-Bold').fontSize(14).text(`PEDIDO #${pedido.id}`, 50, doc.y, { continued: true });
         doc.font('Helvetica').fontSize(10).fillColor('#555555')
             .text(dataPedido, { align: 'right' });
@@ -248,7 +248,7 @@ const gerarPedidoPDF = async (pedidoId) => {
                     : pag.forma_pagamento;
                 linhaTabela(doc, y, [
                     { x: 50, largura: 220, texto: formaTexto },
-                    { x: 280, largura: 170, texto: formatarData(pag.criado_em), alinhamento: 'left' },
+                    { x: 280, largura: 170, texto: formatarData(pag.data_pagamento || pag.criado_em), alinhamento: 'left' },
                     { x: 460, largura: 85, texto: moeda(pag.valor_pago), alinhamento: 'right' },
                 ]);
                 doc.moveDown(0.45);

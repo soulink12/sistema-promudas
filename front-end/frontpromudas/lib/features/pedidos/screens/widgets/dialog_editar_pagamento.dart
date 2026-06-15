@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../../../../core/services/forma_pagamento_service.dart';
 import '../../../../core/services/conta_service.dart';
+import '../../../../core/widgets/seletor_data_hora.dart';
 
 /// Diálogo para editar um pagamento (valor, forma e conta).
 /// Retorna via `Navigator.pop` um mapa `{valor_pago, forma_pagamento, conta}` ao salvar,
@@ -21,6 +22,7 @@ class _DialogEditarPagamentoState extends State<DialogEditarPagamento> {
   late final TextEditingController _cpfPagadorCtrl;
   String? _formaSelecionada;
   String? _contaSelecionada;
+  late DateTime _dataPagamento;
   List<Map<String, dynamic>> _formas = [];
   List<String> _contas = [];
   bool _carregando = true;
@@ -37,6 +39,11 @@ class _DialogEditarPagamentoState extends State<DialogEditarPagamento> {
         text: widget.pagamento['cpf_cnpj_pagador'] as String? ?? '');
     _formaSelecionada = widget.pagamento['forma_pagamento'] as String?;
     _contaSelecionada = widget.pagamento['conta'] as String?;
+    final dataRaw =
+        widget.pagamento['data_pagamento'] ?? widget.pagamento['criado_em'];
+    _dataPagamento =
+        DateTime.tryParse(dataRaw?.toString() ?? '')?.toLocal() ??
+            DateTime.now();
     _carregarDados();
   }
 
@@ -94,6 +101,7 @@ class _DialogEditarPagamentoState extends State<DialogEditarPagamento> {
       'valor_pago': valor,
       'forma_pagamento': _formaSelecionada,
       'conta': _contaSelecionada,
+      'data_pagamento': _dataPagamento.toUtc().toIso8601String(),
       // null limpa o campo; valor preenchido atualiza
       'nome_pagador': nomePagador.isEmpty ? null : nomePagador,
       'cpf_cnpj_pagador': cpfPagador.isEmpty ? null : cpfPagador,
@@ -138,6 +146,26 @@ class _DialogEditarPagamentoState extends State<DialogEditarPagamento> {
                           border: OutlineInputBorder(),
                         ),
                         onChanged: (_) => setState(() {}),
+                      ),
+                      const SizedBox(height: 16),
+                      // Data/hora do pagamento — clicável para editar
+                      InkWell(
+                        onTap: () async {
+                          final nova = await selecionarDataHora(
+                              context, _dataPagamento);
+                          if (nova != null) {
+                            setState(() => _dataPagamento = nova);
+                          }
+                        },
+                        borderRadius: BorderRadius.circular(4),
+                        child: InputDecorator(
+                          decoration: const InputDecoration(
+                            labelText: 'Data/hora do pagamento',
+                            border: OutlineInputBorder(),
+                            suffixIcon: Icon(Icons.edit_calendar_outlined),
+                          ),
+                          child: Text(formatarDataHora(_dataPagamento)),
+                        ),
                       ),
                       const SizedBox(height: 16),
                       DropdownButtonFormField<String>(

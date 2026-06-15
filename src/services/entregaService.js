@@ -87,6 +87,9 @@ const criarEntrega = async (dadosEntrega) => {
         data: {
             pedido_id: parseInt(pedido_id),
             ...dadosPrincipais,
+            // Na criação, a data da entrega é o momento atual (= criado_em).
+            // Pode ser alterada depois na consulta (PUT /entregas/:id).
+            data_entrega: dadosPrincipais.data_entrega ?? new Date(),
             itens_entrega: {
                 create: itens.map(item => ({
                     produto_id: parseInt(item.produto_id),

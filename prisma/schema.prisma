@@ -29,7 +29,7 @@ model pedidos {
   id               Int            @id @default(autoincrement())
   cliente_id       Int?
   ativo            Boolean?       @default(true)
-  data_pedido      DateTime?      @db.Date
+  data_pedido      DateTime?      @db.Timestamp(0)
   valor_total      Decimal?       @db.Decimal(10, 2)
   ajuste           Decimal?       @db.Decimal(10, 2)
   status_geral     String?        @default("Ativa") @db.VarChar(30)
@@ -70,7 +70,7 @@ model itens_pedido {
 model entregas {
   id             Int             @id @default(autoincrement())
   pedido_id      Int
-  data_entrega   DateTime?       @db.Date
+  data_entrega   DateTime?       @db.Timestamp(0)
   local_entrega  String?         @db.VarChar(50)
   motorista      String?         @db.VarChar(100)
   placa_veiculo  String?         @db.VarChar(20)
@@ -98,7 +98,7 @@ model pagamentos {
   id                Int       @id @default(autoincrement())
   pedido_id         Int?
   valor_pago        Decimal   @db.Decimal(10, 2)
-  data_pagamento    DateTime? @db.Date
+  data_pagamento    DateTime? @db.Timestamp(0)
   forma_pagamento   String?   @db.VarChar(50)
   parcelas          Int       @default(1)
   conta             String?   @db.VarChar(50)

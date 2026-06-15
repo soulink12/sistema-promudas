@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../../../../core/services/api_service.dart';
 import '../../../../core/services/local_entrega_service.dart';
+import '../../../../core/widgets/seletor_data_hora.dart';
 
 /// Modal de entrega — cria uma nova entrega ou edita uma existente.
 /// Quando [entregaParaEditar] é informado, entra em modo de edição:
@@ -169,10 +170,11 @@ class _ModalEntregaState extends State<ModalEntrega> {
           'itens': itens,
         });
       } else {
+        // Na criação não enviamos a data — o backend grava a data/hora atual
+        // (= criado_em). A data pode ser ajustada depois na consulta (edição).
         await ApiService.dio.post('/entregas', data: {
           'pedido_id': widget.pedido['id'],
           'local_entrega': _localSaida,
-          'data_entrega': _dataEntrega.toUtc().toIso8601String(),
           if (_motoristaCtrl.text.trim().isNotEmpty)
             'motorista': _motoristaCtrl.text.trim(),
           if (_placaCtrl.text.trim().isNotEmpty)
@@ -203,18 +205,9 @@ class _ModalEntregaState extends State<ModalEntrega> {
     return 'Erro ao $acao entrega.';
   }
 
-  String _formatarData(DateTime dt) =>
-      '${dt.day.toString().padLeft(2, '0')}/'
-      '${dt.month.toString().padLeft(2, '0')}/${dt.year}';
-
   Future<void> _selecionarData() async {
-    final data = await showDatePicker(
-      context: context,
-      initialDate: _dataEntrega,
-      firstDate: DateTime(2020),
-      lastDate: DateTime(2100),
-    );
-    if (data != null) setState(() => _dataEntrega = data);
+    final nova = await selecionarDataHora(context, _dataEntrega);
+    if (nova != null) setState(() => _dataEntrega = nova);
   }
 
   @override
@@ -335,21 +328,25 @@ class _ModalEntregaState extends State<ModalEntrega> {
               const SizedBox(height: 16),
 
               // ── Data da entrega ───────────────────────────────────────
-              _Secao(label: 'DATA DA ENTREGA'),
-              const SizedBox(height: 8),
-              InkWell(
-                onTap: _selecionarData,
-                borderRadius: BorderRadius.circular(4),
-                child: InputDecorator(
-                  decoration: const InputDecoration(
-                    border: OutlineInputBorder(),
-                    isDense: true,
-                    suffixIcon: Icon(Icons.calendar_today_outlined, size: 18),
+              // Só na edição: na criação a data é a atual (= criado_em).
+              if (_modoEdicao) ...[
+                _Secao(label: 'DATA/HORA DA ENTREGA'),
+                const SizedBox(height: 8),
+                InkWell(
+                  onTap: _selecionarData,
+                  borderRadius: BorderRadius.circular(4),
+                  child: InputDecorator(
+                    decoration: const InputDecoration(
+                      border: OutlineInputBorder(),
+                      isDense: true,
+                      suffixIcon:
+                          Icon(Icons.edit_calendar_outlined, size: 18),
+                    ),
+                    child: Text(formatarDataHora(_dataEntrega)),
                   ),
-                  child: Text(_formatarData(_dataEntrega)),
                 ),
-              ),
-              const SizedBox(height: 16),
+                const SizedBox(height: 16),
+              ],
 
               // ── Veículo (opcional) ─────────────────────────────────────
               _Secao(label: 'VEÍCULO (OPCIONAL)'),
