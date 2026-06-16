@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import '../../../../features/pedidos/screens/widgets/lista_pedidos.dart'
-    show ChipStatus;
+import '../../../../core/widgets/chip_status.dart';
+import '../../../../core/utils/formatadores.dart';
 
 class DetalhesCliente extends StatelessWidget {
   final Map<String, dynamic> cliente;
@@ -143,7 +143,7 @@ class DetalhesCliente extends StatelessWidget {
                           ),
                           const SizedBox(height: 4),
                           Text(
-                            'R\$ ${saldoCredito.toStringAsFixed(2)}',
+                            formatarMoeda(saldoCredito),
                             style: TextStyle(
                               fontSize: 22,
                               fontWeight: FontWeight.bold,
@@ -255,7 +255,7 @@ class DetalhesCliente extends StatelessWidget {
                           ),
                         ),
                         title: Text(
-                          'Valor pendente do pedido #$id é R\$ ${valorPendente.toStringAsFixed(2)}',
+                          'Valor pendente do pedido #$id é ${formatarMoeda(valorPendente)}',
                           style:
                               const TextStyle(fontWeight: FontWeight.w600),
                         ),

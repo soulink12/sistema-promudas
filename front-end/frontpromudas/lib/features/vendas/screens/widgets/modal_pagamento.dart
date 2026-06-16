@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../../../core/services/forma_pagamento_service.dart';
 import '../../../../core/services/conta_service.dart';
+import '../../../../core/utils/formatadores.dart';
 
 /// Modal de registro de pagamento do pedido.
 /// Suporta pagamento dividido em múltiplas formas.
@@ -224,7 +225,7 @@ class _ModalPagamentoState extends State<ModalPagamento> {
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  'Total: R\$ ${widget.totalPedido.toStringAsFixed(2)}',
+                  'Total: ${formatarMoeda(widget.totalPedido)}',
                   style: TextStyle(fontSize: 14, color: Colors.grey[600]),
                 ),
                 const Divider(height: 24),
@@ -307,7 +308,7 @@ class _ModalPagamentoState extends State<ModalPagamento> {
                               ),
                             ),
                           Text(
-                            'R\$ ${(p['valor'] as double).toStringAsFixed(2)}',
+                            formatarMoeda(p['valor'] as double),
                             style: TextStyle(
                               fontSize: 14,
                               fontWeight: FontWeight.w600,
@@ -357,7 +358,7 @@ class _ModalPagamentoState extends State<ModalPagamento> {
                           ),
                         ),
                         Text(
-                          'R\$ ${valorDestaque.toStringAsFixed(2)}',
+                          formatarMoeda(valorDestaque),
                           style: TextStyle(
                             fontSize: 16,
                             fontWeight: FontWeight.bold,

@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import '../../../../core/widgets/seletor_data_hora.dart';
+import '../../../../core/utils/formatadores.dart';
 
 /// Card de exibição de uma entrega já registrada.
 /// Quando [onEditar]/[onExcluir] são informados, exibe o menu de ações.

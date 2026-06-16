@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import '../../../core/services/api_service.dart';
 import '../../../core/services/auth_service.dart';
 import '../../../core/services/carrinho_service.dart';
+import '../../../core/utils/formatadores.dart';
 import '../../auth/screens/login_screen.dart';
 import '../../clientes/screens/widgets/dialog_cadastro_cliente.dart';
 import '../../consulta/screens/consulta_hub_screen.dart';
@@ -276,11 +277,11 @@ class _TelaVendaState extends State<TelaVenda> {
     final Color corTexto;
 
     if (diferenca > 0.01) {
-      label = 'A receber: R\$ ${diferenca.toStringAsFixed(2)}';
+      label = 'A receber: ${formatarMoeda(diferenca)}';
       corFundo = cs.primaryContainer;
       corTexto = cs.onPrimaryContainer;
     } else if (diferenca < -0.01) {
-      label = 'Crédito: R\$ ${(-diferenca).toStringAsFixed(2)}';
+      label = 'Crédito: ${formatarMoeda(-diferenca)}';
       corFundo = cs.errorContainer;
       corTexto = cs.onErrorContainer;
     } else {
@@ -299,7 +300,7 @@ class _TelaVendaState extends State<TelaVenda> {
       child: Row(
         children: [
           Text(
-            'Já pago: R\$ ${_totalPagoReal.toStringAsFixed(2)}',
+            'Já pago: ${formatarMoeda(_totalPagoReal)}',
             style: TextStyle(fontSize: 13, color: cs.onSurfaceVariant),
           ),
           const Spacer(),
@@ -544,7 +545,7 @@ class _TelaVendaState extends State<TelaVenda> {
 
       if (mounted) {
         final mensagem = creditoGerado > 0.01
-            ? 'Pedido atualizado. Crédito de R\$ ${creditoGerado.toStringAsFixed(2)} adicionado ao cliente.'
+            ? 'Pedido atualizado. Crédito de ${formatarMoeda(creditoGerado)} adicionado ao cliente.'
             : 'Pedido atualizado com sucesso!';
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(

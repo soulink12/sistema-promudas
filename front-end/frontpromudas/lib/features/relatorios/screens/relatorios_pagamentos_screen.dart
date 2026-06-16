@@ -5,6 +5,7 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import '../../../core/services/api_service.dart';
 import '../../../core/widgets/botao_data.dart';
+import '../../../core/utils/formatadores.dart';
 
 class TelaRelatorioPagamentos extends StatefulWidget {
   const TelaRelatorioPagamentos({super.key});
@@ -289,7 +290,7 @@ class _TelaRelatorioPagamentosState extends State<TelaRelatorioPagamentos> {
                               ),
                             ),
                             Text(
-                              'R\$ ${_totalGeral.toStringAsFixed(2)}',
+                              formatarMoeda(_totalGeral),
                               style: const TextStyle(
                                 color: Colors.white,
                                 fontWeight: FontWeight.bold,
@@ -373,7 +374,7 @@ class _TelaRelatorioPagamentosState extends State<TelaRelatorioPagamentos> {
                                   ),
                                 ),
                                 Text(
-                                  'R\$ ${total.toStringAsFixed(2)}',
+                                  formatarMoeda(total),
                                   style: TextStyle(
                                     fontWeight: FontWeight.bold,
                                     fontSize: 15,

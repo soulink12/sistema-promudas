@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import '../../../../core/services/api_service.dart';
 import '../../../../core/services/local_entrega_service.dart';
 import '../../../../core/utils/api_feedback.dart';
+import '../../../../core/utils/formatadores.dart';
 import '../../../../core/widgets/seletor_data_hora.dart';
 
 /// Modal de entrega — cria uma nova entrega ou edita uma existente.

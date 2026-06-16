@@ -6,6 +6,8 @@ import 'package:flutter/material.dart';
 import '../../../core/services/api_service.dart';
 import '../../../core/widgets/botao_data.dart';
 import '../../../core/widgets/campo_busca_cliente.dart';
+import '../../../core/widgets/chip_status.dart';
+import '../../../core/utils/formatadores.dart';
 
 class TelaRelatorioPedidos extends StatefulWidget {
   const TelaRelatorioPedidos({super.key});
@@ -279,8 +281,7 @@ class _TelaRelatorioPedidosState extends State<TelaRelatorioPedidos> {
                 const SizedBox(width: 8),
                 Expanded(
                   child: _CardResumo(
-                    valor:
-                        'R\$ ${(resumo['valorTotal'] as num).toStringAsFixed(2)}',
+                    valor: formatarMoeda(resumo['valorTotal'] as num),
                     label: 'valor total',
                   ),
                 ),
@@ -316,7 +317,7 @@ class _TelaRelatorioPedidosState extends State<TelaRelatorioPedidos> {
                   for (final entry
                       in (resumo['porStatusPagamento'] as Map).entries)
                     if ((entry.value as int) > 0)
-                      _ChipStatus(
+                      ChipStatus(
                           status: entry.key as String,
                           count: entry.value as int),
                 ],
@@ -436,44 +437,6 @@ class _CardResumo extends StatelessWidget {
   }
 }
 
-// ── Chip de contagem por status ────────────────────────────────────────────
-
-class _ChipStatus extends StatelessWidget {
-  final String status;
-  final int count;
-
-  const _ChipStatus({required this.status, required this.count});
-
-  Color get _cor {
-    switch (status) {
-      case 'Pago':
-        return Colors.green[700]!;
-      case 'Crédito':
-        return Colors.blue[700]!;
-      case 'Parcial':
-        return Colors.orange[700]!;
-      default:
-        return Colors.grey[600]!;
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final cor = _cor;
-    return Chip(
-      label: Text(
-        '$status: $count',
-        style: TextStyle(
-            color: cor, fontSize: 12, fontWeight: FontWeight.bold),
-      ),
-      backgroundColor: cor.withValues(alpha: 0.08),
-      side: BorderSide(color: cor.withValues(alpha: 0.3)),
-      padding: const EdgeInsets.symmetric(horizontal: 4),
-      visualDensity: VisualDensity.compact,
-    );
-  }
-}
-
 // ── Card de pedido individual ──────────────────────────────────────────────
 
 class _CardPedido extends StatelessWidget {
@@ -481,25 +444,15 @@ class _CardPedido extends StatelessWidget {
 
   const _CardPedido({required this.pedido});
 
-  String _formatarDataLocal(String? iso) {
-    if (iso == null) return '—';
-    final dt = DateTime.tryParse(iso)?.toLocal();
-    if (dt == null) return '—';
-    return '${dt.day.toString().padLeft(2, '0')}/'
-        '${dt.month.toString().padLeft(2, '0')}/${dt.year}  '
-        '${dt.hour.toString().padLeft(2, '0')}:'
-        '${dt.minute.toString().padLeft(2, '0')}';
-  }
-
   @override
   Widget build(BuildContext context) {
     final id = pedido['id'] as int;
     final cliente = pedido['cliente'] as String? ?? '—';
-    final valor = (pedido['valor_total'] as num).toStringAsFixed(2);
+    final valor = formatarMoeda(pedido['valor_total'] as num);
     final qtdItens = pedido['qtd_itens'] as int? ?? 0;
     final statusPag = pedido['status_pagamento'] as String? ?? '—';
     final statusRet = pedido['status_entrega'] as String? ?? '—';
-    final data = _formatarDataLocal(pedido['criado_em'] as String?);
+    final data = formatarDataHora(pedido['criado_em']);
 
     return Card(
       child: Padding(
@@ -519,7 +472,7 @@ class _CardPedido extends StatelessWidget {
                   ),
                 ),
                 Text(
-                  'R\$ $valor',
+                  valor,
                   style: TextStyle(
                     fontWeight: FontWeight.bold,
                     fontSize: 14,
@@ -545,25 +498,9 @@ class _CardPedido extends StatelessWidget {
             const SizedBox(height: 8),
             Row(
               children: [
-                _PillStatus(
-                  label: statusPag,
-                  cor: statusPag == 'Pago'
-                      ? Colors.green[700]!
-                      : statusPag == 'Crédito'
-                          ? Colors.blue[700]!
-                          : statusPag == 'Parcial'
-                              ? Colors.orange[700]!
-                              : Colors.grey[600]!,
-                ),
+                ChipStatus(status: statusPag),
                 const SizedBox(width: 8),
-                _PillStatus(
-                  label: statusRet,
-                  cor: statusRet == 'Entregue'
-                      ? Colors.green[700]!
-                      : statusRet == 'Parcial'
-                          ? Colors.orange[700]!
-                          : Colors.grey[600]!,
-                ),
+                ChipStatus(status: statusRet),
               ],
             ),
           ],
@@ -573,26 +510,3 @@ class _CardPedido extends StatelessWidget {
   }
 }
 
-class _PillStatus extends StatelessWidget {
-  final String label;
-  final Color cor;
-
-  const _PillStatus({required this.label, required this.cor});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
-      decoration: BoxDecoration(
-        color: cor.withValues(alpha: 0.1),
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: cor.withValues(alpha: 0.4)),
-      ),
-      child: Text(
-        label,
-        style: TextStyle(
-            color: cor, fontSize: 11, fontWeight: FontWeight.w600),
-      ),
-    );
-  }
-}

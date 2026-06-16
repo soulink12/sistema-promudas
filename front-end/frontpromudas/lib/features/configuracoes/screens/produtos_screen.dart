@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../../core/services/api_service.dart';
+import '../../../core/utils/formatadores.dart';
 
 class TelaProdutos extends StatefulWidget {
   const TelaProdutos({super.key});
@@ -114,7 +115,7 @@ class _TelaProdutosState extends State<TelaProdutos> {
                         ),
                       ),
                       subtitle: Text(
-                        'R\$ ${preco.toStringAsFixed(2)}',
+                        formatarMoeda(preco),
                         style: TextStyle(
                           color: ativo
                               ? Colors.green[700]

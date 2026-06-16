@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../../../../core/services/forma_pagamento_service.dart';
 import '../../../../core/services/conta_service.dart';
+import '../../../../core/utils/formatadores.dart';
 import '../../../../core/widgets/seletor_data_hora.dart';
 
 /// Diálogo para editar um pagamento (valor, forma e conta).

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
-import 'lista_pedidos.dart' show ChipStatus;
+import '../../../../core/widgets/chip_status.dart';
 import '../../../../core/widgets/seletor_data_hora.dart';
+import '../../../../core/utils/formatadores.dart';
 
 class DetalhesPedido extends StatelessWidget {
   final Map<String, dynamic> pedido;
@@ -37,7 +38,7 @@ class DetalhesPedido extends StatelessWidget {
     final total = _toDouble(pedido['valor_total']);
     final ajuste = _toDouble(pedido['ajuste']);
     final dataPedidoRaw = pedido['data_pedido'] ?? pedido['criado_em'];
-    final data = _formatarDataHora(dataPedidoRaw);
+    final data = formatarDataHora(dataPedidoRaw);
     final statusPag = pedido['status_pagamento'] as String? ?? 'Pendente';
     final statusRet = pedido['status_entrega'] as String? ?? 'Pendente';
     final obs = pedido['observacoes'] as String?;
@@ -162,7 +163,7 @@ class DetalhesPedido extends StatelessWidget {
                                 child: Row(
                                   mainAxisSize: MainAxisSize.min,
                                   children: [
-                                    Text(data ?? '—',
+                                    Text(data,
                                         style: TextStyle(
                                             fontSize: 13,
                                             color: Theme.of(context)
@@ -185,7 +186,7 @@ class DetalhesPedido extends StatelessWidget {
                         crossAxisAlignment: CrossAxisAlignment.end,
                         children: [
                           Text(
-                            'R\$ ${total.toStringAsFixed(2)}',
+                            formatarMoeda(total),
                             style: TextStyle(
                                 fontSize: 22,
                                 fontWeight: FontWeight.bold,
@@ -194,7 +195,7 @@ class DetalhesPedido extends StatelessWidget {
                           if (ajuste != 0) ...[
                             const SizedBox(height: 2),
                             Text(
-                              '${ajuste < 0 ? 'Desconto' : 'Acréscimo'}: R\$ ${ajuste.abs().toStringAsFixed(2)}',
+                              '${ajuste < 0 ? 'Desconto' : 'Acréscimo'}: ${formatarMoeda(ajuste.abs())}',
                               style: TextStyle(
                                   fontSize: 12,
                                   color: ajuste < 0
@@ -205,7 +206,7 @@ class DetalhesPedido extends StatelessWidget {
                           if (saldoCredito > 0.005) ...[
                             const SizedBox(height: 4),
                             Text(
-                              'A receber: R\$ ${saldoCredito.toStringAsFixed(2)}',
+                              'A receber: ${formatarMoeda(saldoCredito)}',
                               style: TextStyle(
                                   fontSize: 13,
                                   fontWeight: FontWeight.w600,
@@ -221,7 +222,7 @@ class DetalhesPedido extends StatelessWidget {
                                     size: 14, color: Colors.amber[800]),
                                 const SizedBox(width: 4),
                                 Text(
-                                  'Crédito de R\$ ${(totalPagoReal - total).toStringAsFixed(2)} adicionado ao cliente.',
+                                  'Crédito de ${formatarMoeda(totalPagoReal - total)} adicionado ao cliente.',
                                   style: TextStyle(
                                       fontSize: 12, color: Colors.amber[800]),
                                 ),
@@ -285,8 +286,8 @@ class DetalhesPedido extends StatelessWidget {
                               cells: [
                                 nomeProduto,
                                 '$qtd',
-                                'R\$ ${preco.toStringAsFixed(2)}',
-                                'R\$ ${totalItem.toStringAsFixed(2)}',
+                                formatarMoeda(preco),
+                                formatarMoeda(totalItem),
                               ],
                               flex: const [4, 1, 2, 2],
                             ),
@@ -422,7 +423,7 @@ class _LinhaPagamento extends StatelessWidget {
     final cs = Theme.of(context).colorScheme;
 
     final dataPag =
-        _formatarDataHora(pag['data_pagamento'] ?? pag['criado_em']) ?? '—';
+        formatarDataHora(pag['data_pagamento'] ?? pag['criado_em']);
     final formaBase = pag['forma_pagamento'] as String? ?? '—';
     final parcelas = pag['parcelas'] as int? ?? 1;
     final forma = parcelas > 1 ? '$formaBase ($parcelas' 'x)' : formaBase;
@@ -499,7 +500,7 @@ class _LinhaPagamento extends StatelessWidget {
           Padding(
             padding: const EdgeInsets.only(top: 2),
             child: Text(
-              'R\$ ${valor.toStringAsFixed(2)}',
+              formatarMoeda(valor),
               style: TextStyle(
                 fontWeight: FontWeight.bold,
                 fontSize: 15,
@@ -564,7 +565,7 @@ class _BlocoEntrega extends StatelessWidget {
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
 
-    final data = _formatarDataHora(entrega['data_entrega']) ?? '—';
+    final data = formatarDataHora(entrega['data_entrega']);
     final local = entrega['local_entrega'] as String? ?? '—';
     final motorista = entrega['motorista'] as String?;
     final placa = entrega['placa_veiculo'] as String?;
@@ -725,16 +726,3 @@ String _textoNota(String status, String? numero, String? data) {
   return 'Nota: $status';
 }
 
-String? _formatarDataHora(dynamic valor) {
-  if (valor == null) return null;
-  try {
-    final dt = DateTime.parse(valor.toString()).toLocal();
-    return '${dt.day.toString().padLeft(2, '0')}/'
-        '${dt.month.toString().padLeft(2, '0')}/'
-        '${dt.year}  '
-        '${dt.hour.toString().padLeft(2, '0')}:'
-        '${dt.minute.toString().padLeft(2, '0')}';
-  } catch (_) {
-    return valor.toString();
-  }
-}

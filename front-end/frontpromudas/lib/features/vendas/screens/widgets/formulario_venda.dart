@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../../core/utils/formatadores.dart';
 
 /// Widget que exibe a tabela de itens adicionados à venda (carrinho).
 /// Permite edição inline de quantidade e preço unitário por item.
@@ -156,11 +157,11 @@ class _FormularioVendaWidgetState extends State<FormularioVendaWidget> {
     if (preco < precoOriginal) {
       cor = Colors.blue[700];
       icone = Icons.arrow_downward_rounded;
-      tooltipOriginal = 'Sistema: R\$ ${precoOriginal.toStringAsFixed(2)}';
+      tooltipOriginal = 'Sistema: ${formatarMoeda(precoOriginal)}';
     } else if (preco > precoOriginal) {
       cor = Colors.orange[800];
       icone = Icons.arrow_upward_rounded;
-      tooltipOriginal = 'Sistema: R\$ ${precoOriginal.toStringAsFixed(2)}';
+      tooltipOriginal = 'Sistema: ${formatarMoeda(precoOriginal)}';
     }
 
     final campo = SizedBox(
@@ -268,7 +269,7 @@ class _FormularioVendaWidgetState extends State<FormularioVendaWidget> {
                         DataCell(_celulaPreco(item)),
                         DataCell(
                           Text(
-                            'R\$ ${(item['total'] as double).toStringAsFixed(2)}',
+                            formatarMoeda(item['total'] as double),
                             style: const TextStyle(fontWeight: FontWeight.w500),
                           ),
                         ),
@@ -329,7 +330,7 @@ class _FormularioVendaWidgetState extends State<FormularioVendaWidget> {
                 Text('Subtotal:',
                     style: TextStyle(fontSize: 14, color: cs.onSurfaceVariant)),
                 const SizedBox(width: 8),
-                Text('R\$ ${subtotal.toStringAsFixed(2)}',
+                Text(formatarMoeda(subtotal),
                     style: TextStyle(fontSize: 14, color: cs.onSurfaceVariant)),
               ],
             ),
@@ -354,7 +355,7 @@ class _FormularioVendaWidgetState extends State<FormularioVendaWidget> {
                 ),
                 const SizedBox(width: 8),
                 Text(
-                  '${widget.ajuste < 0 ? '-' : '+'}R\$ ${widget.ajuste.abs().toStringAsFixed(2)}',
+                  '${widget.ajuste < 0 ? '-' : '+'}${formatarMoeda(widget.ajuste.abs())}',
                   style: TextStyle(
                     fontSize: 13,
                     fontWeight: FontWeight.bold,
@@ -382,7 +383,7 @@ class _FormularioVendaWidgetState extends State<FormularioVendaWidget> {
                     ),
                     const SizedBox(width: 12),
                     Text(
-                      'R\$ ${totalFinal.toStringAsFixed(2)}',
+                      formatarMoeda(totalFinal),
                       style: TextStyle(
                         fontSize: 20,
                         fontWeight: FontWeight.bold,
@@ -590,7 +591,7 @@ class _DialogAjusteState extends State<_DialogAjuste> {
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
                         const Text('Subtotal:'),
-                        Text('R\$ ${widget.subtotal.toStringAsFixed(2)}'),
+                        Text(formatarMoeda(widget.subtotal)),
                       ],
                     ),
                     if (ajustePreview != 0) ...[
@@ -607,7 +608,7 @@ class _DialogAjusteState extends State<_DialogAjuste> {
                             ),
                           ),
                           Text(
-                            '${ajustePreview < 0 ? '-' : '+'}R\$ ${ajustePreview.abs().toStringAsFixed(2)}',
+                            '${ajustePreview < 0 ? '-' : '+'}${formatarMoeda(ajustePreview.abs())}',
                             style: TextStyle(
                               fontWeight: FontWeight.bold,
                               color: _ehDesconto
@@ -625,7 +626,7 @@ class _DialogAjusteState extends State<_DialogAjuste> {
                         const Text('Total:',
                             style: TextStyle(fontWeight: FontWeight.bold)),
                         Text(
-                          'R\$ ${totalPreview.toStringAsFixed(2)}',
+                          formatarMoeda(totalPreview),
                           style: TextStyle(
                             fontWeight: FontWeight.bold,
                             color: cs.primary,
@@ -664,7 +665,7 @@ class _DialogAjusteState extends State<_DialogAjuste> {
               final sinalizado = valor * (_ehDesconto ? -1 : 1);
               final descricao = _ehPercentual
                   ? '${_ehDesconto ? 'Desconto' : 'Acréscimo'} ${valor.toStringAsFixed(1)}%'
-                  : '${_ehDesconto ? 'Desconto' : 'Acréscimo'} R\$ ${valor.toStringAsFixed(2)}';
+                  : '${_ehDesconto ? 'Desconto' : 'Acréscimo'} ${formatarMoeda(valor)}';
               widget.onAplicar(sinalizado, descricao,
                   ehPercentual: _ehPercentual);
             }

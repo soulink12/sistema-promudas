@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../../core/services/api_service.dart';
 import '../../../core/services/conta_service.dart';
+import '../../../core/utils/formatadores.dart';
 
 /// Consulta dos pagamentos que ainda não foram colocados em uma conta.
 /// Ex: pagamentos em dinheiro (e futuramente cheque) registrados no PDV sem
@@ -190,7 +191,7 @@ class _CardPagamentoSemConta extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
                     Text(
-                      'R\$ ${valor.toStringAsFixed(2)}',
+                      formatarMoeda(valor),
                       style: TextStyle(
                           fontWeight: FontWeight.bold,
                           fontSize: 15,

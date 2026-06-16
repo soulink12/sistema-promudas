@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import '../../../../core/widgets/chip_status.dart';
+import '../../../../core/utils/formatadores.dart';
 
 class ListaPedidos extends StatelessWidget {
   final List<Map<String, dynamic>> pedidos;
@@ -30,7 +32,7 @@ class ListaPedidos extends StatelessWidget {
         final nomeCliente =
             p['clientes']?['nome'] as String? ?? 'Cliente desconhecido';
         final total = _toDouble(p['valor_total']);
-        final data = _formatarDataHora(p['data_pedido'] ?? p['criado_em']);
+        final data = formatarDataHora(p['data_pedido'] ?? p['criado_em']);
         final statusPag = p['status_pagamento'] as String? ?? 'Pendente';
         final statusEntrega = p['status_entrega'] as String? ?? 'Pendente';
         final statusNota = _statusNotaPedido(p['pagamentos'] as List? ?? []);
@@ -60,7 +62,7 @@ class ListaPedidos extends StatelessWidget {
                             ),
                             const SizedBox(height: 4),
                             Text(
-                              'Pedido #${p['id']} · ${data ?? '—'}',
+                              'Pedido #${p['id']} · $data',
                               style: TextStyle(
                                 color: cs.onSurfaceVariant,
                                 fontSize: 12,
@@ -71,7 +73,7 @@ class ListaPedidos extends StatelessWidget {
                       ),
                       const SizedBox(width: 12),
                       Text(
-                        'R\$ ${total.toStringAsFixed(2)}',
+                        formatarMoeda(total),
                         style: TextStyle(
                           fontWeight: FontWeight.bold,
                           fontSize: 15,
@@ -96,47 +98,6 @@ class ListaPedidos extends StatelessWidget {
           ),
         );
       },
-    );
-  }
-}
-
-// ── Widgets auxiliares ────────────────────────────────────────────────────────
-
-class ChipStatus extends StatelessWidget {
-  final String status;
-  final String prefixo;
-
-  const ChipStatus({super.key, required this.status, this.prefixo = ''});
-
-  @override
-  Widget build(BuildContext context) {
-    Color cor;
-    switch (status.toLowerCase()) {
-      case 'pago':
-      case 'realizada':
-      case 'entregue':
-      case 'emitida':
-        cor = Colors.green;
-        break;
-      case 'crédito':
-      case 'processando':
-        cor = Colors.blue;
-        break;
-      case 'parcial':
-        cor = Colors.orange;
-        break;
-      case 'rejeitada':
-        cor = Colors.red;
-        break;
-      default:
-        cor = Colors.grey; // Pendente / não informado
-    }
-    return Chip(
-      label: Text('$prefixo$status', style: const TextStyle(fontSize: 11)),
-      backgroundColor: cor.withAlpha(30),
-      side: BorderSide(color: cor.withAlpha(80)),
-      padding: EdgeInsets.zero,
-      visualDensity: VisualDensity.compact,
     );
   }
 }
@@ -167,17 +128,3 @@ String _statusNotaPedido(List pagamentos) {
 
 double _toDouble(dynamic v) =>
     v == null ? 0.0 : double.tryParse(v.toString()) ?? 0.0;
-
-String? _formatarDataHora(dynamic valor) {
-  if (valor == null) return null;
-  try {
-    final dt = DateTime.parse(valor.toString()).toLocal();
-    return '${dt.day.toString().padLeft(2, '0')}/'
-        '${dt.month.toString().padLeft(2, '0')}/'
-        '${dt.year}  '
-        '${dt.hour.toString().padLeft(2, '0')}:'
-        '${dt.minute.toString().padLeft(2, '0')}';
-  } catch (_) {
-    return valor.toString();
-  }
-}
