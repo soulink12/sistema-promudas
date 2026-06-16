@@ -1,5 +1,6 @@
 const prisma = require('../config/database');
 const BusinessError = require('../utils/BusinessError');
+const formaPagamentoService = require('./formaPagamentoService');
 
 // Recalcula o status de pagamento do pedido com base na soma real dos pagamentos no banco.
 // Pagamentos com forma de pagamento posterior (ex: crediário) não contam como valor recebido.
@@ -9,10 +10,7 @@ const recalcularStatusPedido = async (pedido_id) => {
             where: { id: parseInt(pedido_id) },
             include: { pagamentos: true }
         }),
-        prisma.formas_pagamento.findMany({
-            where: { pagamento_posterior: true },
-            select: { nome: true }
-        })
+        formaPagamentoService.listarPosteriores()
     ]);
 
     if (!pedido) return;
@@ -53,10 +51,7 @@ const criarPagamento = async (dadosPagamento) => {
             where: { id: parseInt(pedido_id) },
             include: { pagamentos: true }
         }),
-        prisma.formas_pagamento.findMany({
-            where: { pagamento_posterior: true },
-            select: { nome: true }
-        })
+        formaPagamentoService.listarPosteriores()
     ]);
 
     if (!pedido) {
@@ -126,10 +121,7 @@ const listarPagamentos = async () => {
 // Ex: pagamentos em dinheiro (e futuramente cheque) que entram no PDV sem conta definida.
 // Exclui crediário/posterior (esses são "a receber", não dinheiro recebido sem conta).
 const listarPagamentosPendentesDeConta = async () => {
-    const formasPosteriores = await prisma.formas_pagamento.findMany({
-        where: { pagamento_posterior: true },
-        select: { nome: true }
-    });
+    const formasPosteriores = await formaPagamentoService.listarPosteriores();
     const nomesPosteriores = formasPosteriores.map(f => f.nome);
 
     const where = {

@@ -1,16 +1,16 @@
 const relatorioService = require('../services/relatorioService');
 
-const relatorioPagamentos = async (req, res) => {
+const relatorioPagamentos = async (req, res, next) => {
     try {
         const { de, ate, forma } = req.query;
         const dados = await relatorioService.relatorioPagamentos({ de, ate, forma });
         res.status(200).json(dados);
     } catch (erro) {
-        res.status(erro.status || 500).json({ erro: erro.message || 'Erro ao gerar relatório.' });
+        next(erro);
     }
 };
 
-const relatorioPDF = async (req, res) => {
+const relatorioPDF = async (req, res, next) => {
     try {
         const { de, ate, forma } = req.query;
         const buffer = await relatorioService.gerarRelatorioPDF({ de, ate, forma });
@@ -18,21 +18,21 @@ const relatorioPDF = async (req, res) => {
         res.setHeader('Content-Disposition', 'attachment; filename="relatorio_pagamentos.pdf"');
         res.status(200).send(buffer);
     } catch (erro) {
-        res.status(erro.status || 500).json({ erro: erro.message || 'Erro ao gerar PDF.' });
+        next(erro);
     }
 };
 
-const relatorioPedidos = async (req, res) => {
+const relatorioPedidos = async (req, res, next) => {
     try {
         const { de, ate, statusPagamento, statusEntrega, clienteId } = req.query;
         const dados = await relatorioService.relatorioPedidos({ de, ate, statusPagamento, statusEntrega, clienteId });
         res.status(200).json(dados);
     } catch (erro) {
-        res.status(erro.status || 500).json({ erro: erro.message || 'Erro ao gerar relatório.' });
+        next(erro);
     }
 };
 
-const relatorioPedidosPDF = async (req, res) => {
+const relatorioPedidosPDF = async (req, res, next) => {
     try {
         const { de, ate, statusPagamento, statusEntrega, clienteId } = req.query;
         const buffer = await relatorioService.gerarRelatorioPedidosPDF({ de, ate, statusPagamento, statusEntrega, clienteId });
@@ -40,7 +40,7 @@ const relatorioPedidosPDF = async (req, res) => {
         res.setHeader('Content-Disposition', 'attachment; filename="relatorio_pedidos.pdf"');
         res.status(200).send(buffer);
     } catch (erro) {
-        res.status(erro.status || 500).json({ erro: erro.message || 'Erro ao gerar PDF.' });
+        next(erro);
     }
 };
 

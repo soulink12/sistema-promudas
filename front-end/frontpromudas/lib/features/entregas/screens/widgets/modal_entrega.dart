@@ -1,8 +1,8 @@
-import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../../../../core/services/api_service.dart';
 import '../../../../core/services/local_entrega_service.dart';
+import '../../../../core/utils/api_feedback.dart';
 import '../../../../core/widgets/seletor_data_hora.dart';
 
 /// Modal de entrega — cria uma nova entrega ou edita uma existente.
@@ -185,24 +185,11 @@ class _ModalEntregaState extends State<ModalEntrega> {
       widget.onSalvo();
     } catch (e) {
       setState(() => _salvando = false);
+      final acao = _modoEdicao ? 'atualizar' : 'registrar';
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(_extrairErro(e)),
-            backgroundColor: Colors.red,
-          ),
-        );
+        mostrarErro(context, extrairErroApi(e, 'Erro ao $acao entrega.'));
       }
     }
-  }
-
-  String _extrairErro(Object e) {
-    final acao = _modoEdicao ? 'atualizar' : 'registrar';
-    if (e is DioException) {
-      final data = e.response?.data;
-      if (data is Map) return data['erro'] as String? ?? 'Erro ao $acao entrega.';
-    }
-    return 'Erro ao $acao entrega.';
   }
 
   Future<void> _selecionarData() async {

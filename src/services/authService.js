@@ -1,5 +1,7 @@
 const prisma = require('../config/database');
 const bcrypt = require('bcrypt');
+const jwt = require('jsonwebtoken');
+const BusinessError = require('../utils/BusinessError');
 
 const registrarUsuario = async (dadosUsuario) => {
     // Verifica se o email já existe no banco
@@ -8,7 +10,7 @@ const registrarUsuario = async (dadosUsuario) => {
     });
     
     if (usuarioExistente) {
-        throw new Error('Este email já está em uso.');
+        throw new BusinessError('Este email já está em uso.', 400);
     }
 
     // Criptografa a senha
@@ -34,19 +36,29 @@ const validarLogin = async (email, senha) => {
     });
     
     if (!usuario || !usuario.ativo) {
-        throw new Error('Email ou senha inválidos.');
+        throw new BusinessError('Email ou senha inválidos.', 401);
     }
 
     // Compara a senha
     const senhaValida = await bcrypt.compare(senha, usuario.senha_hash);
     if (!senhaValida) {
-        throw new Error('Email ou senha inválidos.');
+        throw new BusinessError('Email ou senha inválidos.', 401);
     }
 
     return usuario;
 };
 
+// Gera o token JWT de um usuário autenticado (payload, segredo e expiração padrão).
+const gerarToken = (usuario) => {
+    return jwt.sign(
+        { id: usuario.id, email: usuario.email },
+        process.env.JWT_SECRET,
+        { expiresIn: '8h' }
+    );
+};
+
 module.exports = {
     registrarUsuario,
-    validarLogin
+    validarLogin,
+    gerarToken
 };

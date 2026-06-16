@@ -29,4 +29,12 @@ const deletarForma = async (id) => {
     await prisma.formas_pagamento.update({ where: { id }, data: { ativo: false } });
 };
 
-module.exports = { listarFormasPagamento, criarForma, atualizarForma, deletarForma };
+// Lista as formas marcadas como pagamento posterior (crediário). Usado para excluir
+// esses pagamentos do cálculo de valor efetivamente recebido.
+const listarPosteriores = () =>
+    prisma.formas_pagamento.findMany({
+        where: { pagamento_posterior: true },
+        select: { nome: true }
+    });
+
+module.exports = { listarFormasPagamento, criarForma, atualizarForma, deletarForma, listarPosteriores };

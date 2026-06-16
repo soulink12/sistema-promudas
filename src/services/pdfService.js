@@ -1,6 +1,7 @@
 const PDFDocument = require('pdfkit');
 const prisma = require('../config/database');
 const BusinessError = require('../utils/BusinessError');
+const formaPagamentoService = require('./formaPagamentoService');
 
 const moeda = (v) => `R$ ${parseFloat(v || 0).toFixed(2).replace('.', ',')}`;
 
@@ -52,10 +53,7 @@ const gerarPedidoPDF = async (pedidoId) => {
                 }
             }
         }),
-        prisma.formas_pagamento.findMany({
-            where: { pagamento_posterior: true },
-            select: { nome: true }
-        })
+        formaPagamentoService.listarPosteriores()
     ]);
 
     if (!pedido) {

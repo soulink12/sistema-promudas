@@ -14,6 +14,7 @@ const formaPagamentoRoutes = require('./routes/formaPagamentoRoutes');
 const relatorioRoutes = require('./routes/relatorioRoutes');
 
 const { verificarToken } = require('./middlewares/authMiddleware.js');
+const errorHandler = require('./middlewares/errorHandler');
 
 const prismaTest = require('./config/database');
 console.log("Prisma carregado com sucesso:", !!prismaTest);
@@ -38,6 +39,9 @@ app.use('/api/pagamentos', pagamentoRoutes);
 app.use('/api/entregas', entregaRoutes);
 app.use('/api/locais-entrega', locaisEntregaRoutes);
 app.use('/api/contas', contaRoutes);
+
+// Tratamento central de erro — sempre por último, depois de todas as rotas.
+app.use(errorHandler);
 
 const PORT = process.env.PORT || 6072;
 app.listen(PORT, () => {

@@ -1,7 +1,7 @@
 const pedidoService = require('../services/pedidoService');
 const pdfService = require('../services/pdfService');
 
-const criarPedido = async (req, res) => {
+const criarPedido = async (req, res, next) => {
     try {
         const dados = req.body;
 
@@ -17,24 +17,22 @@ const criarPedido = async (req, res) => {
             data: novoPedido
         });
 
-    } catch (error) {
-        console.error('Erro ao criar pedido:', error);
-        return res.status(500).json({ erro: 'Erro interno ao registrar pedido.' });
+    } catch (erro) {
+        next(erro);
     }
 };
 
-const buscarPedido = async (req, res) => {
+const buscarPedido = async (req, res, next) => {
     try {
         const pedido = await pedidoService.buscarPedido(req.params.id);
         if (!pedido) return res.status(404).json({ erro: 'Pedido não encontrado.' });
         res.json(pedido);
-    } catch (error) {
-        console.error('Erro ao buscar pedido:', error);
-        res.status(500).json({ erro: 'Erro ao buscar pedido.' });
+    } catch (erro) {
+        next(erro);
     }
 };
 
-const listarPedidos = async (req, res) => {
+const listarPedidos = async (req, res, next) => {
     try {
         const { cliente, statusEntrega, statusPagamento } = req.query;
         const filtros = {};
@@ -43,41 +41,38 @@ const listarPedidos = async (req, res) => {
         if (statusPagamento) filtros.statusPagamento = statusPagamento;
         const pedidos = await pedidoService.listarPedidos(filtros);
         return res.status(200).json(pedidos);
-    } catch (error) {
-        console.error('Erro ao buscar pedidos:', error);
-        return res.status(500).json({ erro: 'Erro interno do servidor.' });
+    } catch (erro) {
+        next(erro);
     }
 };
 
-const atualizarPedido = async (req, res) => {
+const atualizarPedido = async (req, res, next) => {
     try {
         const pedido = await pedidoService.atualizarPedido(req.params.id, req.body);
         res.json({ ...pedido, creditoGerado: pedido.creditoGerado ?? 0 });
-    } catch (error) {
-        console.error('Erro ao atualizar pedido:', error);
-        res.status(error.status || 500).json({ erro: error.message || 'Erro ao atualizar pedido.' });
+    } catch (erro) {
+        next(erro);
     }
 };
 
-const eliminarPedido = async (req, res) => {
+const eliminarPedido = async (req, res, next) => {
     try {
         await pedidoService.eliminarPedido(req.params.id);
         res.status(204).send();
-    } catch (error) {
-        res.status(500).json({ erro: 'Erro ao eliminar pedido.' });
+    } catch (erro) {
+        next(erro);
     }
 };
 
-const gerarPDF = async (req, res) => {
+const gerarPDF = async (req, res, next) => {
     try {
         const buffer = await pdfService.gerarPedidoPDF(req.params.id);
         res.setHeader('Content-Type', 'application/pdf');
         res.setHeader('Content-Disposition', `attachment; filename="pedido_${req.params.id}.pdf"`);
         res.setHeader('Content-Length', buffer.length);
         res.send(buffer);
-    } catch (error) {
-        console.error('Erro ao gerar PDF:', error);
-        res.status(error.status || 500).json({ erro: error.message || 'Erro ao gerar PDF do pedido.' });
+    } catch (erro) {
+        next(erro);
     }
 };
 

@@ -1,5 +1,38 @@
 const prisma = require('../config/database');
 const { recalcularStatusPedido } = require('./pagamentoService');
+const formaPagamentoService = require('./formaPagamentoService');
+
+// Campos de pagamento retornados ao montar um pedido completo (listar/buscar).
+const PAGAMENTO_SELECT = {
+    id: true,
+    valor_pago: true,
+    data_pagamento: true,
+    forma_pagamento: true,
+    parcelas: true,
+    conta: true,
+    nome_pagador: true,
+    cpf_cnpj_pagador: true,
+    status_nota: true,
+    numero_nota: true,
+    data_emissao_nota: true,
+    criado_em: true,
+};
+
+// Include padrão de um pedido completo: cliente, itens (com nome do produto),
+// pagamentos (PAGAMENTO_SELECT) e entregas com seus itens.
+const PEDIDO_INCLUDE = {
+    clientes: { select: { id: true, nome: true } },
+    itens_pedido: {
+        include: { produtos: { select: { nome: true } } }
+    },
+    pagamentos: {
+        select: PAGAMENTO_SELECT,
+        orderBy: { criado_em: 'asc' }
+    },
+    entregas: {
+        include: { itens_entrega: true }
+    }
+};
 
 const criarPedido = async (dados) => {
     return await prisma.pedidos.create({
@@ -49,37 +82,9 @@ const listarPedidos = async (filtros = {}) => {
             where,
             orderBy: { criado_em: 'desc' },
             take: (filtros.cliente || filtros.statusPagamento) ? 100 : 20,
-            include: {
-                clientes: { select: { id: true, nome: true } },
-                itens_pedido: {
-                    include: { produtos: { select: { nome: true } } }
-                },
-                pagamentos: {
-                    select: {
-                        id: true,
-                        valor_pago: true,
-                        data_pagamento: true,
-                        forma_pagamento: true,
-                        parcelas: true,
-                        conta: true,
-                        nome_pagador: true,
-                        cpf_cnpj_pagador: true,
-                        status_nota: true,
-                        numero_nota: true,
-                        data_emissao_nota: true,
-                        criado_em: true,
-                    },
-                    orderBy: { criado_em: 'asc' }
-                },
-                entregas: {
-                    include: { itens_entrega: true }
-                }
-            }
+            include: PEDIDO_INCLUDE
         }),
-        prisma.formas_pagamento.findMany({
-            where: { pagamento_posterior: true },
-            select: { nome: true }
-        })
+        formaPagamentoService.listarPosteriores()
     ]);
 
     const nomesPosteriores = new Set(formasPosteriores.map(f => f.nome));
@@ -113,10 +118,7 @@ const atualizarPedido = async (id, dados) => {
                 pagamentos: { select: { valor_pago: true, forma_pagamento: true } },
             },
         }),
-        prisma.formas_pagamento.findMany({
-            where: { pagamento_posterior: true },
-            select: { nome: true },
-        }),
+        formaPagamentoService.listarPosteriores(),
     ]);
 
     const ajuste = camposPedido.ajuste !== undefined
@@ -174,37 +176,9 @@ const buscarPedido = async (id) => {
     const [pedido, formasPosteriores] = await Promise.all([
         prisma.pedidos.findUnique({
             where: { id: parseInt(id), ativo: true },
-            include: {
-                clientes: { select: { id: true, nome: true } },
-                itens_pedido: {
-                    include: { produtos: { select: { nome: true } } }
-                },
-                pagamentos: {
-                    select: {
-                        id: true,
-                        valor_pago: true,
-                        data_pagamento: true,
-                        forma_pagamento: true,
-                        parcelas: true,
-                        conta: true,
-                        nome_pagador: true,
-                        cpf_cnpj_pagador: true,
-                        status_nota: true,
-                        numero_nota: true,
-                        data_emissao_nota: true,
-                        criado_em: true,
-                    },
-                    orderBy: { criado_em: 'asc' }
-                },
-                entregas: {
-                    include: { itens_entrega: true }
-                }
-            }
+            include: PEDIDO_INCLUDE
         }),
-        prisma.formas_pagamento.findMany({
-            where: { pagamento_posterior: true },
-            select: { nome: true }
-        })
+        formaPagamentoService.listarPosteriores()
     ]);
 
     if (!pedido) return null;

@@ -1,15 +1,15 @@
 const formaPagamentoService = require('../services/formaPagamentoService');
 
-const listarFormasPagamento = async (req, res) => {
+const listarFormasPagamento = async (req, res, next) => {
     try {
         const formas = await formaPagamentoService.listarFormasPagamento();
         res.status(200).json(formas);
     } catch (erro) {
-        res.status(erro.status || 500).json({ erro: erro.message || 'Erro ao listar formas de pagamento.' });
+        next(erro);
     }
 };
 
-const criarForma = async (req, res) => {
+const criarForma = async (req, res, next) => {
     try {
         const { nome, pagamento_posterior, conta_posterior, parcelado_em_ate } = req.body;
         if (!nome || nome.trim() === '') {
@@ -18,11 +18,11 @@ const criarForma = async (req, res) => {
         const nova = await formaPagamentoService.criarForma(nome.trim(), pagamento_posterior ?? false, conta_posterior ?? false, parcelado_em_ate ?? 1);
         res.status(201).json(nova);
     } catch (erro) {
-        res.status(erro.status || 500).json({ erro: erro.message || 'Erro ao criar forma de pagamento.' });
+        next(erro);
     }
 };
 
-const atualizarForma = async (req, res) => {
+const atualizarForma = async (req, res, next) => {
     try {
         const id = parseInt(req.params.id);
         const { nome, pagamento_posterior, conta_posterior, ativo, parcelado_em_ate } = req.body;
@@ -35,17 +35,17 @@ const atualizarForma = async (req, res) => {
         const atualizada = await formaPagamentoService.atualizarForma(id, dados);
         res.status(200).json(atualizada);
     } catch (erro) {
-        res.status(erro.status || 500).json({ erro: erro.message || 'Erro ao atualizar forma de pagamento.' });
+        next(erro);
     }
 };
 
-const deletarForma = async (req, res) => {
+const deletarForma = async (req, res, next) => {
     try {
         const id = parseInt(req.params.id);
         await formaPagamentoService.deletarForma(id);
         res.status(204).send();
     } catch (erro) {
-        res.status(erro.status || 500).json({ erro: erro.message || 'Erro ao deletar forma de pagamento.' });
+        next(erro);
     }
 };
 

@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:dio/dio.dart';
 import '../../../core/services/api_service.dart';
+import '../../../core/utils/api_feedback.dart';
 import '../../../core/widgets/pesquisa_cliente_lista.dart';
 import '../../../core/widgets/dialog_confirmacao.dart';
 import '../../vendas/screens/widgets/modal_pagamento.dart';
@@ -274,7 +274,7 @@ class _TelaPedidosState extends State<TelaPedidos> {
       }
     } catch (e) {
       setState(() => _salvando = false);
-      _mostrarErro(_extrairErro(e, 'Erro ao atualizar a data do pedido.'));
+      if (mounted) mostrarErro(context, extrairErroApi(e, 'Erro ao atualizar a data do pedido.'));
     }
   }
 
@@ -311,7 +311,7 @@ class _TelaPedidosState extends State<TelaPedidos> {
       }
     } catch (e) {
       setState(() => _salvando = false);
-      _mostrarErro(_extrairErro(e, 'Erro ao atualizar pagamento.'));
+      if (mounted) mostrarErro(context, extrairErroApi(e, 'Erro ao atualizar pagamento.'));
     }
   }
 
@@ -341,7 +341,7 @@ class _TelaPedidosState extends State<TelaPedidos> {
       }
     } catch (e) {
       setState(() => _salvando = false);
-      _mostrarErro(_extrairErro(e, 'Erro ao excluir pagamento.'));
+      if (mounted) mostrarErro(context, extrairErroApi(e, 'Erro ao excluir pagamento.'));
     }
   }
 
@@ -372,27 +372,8 @@ class _TelaPedidosState extends State<TelaPedidos> {
       }
     } catch (e) {
       setState(() => _salvando = false);
-      _mostrarErro(_extrairErro(e, 'Erro ao atualizar nota fiscal.'));
+      if (mounted) mostrarErro(context, extrairErroApi(e, 'Erro ao atualizar nota fiscal.'));
     }
-  }
-
-  String _extrairErro(Object e, String fallback) {
-    if (e is DioException) {
-      final data = e.response?.data;
-      if (data is Map && data['erro'] is String) return data['erro'] as String;
-    }
-    return fallback;
-  }
-
-  void _mostrarErro(String mensagem) {
-    if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(mensagem),
-        backgroundColor: Colors.red,
-        duration: const Duration(seconds: 4),
-      ),
-    );
   }
 
   @override

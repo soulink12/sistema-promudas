@@ -1,6 +1,6 @@
 const produtoService = require('../services/produtoService');
 
-const criarProduto = async (req, res) => {
+const criarProduto = async (req, res, next) => {
     try {
         const dados = req.body;
 
@@ -11,37 +11,35 @@ const criarProduto = async (req, res) => {
         const novoId = await produtoService.criarProduto(dados);
         return res.status(201).json({ mensagem: 'Produto cadastrado com sucesso!', id: novoId });
 
-    } catch (error) {
-        console.error('Erro ao criar produto:', error);
-        return res.status(500).json({ erro: 'Erro interno do servidor.' });
+    } catch (erro) {
+        next(erro);
     }
 };
 
-const listarProdutos = async (req, res) => {
+const listarProdutos = async (req, res, next) => {
     try {
         const produtos = await produtoService.listarProdutos();
         return res.status(200).json(produtos);
-    } catch (error) {
-        console.error('Erro ao buscar produtos:', error);
-        return res.status(500).json({ erro: 'Erro interno do servidor.' });
+    } catch (erro) {
+        next(erro);
     }
 };
 
-const atualizarProduto = async (req, res) => {
+const atualizarProduto = async (req, res, next) => {
     try {
         const produto = await produtoService.atualizarProduto(req.params.id, req.body);
         res.json(produto);
-    } catch (error) {
-        res.status(500).json({ erro: 'Erro ao atualizar produto.' });
+    } catch (erro) {
+        next(erro);
     }
 };
 
-const eliminarProduto = async (req, res) => {
+const eliminarProduto = async (req, res, next) => {
     try {
         await produtoService.eliminarProduto(req.params.id);
         res.status(204).send();
-    } catch (error) {
-        res.status(500).json({ erro: 'Erro ao eliminar produto.' });
+    } catch (erro) {
+        next(erro);
     }
 };
 
