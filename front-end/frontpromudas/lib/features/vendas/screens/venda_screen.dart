@@ -1,22 +1,18 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../../../core/services/api_service.dart';
-import '../../../core/services/auth_service.dart';
 import '../../../core/services/carrinho_service.dart';
 import '../../../core/theme/cores_semanticas.dart';
 import '../../../core/utils/formatadores.dart';
-import '../../auth/screens/login_screen.dart';
 import '../../clientes/screens/widgets/dialog_cadastro_cliente.dart';
-import '../../consulta/screens/consulta_hub_screen.dart';
 import '../../pagamentos/screens/pagamentos_sem_conta_screen.dart';
-import '../../configuracoes/screens/configuracoes_screen.dart';
-import '../../relatorios/screens/relatorios_hub_screen.dart';
 import 'widgets/detalhes_app_bar.dart';
 import 'widgets/modal_busca_cliente.dart';
 import 'widgets/formulario_venda.dart';
 import 'widgets/rodape_venda.dart';
 import 'widgets/modal_pagamento.dart';
 import 'widgets/dialog_observacoes.dart';
+import 'widgets/drawer_pdv.dart';
 import '../../../core/services/pdf_download_service.dart';
 import '../../../core/widgets/dialog_confirmacao.dart';
 
@@ -200,7 +196,12 @@ class _TelaVendaState extends State<TelaVenda> {
               modoEdicao ? 'Editando Pedido #$pedidoId' : null,
         ),
       ),
-      drawer: modoEdicao ? null : _buildDrawer(context),
+      drawer: modoEdicao
+          ? null
+          : DrawerPdv(
+              pendentesSemConta: _pendentesSemConta,
+              onAbrirPagamentosSemConta: _abrirPagamentosSemConta,
+            ),
       // Atualiza o badge de pagamentos sem conta sempre que o drawer abre
       onDrawerChanged: (aberto) {
         if (aberto) _carregarPendentesSemConta();
@@ -309,137 +310,6 @@ class _TelaVendaState extends State<TelaVenda> {
             label,
             style: TextStyle(
                 fontSize: 13, fontWeight: FontWeight.w600, color: corTexto),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildDrawer(BuildContext context) {
-    final nomeUsuario =
-        AuthService.usuario?['nome'] as String? ?? 'Usuário';
-    final cs = Theme.of(context).colorScheme;
-
-    return Drawer(
-      child: Column(
-        children: [
-          DrawerHeader(
-            decoration: BoxDecoration(color: cs.primary),
-            child: Stack(
-              children: [
-                Align(
-                  alignment: Alignment.bottomLeft,
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(Icons.storefront, color: cs.onPrimary, size: 36),
-                      const SizedBox(height: 8),
-                      Text(
-                        'Sistema Promudas',
-                        style: TextStyle(
-                            color: cs.onPrimary,
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold),
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        nomeUsuario,
-                        style: TextStyle(
-                            color: cs.onPrimary.withValues(alpha: 0.7),
-                            fontSize: 13),
-                      ),
-                    ],
-                  ),
-                ),
-                // Sino de notificações (canto superior direito do header).
-                // FUTURO: centro de notificações geral, agregando todos os tipos
-                // de alerta. Hoje a única fonte é "pagamentos sem conta".
-                Positioned(
-                  top: 0,
-                  right: 0,
-                  child: IconButton(
-                    tooltip: 'Pagamentos sem conta',
-                    icon: Badge(
-                      isLabelVisible: _pendentesSemConta > 0,
-                      label: Text('$_pendentesSemConta'),
-                      child: Icon(
-                        _pendentesSemConta > 0
-                            ? Icons.notifications_active
-                            : Icons.notifications_none,
-                        color: cs.onPrimary,
-                      ),
-                    ),
-                    onPressed: _abrirPagamentosSemConta,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          ListTile(
-            leading: const Icon(Icons.apps),
-            title: const Text('Trocar Módulo'),
-            onTap: () {
-              Navigator.pop(context); // fecha drawer
-              Navigator.pop(context); // volta para TelaModulos
-            },
-          ),
-          const Divider(height: 1),
-          ListTile(
-            leading: const Icon(Icons.point_of_sale),
-            title: const Text('PDV'),
-            selected: true,
-            selectedColor: cs.primary,
-            onTap: () => Navigator.pop(context),
-          ),
-          ListTile(
-            leading: const Icon(Icons.search),
-            title: const Text('Consulta'),
-            onTap: () {
-              Navigator.pop(context);
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => const TelaConsultaHub()),
-              );
-            },
-          ),
-          ListTile(
-            leading: const Icon(Icons.bar_chart_outlined),
-            title: const Text('Relatórios'),
-            onTap: () {
-              Navigator.pop(context);
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                    builder: (_) => const TelaRelatoriosHub()),
-              );
-            },
-          ),
-          ListTile(
-            leading: const Icon(Icons.settings_outlined),
-            title: const Text('Configurações'),
-            onTap: () {
-              Navigator.pop(context);
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                    builder: (_) => const TelaConfiguracoes()),
-              );
-            },
-          ),
-          const Spacer(),
-          const Divider(height: 1),
-          ListTile(
-            leading: const Icon(Icons.logout, color: CoresSemanticas.erro),
-            title: const Text('Sair', style: TextStyle(color: CoresSemanticas.erro)),
-            onTap: () {
-              AuthService.logout();
-              Navigator.pushAndRemoveUntil(
-                context,
-                MaterialPageRoute(builder: (_) => const TelaLogin()),
-                (_) => false,
-              );
-            },
           ),
         ],
       ),
