@@ -3,6 +3,10 @@ import '../../../../core/widgets/chip_status.dart';
 import '../../../../core/widgets/seletor_data_hora.dart';
 import '../../../../core/theme/cores_semanticas.dart';
 import '../../../../core/utils/formatadores.dart';
+import 'titulo_secao.dart';
+import 'linha_tabela.dart';
+import 'linha_pagamento.dart';
+import 'bloco_entrega.dart';
 
 class DetalhesPedido extends StatelessWidget {
   final Map<String, dynamic> pedido;
@@ -260,7 +264,7 @@ class DetalhesPedido extends StatelessWidget {
           const SizedBox(height: 16),
 
           // Itens do pedido
-          _TituloSecao(titulo: 'Itens do Pedido'),
+          const TituloSecao(titulo: 'Itens do Pedido'),
           Card(
             child: itens.isEmpty
                 ? const Padding(
@@ -269,10 +273,10 @@ class DetalhesPedido extends StatelessWidget {
                   )
                 : Column(
                     children: [
-                      _LinhaTabela(
+                      const LinhaTabela(
                         isHeader: true,
-                        cells: const ['Produto', 'Qtd.', 'Preço Unit.', 'Total'],
-                        flex: const [4, 1, 2, 2],
+                        cells: ['Produto', 'Qtd.', 'Preço Unit.', 'Total'],
+                        flex: [4, 1, 2, 2],
                       ),
                       const Divider(height: 1),
                       ...itens.map((item) {
@@ -283,7 +287,7 @@ class DetalhesPedido extends StatelessWidget {
                         final totalItem = preco * qtd;
                         return Column(
                           children: [
-                            _LinhaTabela(
+                            LinhaTabela(
                               cells: [
                                 nomeProduto,
                                 '$qtd',
@@ -302,7 +306,7 @@ class DetalhesPedido extends StatelessWidget {
           const SizedBox(height: 16),
 
           // Pagamentos recebidos
-          _TituloSecao(titulo: 'Pagamentos'),
+          const TituloSecao(titulo: 'Pagamentos'),
           Card(
             child: pagamentosReais.isEmpty
                 ? const Padding(
@@ -311,7 +315,7 @@ class DetalhesPedido extends StatelessWidget {
                   )
                 : Column(
                     children: pagamentosReais
-                        .map((pag) => _LinhaPagamento(
+                        .map((pag) => LinhaPagamento(
                               pag: pag,
                               onEditar: onEditarPagamento,
                               onExcluir: onExcluirPagamento,
@@ -324,7 +328,7 @@ class DetalhesPedido extends StatelessWidget {
           const SizedBox(height: 16),
 
           // Entregas do pedido
-          _TituloSecao(titulo: 'Entregas'),
+          const TituloSecao(titulo: 'Entregas'),
           Card(
             child: entregas.isEmpty
                 ? const Padding(
@@ -335,7 +339,7 @@ class DetalhesPedido extends StatelessWidget {
                     children: [
                       for (int i = 0; i < entregas.length; i++) ...[
                         if (i > 0) const Divider(height: 1),
-                        _BlocoEntrega(
+                        BlocoEntrega(
                           entrega: entregas[i],
                           nomesPorProduto: nomesPorProduto,
                         ),
@@ -381,349 +385,8 @@ class DetalhesPedido extends StatelessWidget {
   }
 }
 
-// ── Widgets auxiliares ────────────────────────────────────────────────────────
-
-class _TituloSecao extends StatelessWidget {
-  final String titulo;
-  const _TituloSecao({required this.titulo});
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
-      child: Text(
-        titulo,
-        style: TextStyle(
-          fontSize: 12,
-          fontWeight: FontWeight.w600,
-          color: Theme.of(context).colorScheme.primary,
-          letterSpacing: 0.8,
-        ),
-      ),
-    );
-  }
-}
-
-/// Linha de um pagamento na lista de detalhes do pedido — mostra forma, data,
-/// pagador (se houver), status da nota fiscal e o menu de ações.
-class _LinhaPagamento extends StatelessWidget {
-  final Map<String, dynamic> pag;
-  final void Function(Map<String, dynamic>) onEditar;
-  final void Function(Map<String, dynamic>) onExcluir;
-  final void Function(Map<String, dynamic>) onNota;
-
-  const _LinhaPagamento({
-    required this.pag,
-    required this.onEditar,
-    required this.onExcluir,
-    required this.onNota,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-
-    final dataPag =
-        formatarDataHora(pag['data_pagamento'] ?? pag['criado_em']);
-    final formaBase = pag['forma_pagamento'] as String? ?? '—';
-    final parcelas = pag['parcelas'] as int? ?? 1;
-    final forma = parcelas > 1 ? '$formaBase ($parcelas' 'x)' : formaBase;
-    final valor = _toDouble(pag['valor_pago']);
-    final conta = pag['conta'] as String?;
-    final temConta = conta != null && conta.isNotEmpty;
-    final posterior = pag['pagamento_posterior'] == true;
-    // Pagamento real sem conta = conta ainda pendente (ex: dinheiro/cheque)
-    final contaPendente = !temConta && !posterior;
-    final nomePagador = pag['nome_pagador'] as String?;
-    final temPagador = nomePagador != null && nomePagador.isNotEmpty;
-
-    final statusNota = pag['status_nota'] as String? ?? 'Pendente';
-    final numeroNota = pag['numero_nota'] as String?;
-    final dataNota = _formatarDataNota(pag['data_emissao_nota']);
-    final corNota = _corStatusNota(statusNota, cs);
-    final textoNota = _textoNota(statusNota, numeroNota, dataNota);
-
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Padding(
-            padding: const EdgeInsets.only(top: 2, right: 12),
-            child: Icon(Icons.payments_outlined, color: cs.onSurfaceVariant),
-          ),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(forma,
-                    style: const TextStyle(
-                        fontWeight: FontWeight.w500, fontSize: 15)),
-                const SizedBox(height: 2),
-                Text(dataPag,
-                    style: TextStyle(fontSize: 12, color: cs.onSurfaceVariant)),
-                if (temConta) ...[
-                  const SizedBox(height: 2),
-                  Text('Conta: $conta',
-                      style: TextStyle(fontSize: 12, color: cs.onSurfaceVariant)),
-                ] else if (contaPendente) ...[
-                  const SizedBox(height: 2),
-                  Text('Conta: pendente',
-                      style: TextStyle(
-                          fontSize: 12, color: CoresSemanticas.aviso)),
-                ],
-                if (temPagador) ...[
-                  const SizedBox(height: 2),
-                  Text('Pago por: $nomePagador',
-                      style: TextStyle(fontSize: 12, color: cs.primary)),
-                ],
-                const SizedBox(height: 4),
-                Row(
-                  children: [
-                    Icon(Icons.receipt_long_outlined, size: 13, color: corNota),
-                    const SizedBox(width: 4),
-                    Flexible(
-                      child: Text(
-                        textoNota,
-                        style: TextStyle(
-                            fontSize: 12,
-                            color: corNota,
-                            fontWeight: FontWeight.w500),
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(width: 8),
-          Padding(
-            padding: const EdgeInsets.only(top: 2),
-            child: Text(
-              formatarMoeda(valor),
-              style: TextStyle(
-                fontWeight: FontWeight.bold,
-                fontSize: 15,
-                color: cs.primary,
-              ),
-            ),
-          ),
-          PopupMenuButton<String>(
-            icon: Icon(Icons.more_vert, size: 20, color: cs.onSurfaceVariant),
-            tooltip: 'Ações',
-            onSelected: (v) {
-              if (v == 'editar') onEditar(pag);
-              if (v == 'nota') onNota(pag);
-              if (v == 'excluir') onExcluir(pag);
-            },
-            itemBuilder: (_) => [
-              const PopupMenuItem(
-                value: 'editar',
-                child: ListTile(
-                  leading: Icon(Icons.edit_outlined),
-                  title: Text('Editar'),
-                  contentPadding: EdgeInsets.zero,
-                  dense: true,
-                ),
-              ),
-              const PopupMenuItem(
-                value: 'nota',
-                child: ListTile(
-                  leading: Icon(Icons.receipt_long_outlined),
-                  title: Text('Nota fiscal'),
-                  contentPadding: EdgeInsets.zero,
-                  dense: true,
-                ),
-              ),
-              PopupMenuItem(
-                value: 'excluir',
-                child: ListTile(
-                  leading: Icon(Icons.delete_outline, color: cs.error),
-                  title: Text('Excluir', style: TextStyle(color: cs.error)),
-                  contentPadding: EdgeInsets.zero,
-                  dense: true,
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _BlocoEntrega extends StatelessWidget {
-  final Map<String, dynamic> entrega;
-  final Map<int, String> nomesPorProduto;
-
-  const _BlocoEntrega({
-    required this.entrega,
-    required this.nomesPorProduto,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-
-    final data = formatarDataHora(entrega['data_entrega']);
-    final local = entrega['local_entrega'] as String? ?? '—';
-    final motorista = entrega['motorista'] as String?;
-    final placa = entrega['placa_veiculo'] as String?;
-
-    final itens = (entrega['itens_entrega'] as List? ?? [])
-        .map((e) => Map<String, dynamic>.from(e as Map))
-        .toList();
-
-    final temVeiculo = (motorista != null && motorista.isNotEmpty) ||
-        (placa != null && placa.isNotEmpty);
-
-    return Padding(
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Cabeçalho: local de saída + data
-          Row(
-            children: [
-              Icon(Icons.local_shipping_outlined, size: 18, color: cs.primary),
-              const SizedBox(width: 8),
-              Text(
-                local,
-                style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
-              ),
-              const Spacer(),
-              Text(
-                data,
-                style: TextStyle(fontSize: 12, color: cs.onSurfaceVariant),
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
-
-          // Itens entregues
-          ...itens.map((item) {
-            final prodId = item['produto_id'] as int?;
-            final nome = prodId != null ? nomesPorProduto[prodId] : null;
-            final qtd = item['quantidade'] as int? ?? 0;
-            return Padding(
-              padding: const EdgeInsets.only(left: 26, bottom: 4),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: Text(nome ?? '—', style: const TextStyle(fontSize: 13)),
-                  ),
-                  Text(
-                    '${qtd}x',
-                    style: const TextStyle(
-                        fontSize: 13, fontWeight: FontWeight.w600),
-                  ),
-                ],
-              ),
-            );
-          }),
-
-          // Veículo (quando informado)
-          if (temVeiculo) ...[
-            const SizedBox(height: 4),
-            Padding(
-              padding: const EdgeInsets.only(left: 26),
-              child: Row(
-                children: [
-                  Icon(Icons.person_outline, size: 14, color: cs.onSurfaceVariant),
-                  const SizedBox(width: 6),
-                  Expanded(
-                    child: Text(
-                      [
-                        if (motorista != null && motorista.isNotEmpty) motorista,
-                        if (placa != null && placa.isNotEmpty) placa,
-                      ].join(' · '),
-                      style: TextStyle(fontSize: 12, color: cs.onSurfaceVariant),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ],
-      ),
-    );
-  }
-}
-
-class _LinhaTabela extends StatelessWidget {
-  final List<String> cells;
-  final List<int> flex;
-  final bool isHeader;
-
-  const _LinhaTabela({
-    required this.cells,
-    required this.flex,
-    this.isHeader = false,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-    return Container(
-      color: isHeader ? cs.surfaceContainerHighest : null,
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-      child: Row(
-        children: List.generate(cells.length, (i) {
-          return Expanded(
-            flex: flex[i],
-            child: Text(
-              cells[i],
-              textAlign: i > 0 ? TextAlign.right : TextAlign.left,
-              style: TextStyle(
-                fontWeight: isHeader ? FontWeight.bold : FontWeight.normal,
-                fontSize: isHeader ? 13 : 14,
-                color: isHeader ? cs.onSurfaceVariant : null,
-              ),
-            ),
-          );
-        }),
-      ),
-    );
-  }
-}
-
 // ── Funções utilitárias ───────────────────────────────────────────────────────
 
 double _toDouble(dynamic v) =>
     v == null ? 0.0 : double.tryParse(v.toString()) ?? 0.0;
-
-/// Formata a data de emissão da nota (coluna só-data). Usa componentes UTC
-/// para não deslocar o dia ao converter para o fuso local.
-String? _formatarDataNota(dynamic valor) {
-  if (valor == null) return null;
-  final dt = DateTime.tryParse(valor.toString());
-  if (dt == null) return null;
-  final u = dt.toUtc();
-  return '${u.day.toString().padLeft(2, '0')}/'
-      '${u.month.toString().padLeft(2, '0')}/${u.year}';
-}
-
-Color _corStatusNota(String status, ColorScheme cs) {
-  switch (status) {
-    case 'Emitida':
-      return CoresSemanticas.sucesso;
-    case 'Rejeitada':
-      return cs.error;
-    case 'Processando':
-      return CoresSemanticas.info;
-    default: // Pendente
-      return CoresSemanticas.aviso;
-  }
-}
-
-String _textoNota(String status, String? numero, String? data) {
-  if (status == 'Emitida') {
-    final partes = <String>['Nota emitida'];
-    if (numero != null && numero.isNotEmpty) partes.add('nº $numero');
-    if (data != null) partes.add(data);
-    return partes.join(' · ');
-  }
-  return 'Nota: $status';
-}
 
