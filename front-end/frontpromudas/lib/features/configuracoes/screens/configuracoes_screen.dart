@@ -19,7 +19,7 @@ class _TelaConfiguracoesState extends State<TelaConfiguracoes> {
       ),
       body: ListView(
         children: [
-          _buildSecao('Aparência'),
+          _buildSecao(context, 'Aparência'),
           ValueListenableBuilder<ThemeMode>(
             valueListenable: ThemeService.themeMode,
             builder: (context, mode, _) {
@@ -62,7 +62,7 @@ class _TelaConfiguracoesState extends State<TelaConfiguracoes> {
               );
             },
           ),
-          _buildSecao('Cadastros'),
+          _buildSecao(context, 'Cadastros'),
           ListTile(
             leading: const Icon(Icons.eco_outlined),
             title: const Text('Produtos'),
@@ -89,7 +89,7 @@ class _TelaConfiguracoesState extends State<TelaConfiguracoes> {
     );
   }
 
-  Widget _buildSecao(String titulo) {
+  Widget _buildSecao(BuildContext context, String titulo) {
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 20, 16, 4),
       child: Text(
@@ -97,7 +97,7 @@ class _TelaConfiguracoesState extends State<TelaConfiguracoes> {
         style: TextStyle(
           fontSize: 12,
           fontWeight: FontWeight.w600,
-          color: Colors.green[700],
+          color: Theme.of(context).colorScheme.primary,
           letterSpacing: 0.8,
         ),
       ),

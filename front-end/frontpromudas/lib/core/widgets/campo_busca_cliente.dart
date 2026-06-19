@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../services/cliente_service.dart';
+import '../theme/cores_semanticas.dart';
 
 /// Autocomplete de clientes reutilizável.
 /// Carrega a lista de clientes da API e exibe sugestões ao digitar.
@@ -69,9 +70,9 @@ class _CampoBuscaClienteState extends State<CampoBuscaCliente> {
     if (_erro != null) {
       return Row(
         children: [
-          const Icon(Icons.error_outline, color: Colors.red, size: 18),
+          const Icon(Icons.error_outline, color: CoresSemanticas.erro, size: 18),
           const SizedBox(width: 8),
-          Expanded(child: Text(_erro!, style: const TextStyle(color: Colors.red, fontSize: 13))),
+          Expanded(child: Text(_erro!, style: const TextStyle(color: CoresSemanticas.erro, fontSize: 13))),
           TextButton(onPressed: _carregar, child: const Text('Tentar novamente')),
         ],
       );

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../../core/services/api_service.dart';
+import '../../../core/theme/cores_semanticas.dart';
 import '../../../core/utils/formatadores.dart';
 
 class TelaProdutos extends StatefulWidget {
@@ -66,7 +67,7 @@ class _TelaProdutosState extends State<TelaProdutos> {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('Erro ao alterar status. Tente novamente.'),
-            backgroundColor: Colors.red,
+            backgroundColor: CoresSemanticas.erro,
           ),
         );
       }
@@ -85,10 +86,11 @@ class _TelaProdutosState extends State<TelaProdutos> {
       body: _carregando
           ? const Center(child: CircularProgressIndicator())
           : _produtos.isEmpty
-              ? const Center(
+              ? Center(
                   child: Text(
                     'Nenhum produto cadastrado.',
-                    style: TextStyle(color: Colors.grey),
+                    style: TextStyle(
+                        color: Theme.of(context).colorScheme.onSurfaceVariant),
                   ),
                 )
               : ListView.separated(
@@ -100,16 +102,17 @@ class _TelaProdutosState extends State<TelaProdutos> {
                     final ativo = p['ativo'] as bool? ?? true;
                     final preco =
                         double.tryParse(p['preco'].toString()) ?? 0.0;
+                    final cs = Theme.of(context).colorScheme;
 
                     return ListTile(
                       leading: Icon(
                         Icons.eco_outlined,
-                        color: ativo ? Colors.green[700] : Colors.grey,
+                        color: ativo ? cs.primary : cs.onSurfaceVariant,
                       ),
                       title: Text(
                         p['nome'] as String? ?? '',
                         style: TextStyle(
-                          color: ativo ? null : Colors.grey,
+                          color: ativo ? null : cs.onSurfaceVariant,
                           decoration:
                               ativo ? null : TextDecoration.lineThrough,
                         ),
@@ -117,9 +120,7 @@ class _TelaProdutosState extends State<TelaProdutos> {
                       subtitle: Text(
                         formatarMoeda(preco),
                         style: TextStyle(
-                          color: ativo
-                              ? Colors.green[700]
-                              : Colors.grey,
+                          color: ativo ? cs.primary : cs.onSurfaceVariant,
                           fontWeight: FontWeight.w600,
                           fontSize: 13,
                         ),
@@ -264,7 +265,7 @@ class _DialogProdutoState extends State<_DialogProduto> {
                 padding: const EdgeInsets.only(top: 10),
                 child: Text(_erro!,
                     style: const TextStyle(
-                        color: Colors.red, fontSize: 13)),
+                        color: CoresSemanticas.erro, fontSize: 13)),
               ),
           ],
         ),

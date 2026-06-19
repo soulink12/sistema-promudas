@@ -5,6 +5,7 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import '../../../core/services/api_service.dart';
 import '../../../core/widgets/botao_data.dart';
+import '../../../core/theme/cores_semanticas.dart';
 import '../../../core/utils/formatadores.dart';
 
 class TelaRelatorioPagamentos extends StatefulWidget {
@@ -87,7 +88,7 @@ class _TelaRelatorioPagamentosState extends State<TelaRelatorioPagamentos> {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('Erro ao gerar relatório. Tente novamente.'),
-            backgroundColor: Colors.red,
+            backgroundColor: CoresSemanticas.erro,
           ),
         );
       }
@@ -128,7 +129,7 @@ class _TelaRelatorioPagamentosState extends State<TelaRelatorioPagamentos> {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('Não foi possível gerar o PDF do relatório.'),
-            backgroundColor: Colors.red,
+            backgroundColor: CoresSemanticas.erro,
             duration: Duration(seconds: 3),
           ),
         );
@@ -167,6 +168,7 @@ class _TelaRelatorioPagamentosState extends State<TelaRelatorioPagamentos> {
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
     return Scaffold(
       appBar: AppBar(title: const Text('Relatório de Pagamentos')),
       body: Column(
@@ -185,7 +187,7 @@ class _TelaRelatorioPagamentosState extends State<TelaRelatorioPagamentos> {
                     style: TextStyle(
                       fontSize: 11,
                       fontWeight: FontWeight.bold,
-                      color: Colors.grey[600],
+                      color: cs.onSurfaceVariant,
                       letterSpacing: 0.8,
                     ),
                   ),
@@ -273,17 +275,17 @@ class _TelaRelatorioPagamentosState extends State<TelaRelatorioPagamentos> {
                 children: [
                   Expanded(
                     child: Card(
-                      color: Colors.green[700],
+                      color: cs.primary,
                       child: Padding(
                         padding: const EdgeInsets.symmetric(
                             horizontal: 20, vertical: 14),
                         child: Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
-                            const Text(
+                            Text(
                               'TOTAL GERAL',
                               style: TextStyle(
-                                color: Colors.white,
+                                color: cs.onPrimary,
                                 fontWeight: FontWeight.bold,
                                 letterSpacing: 0.8,
                                 fontSize: 13,
@@ -291,8 +293,8 @@ class _TelaRelatorioPagamentosState extends State<TelaRelatorioPagamentos> {
                             ),
                             Text(
                               formatarMoeda(_totalGeral),
-                              style: const TextStyle(
-                                color: Colors.white,
+                              style: TextStyle(
+                                color: cs.onPrimary,
                                 fontWeight: FontWeight.bold,
                                 fontSize: 20,
                               ),
@@ -319,8 +321,8 @@ class _TelaRelatorioPagamentosState extends State<TelaRelatorioPagamentos> {
                           onPressed: _baixarPdf,
                           tooltip: 'Exportar PDF',
                           style: IconButton.styleFrom(
-                            backgroundColor: Colors.green[800],
-                            foregroundColor: Colors.white,
+                            backgroundColor: cs.primary,
+                            foregroundColor: cs.onPrimary,
                           ),
                           icon: const Icon(Icons.picture_as_pdf),
                         ),
@@ -328,13 +330,13 @@ class _TelaRelatorioPagamentosState extends State<TelaRelatorioPagamentos> {
               ),
             ),
             if (_resultado!.isEmpty)
-              const Padding(
-                padding: EdgeInsets.all(24),
+              Padding(
+                padding: const EdgeInsets.all(24),
                 child: Center(
                   child: Text(
                     'Nenhum pagamento encontrado para os filtros selecionados.',
                     textAlign: TextAlign.center,
-                    style: TextStyle(color: Colors.grey),
+                    style: TextStyle(color: cs.onSurfaceVariant),
                   ),
                 ),
               )
@@ -378,7 +380,7 @@ class _TelaRelatorioPagamentosState extends State<TelaRelatorioPagamentos> {
                                   style: TextStyle(
                                     fontWeight: FontWeight.bold,
                                     fontSize: 15,
-                                    color: Colors.green[700],
+                                    color: cs.primary,
                                   ),
                                 ),
                               ],
@@ -391,13 +393,13 @@ class _TelaRelatorioPagamentosState extends State<TelaRelatorioPagamentos> {
                                 Text(
                                   '$quantidade pagamento${quantidade != 1 ? 's' : ''}',
                                   style: TextStyle(
-                                      color: Colors.grey[600],
+                                      color: cs.onSurfaceVariant,
                                       fontSize: 12),
                                 ),
                                 Text(
                                   '${(percentual * 100).toStringAsFixed(1)}%',
                                   style: TextStyle(
-                                      color: Colors.grey[600],
+                                      color: cs.onSurfaceVariant,
                                       fontSize: 12),
                                 ),
                               ],
@@ -408,9 +410,9 @@ class _TelaRelatorioPagamentosState extends State<TelaRelatorioPagamentos> {
                               child: LinearProgressIndicator(
                                 value: percentual.toDouble(),
                                 minHeight: 6,
-                                backgroundColor: Colors.grey[200],
-                                valueColor: AlwaysStoppedAnimation<Color>(
-                                    Colors.green[400]!),
+                                backgroundColor: cs.surfaceContainerHighest,
+                                valueColor:
+                                    AlwaysStoppedAnimation<Color>(cs.primary),
                               ),
                             ),
                           ],

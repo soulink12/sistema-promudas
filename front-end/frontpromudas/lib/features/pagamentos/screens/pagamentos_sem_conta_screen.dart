@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../../core/services/api_service.dart';
 import '../../../core/services/conta_service.dart';
+import '../../../core/theme/cores_semanticas.dart';
 import '../../../core/utils/formatadores.dart';
 
 /// Consulta dos pagamentos que ainda não foram colocados em uma conta.
@@ -40,7 +41,7 @@ class _TelaPagamentosSemContaState extends State<TelaPagamentosSemConta> {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('Erro ao carregar pagamentos. Tente novamente.'),
-            backgroundColor: Colors.red,
+            backgroundColor: CoresSemanticas.erro,
           ),
         );
       }
@@ -63,7 +64,7 @@ class _TelaPagamentosSemContaState extends State<TelaPagamentosSemConta> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('Pagamento colocado na conta "$conta".'),
-          backgroundColor: Colors.green,
+          backgroundColor: CoresSemanticas.sucesso,
         ),
       );
       _carregar();
@@ -72,7 +73,7 @@ class _TelaPagamentosSemContaState extends State<TelaPagamentosSemConta> {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('Erro ao definir a conta. Tente novamente.'),
-            backgroundColor: Colors.red,
+            backgroundColor: CoresSemanticas.erro,
           ),
         );
       }
@@ -227,7 +228,7 @@ class _CardPagamentoSemConta extends StatelessWidget {
 class _PillSemConta extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
-    final cor = Colors.orange[800]!;
+    const cor = CoresSemanticas.aviso;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
       decoration: BoxDecoration(

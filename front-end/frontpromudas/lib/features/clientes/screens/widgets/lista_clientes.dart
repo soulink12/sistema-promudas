@@ -20,7 +20,7 @@ class ListaClientes extends StatelessWidget {
           textoBusca.isEmpty
               ? 'Nenhum cliente cadastrado.'
               : 'Nenhum cliente encontrado.',
-          style: const TextStyle(color: Colors.grey),
+          style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant),
         ),
       );
     }
@@ -36,13 +36,14 @@ class ListaClientes extends StatelessWidget {
           if (cpf != null && cpf.isNotEmpty) cpf,
           if (tel != null && tel.isNotEmpty) tel,
         ].join(' • ');
+        final cs = Theme.of(context).colorScheme;
         return ListTile(
           leading: CircleAvatar(
-            backgroundColor: Colors.green[100],
+            backgroundColor: cs.primaryContainer,
             child: Text(
               _iniciais(nome),
               style: TextStyle(
-                  color: Colors.green[800], fontWeight: FontWeight.bold),
+                  color: cs.onPrimaryContainer, fontWeight: FontWeight.bold),
             ),
           ),
           title: Text(nome),

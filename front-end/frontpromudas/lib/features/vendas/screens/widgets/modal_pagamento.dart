@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../../../core/services/forma_pagamento_service.dart';
 import '../../../../core/services/conta_service.dart';
+import '../../../../core/theme/cores_semanticas.dart';
 import '../../../../core/utils/formatadores.dart';
 
 /// Modal de registro de pagamento do pedido.
@@ -181,17 +182,15 @@ class _ModalPagamentoState extends State<ModalPagamento> {
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
     final temTroco = _restante < -0.005;
     final valorDestaque = temTroco ? _restante.abs() : _restante;
+    // Verde quando o pagamento cobre o total (ou há troco); laranja enquanto resta.
     final corDestaque = (_podeFinalizar || temTroco)
-        ? Colors.green[700]!
-        : Colors.orange[800]!;
-    final corFundo = (_podeFinalizar || temTroco)
-        ? Colors.green[50]!
-        : Colors.orange[50]!;
-    final corBorda = (_podeFinalizar || temTroco)
-        ? Colors.green.shade300
-        : Colors.orange.shade300;
+        ? CoresSemanticas.sucesso
+        : CoresSemanticas.aviso;
+    final corFundo = corDestaque.withAlpha(30);
+    final corBorda = corDestaque.withAlpha(90);
 
     return Dialog(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -226,7 +225,7 @@ class _ModalPagamentoState extends State<ModalPagamento> {
                 const SizedBox(height: 4),
                 Text(
                   'Total: ${formatarMoeda(widget.totalPedido)}',
-                  style: TextStyle(fontSize: 14, color: Colors.grey[600]),
+                  style: TextStyle(fontSize: 14, color: cs.onSurfaceVariant),
                 ),
                 const Divider(height: 24),
 
@@ -245,12 +244,12 @@ class _ModalPagamentoState extends State<ModalPagamento> {
                               ? Icon(
                                   Icons.access_time,
                                   size: 16,
-                                  color: Colors.orange[700],
+                                  color: CoresSemanticas.aviso,
                                 )
-                              : Icon(
+                              : const Icon(
                                   Icons.check_circle_outline,
                                   size: 16,
-                                  color: Colors.green[700],
+                                  color: CoresSemanticas.sucesso,
                                 ),
                           const SizedBox(width: 8),
                           Expanded(
@@ -264,7 +263,7 @@ class _ModalPagamentoState extends State<ModalPagamento> {
                                   style: TextStyle(
                                     fontSize: 14,
                                     color: isPosterior
-                                        ? Colors.orange[800]
+                                        ? CoresSemanticas.aviso
                                         : null,
                                   ),
                                 ),
@@ -273,7 +272,7 @@ class _ModalPagamentoState extends State<ModalPagamento> {
                                     'Conta: ${p['conta']}',
                                     style: TextStyle(
                                       fontSize: 11,
-                                      color: Colors.grey[600],
+                                      color: cs.onSurfaceVariant,
                                     ),
                                   )
                                 else if (!isPosterior)
@@ -281,7 +280,7 @@ class _ModalPagamentoState extends State<ModalPagamento> {
                                     'Conta: pendente',
                                     style: TextStyle(
                                       fontSize: 11,
-                                      color: Colors.orange[800],
+                                      color: CoresSemanticas.aviso,
                                     ),
                                   ),
                                 if (p['nomePagador'] != null)
@@ -289,7 +288,7 @@ class _ModalPagamentoState extends State<ModalPagamento> {
                                     'Pago por: ${p['nomePagador']}',
                                     style: TextStyle(
                                       fontSize: 11,
-                                      color: Colors.grey[600],
+                                      color: cs.onSurfaceVariant,
                                     ),
                                   ),
                               ],
@@ -302,7 +301,7 @@ class _ModalPagamentoState extends State<ModalPagamento> {
                                 'a receber',
                                 style: TextStyle(
                                   fontSize: 11,
-                                  color: Colors.orange[700],
+                                  color: CoresSemanticas.aviso,
                                   fontStyle: FontStyle.italic,
                                 ),
                               ),
@@ -312,7 +311,7 @@ class _ModalPagamentoState extends State<ModalPagamento> {
                             style: TextStyle(
                               fontSize: 14,
                               fontWeight: FontWeight.w600,
-                              color: isPosterior ? Colors.orange[800] : null,
+                              color: isPosterior ? CoresSemanticas.aviso : null,
                             ),
                           ),
                           const SizedBox(width: 4),
@@ -325,7 +324,7 @@ class _ModalPagamentoState extends State<ModalPagamento> {
                               child: Icon(
                                 Icons.close,
                                 size: 15,
-                                color: Colors.redAccent,
+                                color: CoresSemanticas.erro,
                               ),
                             ),
                           ),
@@ -384,7 +383,7 @@ class _ModalPagamentoState extends State<ModalPagamento> {
                       children: [
                         const Icon(
                           Icons.error_outline,
-                          color: Colors.red,
+                          color: CoresSemanticas.erro,
                           size: 18,
                         ),
                         const SizedBox(width: 8),
@@ -392,7 +391,7 @@ class _ModalPagamentoState extends State<ModalPagamento> {
                           child: Text(
                             _erroCarregamento!,
                             style: const TextStyle(
-                              color: Colors.red,
+                              color: CoresSemanticas.erro,
                               fontSize: 13,
                             ),
                           ),
@@ -441,14 +440,14 @@ class _ModalPagamentoState extends State<ModalPagamento> {
                                     Icon(
                                       Icons.access_time,
                                       size: 14,
-                                      color: Colors.orange[700],
+                                      color: CoresSemanticas.aviso,
                                     ),
                                     const SizedBox(width: 4),
                                     Text(
                                       'a receber',
                                       style: TextStyle(
                                         fontSize: 12,
-                                        color: Colors.orange[700],
+                                        color: CoresSemanticas.aviso,
                                       ),
                                     ),
                                   ],
@@ -561,8 +560,8 @@ class _ModalPagamentoState extends State<ModalPagamento> {
                       icon: const Icon(Icons.add, size: 18),
                       label: const Text('Adicionar'),
                       style: FilledButton.styleFrom(
-                        backgroundColor: Colors.blueGrey[700],
-                        foregroundColor: Colors.white,
+                        backgroundColor: cs.secondary,
+                        foregroundColor: cs.onSecondary,
                         padding: const EdgeInsets.symmetric(
                           vertical: 14,
                           horizontal: 16,
@@ -581,7 +580,7 @@ class _ModalPagamentoState extends State<ModalPagamento> {
                     style: TextStyle(
                       fontSize: 11,
                       fontWeight: FontWeight.bold,
-                      color: Colors.grey[600],
+                      color: cs.onSurfaceVariant,
                       letterSpacing: 0.8,
                     ),
                   ),
@@ -637,7 +636,8 @@ class _ModalPagamentoState extends State<ModalPagamento> {
                       icon: const Icon(Icons.check_circle_outline, size: 18),
                       label: const Text('Finalizar Pagamento'),
                       style: FilledButton.styleFrom(
-                        backgroundColor: Colors.green[700],
+                        backgroundColor: cs.primary,
+                        foregroundColor: cs.onPrimary,
                         padding: const EdgeInsets.symmetric(
                           vertical: 12,
                           horizontal: 20,

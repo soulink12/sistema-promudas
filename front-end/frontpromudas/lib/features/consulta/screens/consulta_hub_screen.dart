@@ -95,13 +95,14 @@ class _CardConsulta extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
     return Card(
       child: ListTile(
         contentPadding:
             const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
         leading: CircleAvatar(
-          backgroundColor: Colors.green[50],
-          child: Icon(icon, color: Colors.green[700]),
+          backgroundColor: cs.primaryContainer,
+          child: Icon(icon, color: cs.onPrimaryContainer),
         ),
         title: Text(
           titulo,
@@ -111,7 +112,7 @@ class _CardConsulta extends StatelessWidget {
           padding: const EdgeInsets.only(top: 4),
           child: Text(
             descricao,
-            style: TextStyle(color: Colors.grey[600], fontSize: 13),
+            style: TextStyle(color: cs.onSurfaceVariant, fontSize: 13),
           ),
         ),
         trailing: const Icon(Icons.chevron_right),

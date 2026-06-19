@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../../../core/widgets/chip_status.dart';
+import '../../../../core/theme/cores_semanticas.dart';
 import '../../../../core/utils/formatadores.dart';
 
 class DetalhesCliente extends StatelessWidget {
@@ -22,6 +23,7 @@ class DetalhesCliente extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
     final c = cliente;
     final nome = c['nome'] as String? ?? '';
     final saldoCredito = _toDouble(c['saldo_credito']);
@@ -49,13 +51,13 @@ class DetalhesCliente extends StatelessWidget {
                     children: [
                       CircleAvatar(
                         radius: 28,
-                        backgroundColor: Colors.green[100],
+                        backgroundColor: cs.primaryContainer,
                         child: Text(
                           _iniciais(nome),
                           style: TextStyle(
                               fontSize: 20,
                               fontWeight: FontWeight.bold,
-                              color: Colors.green[800]),
+                              color: cs.onPrimaryContainer),
                         ),
                       ),
                       const SizedBox(width: 16),
@@ -68,8 +70,8 @@ class DetalhesCliente extends StatelessWidget {
                                     fontSize: 20,
                                     fontWeight: FontWeight.bold)),
                             Text('ID: ${c['id']}',
-                                style: const TextStyle(
-                                    color: Colors.grey, fontSize: 13)),
+                                style: TextStyle(
+                                    color: cs.onSurfaceVariant, fontSize: 13)),
                           ],
                         ),
                       ),
@@ -82,15 +84,15 @@ class DetalhesCliente extends StatelessWidget {
                   ),
                   const Divider(height: 32),
                   ...[
-                    _secao('Identificação', [
+                    _secao(context, 'Identificação', [
                       ('CPF / CNPJ', c['cpf_cnpj']),
                       ('Inscrição Estadual', c['inscricao_estadual']),
                     ]),
-                    _secao('Contato', [
+                    _secao(context, 'Contato', [
                       ('Telefone', c['telefone_1']),
                       ('Telefone 2', c['telefone_2']),
                     ]),
-                    _secao('Endereço', [
+                    _secao(context, 'Endereço', [
                       ('CEP', c['cep']),
                       ('Logradouro', c['logradouro']),
                       ('Número', c['numero']),
@@ -98,7 +100,7 @@ class DetalhesCliente extends StatelessWidget {
                       ('Cidade', c['cidade']),
                       ('Estado', c['estado']),
                     ]),
-                    _secao('Sistema', [
+                    _secao(context, 'Sistema', [
                       ('Cadastrado em', _formatarData(c['criado_em'])),
                     ]),
                   ].whereType<Widget>(),
@@ -111,7 +113,7 @@ class DetalhesCliente extends StatelessWidget {
           if (saldoCredito > 0) ...[
             const SizedBox(height: 12),
             Card(
-              color: Colors.green[50],
+              color: cs.primaryContainer,
               child: Padding(
                 padding: const EdgeInsets.symmetric(
                     horizontal: 20, vertical: 16),
@@ -121,11 +123,11 @@ class DetalhesCliente extends StatelessWidget {
                       width: 44,
                       height: 44,
                       decoration: BoxDecoration(
-                        color: Colors.green[100],
+                        color: cs.onPrimaryContainer.withValues(alpha: 0.15),
                         borderRadius: BorderRadius.circular(10),
                       ),
                       child: Icon(Icons.savings_outlined,
-                          color: Colors.green[800]),
+                          color: cs.onPrimaryContainer),
                     ),
                     const SizedBox(width: 16),
                     Expanded(
@@ -137,7 +139,7 @@ class DetalhesCliente extends StatelessWidget {
                             style: TextStyle(
                               fontSize: 11,
                               fontWeight: FontWeight.bold,
-                              color: Colors.green[700],
+                              color: cs.onPrimaryContainer,
                               letterSpacing: 0.8,
                             ),
                           ),
@@ -147,7 +149,7 @@ class DetalhesCliente extends StatelessWidget {
                             style: TextStyle(
                               fontSize: 22,
                               fontWeight: FontWeight.bold,
-                              color: Colors.green[800],
+                              color: cs.onPrimaryContainer,
                             ),
                           ),
                         ],
@@ -168,7 +170,7 @@ class DetalhesCliente extends StatelessWidget {
                 style: TextStyle(
                   fontSize: 11,
                   fontWeight: FontWeight.bold,
-                  color: Colors.grey[600],
+                  color: cs.onSurfaceVariant,
                   letterSpacing: 0.8,
                 ),
               ),
@@ -178,16 +180,16 @@ class DetalhesCliente extends StatelessWidget {
                   padding:
                       const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
                   decoration: BoxDecoration(
-                    color: Colors.orange[100],
+                    color: CoresSemanticas.aviso.withAlpha(40),
                     borderRadius: BorderRadius.circular(10),
-                    border: Border.all(color: Colors.orange.shade300),
+                    border: Border.all(color: CoresSemanticas.aviso.withAlpha(120)),
                   ),
                   child: Text(
                     '${pendentes.length}',
-                    style: TextStyle(
+                    style: const TextStyle(
                       fontSize: 11,
                       fontWeight: FontWeight.bold,
-                      color: Colors.orange[800],
+                      color: CoresSemanticas.aviso,
                     ),
                   ),
                 ),
@@ -206,7 +208,7 @@ class DetalhesCliente extends StatelessWidget {
               padding: const EdgeInsets.symmetric(vertical: 12),
               child: Text(
                 'Nenhum pedido com pagamento pendente.',
-                style: TextStyle(color: Colors.grey[500], fontSize: 13),
+                style: TextStyle(color: cs.onSurfaceVariant, fontSize: 13),
               ),
             )
           else
@@ -238,10 +240,10 @@ class DetalhesCliente extends StatelessWidget {
                           width: 40,
                           height: 40,
                           decoration: BoxDecoration(
-                            color: Colors.green[50],
+                            color: cs.primaryContainer,
                             borderRadius: BorderRadius.circular(8),
-                            border:
-                                Border.all(color: Colors.green.shade200),
+                            border: Border.all(
+                                color: cs.primary.withValues(alpha: 0.3)),
                           ),
                           child: Center(
                             child: Text(
@@ -249,7 +251,7 @@ class DetalhesCliente extends StatelessWidget {
                               style: TextStyle(
                                 fontSize: 11,
                                 fontWeight: FontWeight.bold,
-                                color: Colors.green[800],
+                                color: cs.onPrimaryContainer,
                               ),
                             ),
                           ),
@@ -290,7 +292,8 @@ class DetalhesCliente extends StatelessWidget {
 
 // ── Widgets auxiliares ──────────────────────────────────────────────────────
 
-Widget? _secao(String titulo, List<(String, dynamic)> campos) {
+Widget? _secao(
+    BuildContext context, String titulo, List<(String, dynamic)> campos) {
   final preenchidos =
       campos.where((f) => f.$2 != null && f.$2.toString().isNotEmpty).toList();
   if (preenchidos.isEmpty) return null;
@@ -302,17 +305,17 @@ Widget? _secao(String titulo, List<(String, dynamic)> campos) {
         style: TextStyle(
             fontSize: 11,
             fontWeight: FontWeight.bold,
-            color: Colors.grey[600],
+            color: Theme.of(context).colorScheme.onSurfaceVariant,
             letterSpacing: 0.8),
       ),
       const SizedBox(height: 10),
-      ...preenchidos.map((f) => _linha(f.$1, f.$2)),
+      ...preenchidos.map((f) => _linha(context, f.$1, f.$2)),
       const SizedBox(height: 20),
     ],
   );
 }
 
-Widget _linha(String label, dynamic valor) {
+Widget _linha(BuildContext context, String label, dynamic valor) {
   return Padding(
     padding: const EdgeInsets.only(bottom: 8),
     child: Row(
@@ -321,7 +324,9 @@ Widget _linha(String label, dynamic valor) {
         SizedBox(
           width: 150,
           child: Text(label,
-              style: const TextStyle(color: Colors.grey, fontSize: 14)),
+              style: TextStyle(
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  fontSize: 14)),
         ),
         Expanded(
           child: Text(valor.toString(), style: const TextStyle(fontSize: 14)),

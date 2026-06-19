@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../../core/services/api_service.dart';
+import '../../../core/theme/cores_semanticas.dart';
 import '../../../core/utils/api_feedback.dart';
 import '../../../core/widgets/pesquisa_cliente_lista.dart';
 import '../../../core/widgets/dialog_confirmacao.dart';
@@ -236,7 +237,7 @@ class _TelaPedidosState extends State<TelaPedidos> {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('Pagamento registrado com sucesso!'),
-            backgroundColor: Colors.green,
+            backgroundColor: CoresSemanticas.sucesso,
           ),
         );
         await PdfDownloadService.baixarESalvar(context, pedidoId);
@@ -247,7 +248,7 @@ class _TelaPedidosState extends State<TelaPedidos> {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('Erro ao registrar pagamento. Tente novamente.'),
-            backgroundColor: Colors.red,
+            backgroundColor: CoresSemanticas.erro,
             duration: Duration(seconds: 4),
           ),
         );
@@ -268,7 +269,7 @@ class _TelaPedidosState extends State<TelaPedidos> {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('Data do pedido atualizada com sucesso!'),
-            backgroundColor: Colors.green,
+            backgroundColor: CoresSemanticas.sucesso,
           ),
         );
       }
@@ -305,7 +306,7 @@ class _TelaPedidosState extends State<TelaPedidos> {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('Pagamento atualizado com sucesso!'),
-            backgroundColor: Colors.green,
+            backgroundColor: CoresSemanticas.sucesso,
           ),
         );
       }
@@ -335,7 +336,7 @@ class _TelaPedidosState extends State<TelaPedidos> {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('Pagamento excluído com sucesso!'),
-            backgroundColor: Colors.green,
+            backgroundColor: CoresSemanticas.sucesso,
           ),
         );
       }
@@ -366,7 +367,7 @@ class _TelaPedidosState extends State<TelaPedidos> {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('Nota fiscal atualizada com sucesso!'),
-            backgroundColor: Colors.green,
+            backgroundColor: CoresSemanticas.sucesso,
           ),
         );
       }
@@ -450,7 +451,7 @@ class _TelaPedidosState extends State<TelaPedidos> {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          const Icon(Icons.error_outline, color: Colors.red, size: 40),
+          const Icon(Icons.error_outline, color: CoresSemanticas.erro, size: 40),
           const SizedBox(height: 8),
           Text(_erro!),
           const SizedBox(height: 16),

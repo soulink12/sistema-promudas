@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../../core/services/api_service.dart';
+import '../../../core/theme/cores_semanticas.dart';
 
 class TelaFormasPagamento extends StatefulWidget {
   const TelaFormasPagamento({super.key});
@@ -66,7 +67,7 @@ class _TelaFormasPagamentoState extends State<TelaFormasPagamento> {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('Erro ao alterar status. Tente novamente.'),
-            backgroundColor: Colors.red,
+            backgroundColor: CoresSemanticas.erro,
           ),
         );
       }
@@ -86,10 +87,11 @@ class _TelaFormasPagamentoState extends State<TelaFormasPagamento> {
       body: _carregando
           ? const Center(child: CircularProgressIndicator())
           : _formas.isEmpty
-              ? const Center(
+              ? Center(
                   child: Text(
                     'Nenhuma forma de pagamento cadastrada.',
-                    style: TextStyle(color: Colors.grey),
+                    style: TextStyle(
+                        color: Theme.of(context).colorScheme.onSurfaceVariant),
                   ),
                 )
               : ListView.separated(
@@ -114,16 +116,17 @@ class _TelaFormasPagamentoState extends State<TelaFormasPagamento> {
                       partes.add('Parcela em até ${parceladoEmAte}x');
                     }
                     final legenda = partes.isEmpty ? null : partes.join(' · ');
+                    final cs = Theme.of(context).colorScheme;
 
                     return ListTile(
                       leading: Icon(
                         Icons.payment,
-                        color: ativo ? Colors.green[700] : Colors.grey,
+                        color: ativo ? cs.primary : cs.onSurfaceVariant,
                       ),
                       title: Text(
                         f['nome'] as String? ?? '',
                         style: TextStyle(
-                          color: ativo ? null : Colors.grey,
+                          color: ativo ? null : cs.onSurfaceVariant,
                           decoration: ativo
                               ? null
                               : TextDecoration.lineThrough,
@@ -132,8 +135,8 @@ class _TelaFormasPagamentoState extends State<TelaFormasPagamento> {
                       subtitle: legenda != null
                           ? Text(
                               legenda,
-                              style: TextStyle(
-                                  color: Colors.orange[700], fontSize: 12),
+                              style: const TextStyle(
+                                  color: CoresSemanticas.aviso, fontSize: 12),
                             )
                           : null,
                       trailing: Row(
@@ -302,7 +305,8 @@ class _DialogFormaState extends State<_DialogForma> {
               Padding(
                 padding: const EdgeInsets.only(top: 8),
                 child: Text(_erro!,
-                    style: const TextStyle(color: Colors.red, fontSize: 13)),
+                    style: const TextStyle(
+                        color: CoresSemanticas.erro, fontSize: 13)),
               ),
           ],
         ),

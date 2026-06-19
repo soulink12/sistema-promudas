@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import '../../../core/services/api_service.dart';
+import '../../../core/theme/cores_semanticas.dart';
 import '../../pedidos/screens/pedidos_screen.dart';
 import 'widgets/lista_clientes.dart';
 import 'widgets/detalhes_cliente.dart';
@@ -173,7 +174,7 @@ class _TelaListaClientesState extends State<TelaListaClientes> {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('Cliente atualizado com sucesso!'),
-            backgroundColor: Colors.green,
+            backgroundColor: CoresSemanticas.sucesso,
           ),
         );
       }
@@ -183,7 +184,7 @@ class _TelaListaClientesState extends State<TelaListaClientes> {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('Erro ao atualizar cliente. Tente novamente.'),
-            backgroundColor: Colors.red,
+            backgroundColor: CoresSemanticas.erro,
           ),
         );
       }
@@ -332,7 +333,7 @@ class _TelaListaClientesState extends State<TelaListaClientes> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(Icons.error_outline, color: Colors.red, size: 40),
+            const Icon(Icons.error_outline, color: CoresSemanticas.erro, size: 40),
             const SizedBox(height: 8),
             Text(_erroCarregamento!),
             const SizedBox(height: 16),

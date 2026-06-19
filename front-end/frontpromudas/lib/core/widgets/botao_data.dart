@@ -18,11 +18,12 @@ class BotaoData extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
     return OutlinedButton(
       style: OutlinedButton.styleFrom(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
         side: BorderSide(
-          color: selecionado ? Colors.green : Colors.grey.shade400,
+          color: selecionado ? cs.primary : cs.outline,
         ),
       ),
       onPressed: onTap,
@@ -31,7 +32,7 @@ class BotaoData extends StatelessWidget {
           Icon(
             Icons.calendar_today_outlined,
             size: 16,
-            color: selecionado ? Colors.green[700] : Colors.grey,
+            color: selecionado ? cs.primary : cs.onSurfaceVariant,
           ),
           const SizedBox(width: 6),
           Expanded(
@@ -40,13 +41,13 @@ class BotaoData extends StatelessWidget {
               children: [
                 Text(
                   label,
-                  style: TextStyle(fontSize: 10, color: Colors.grey[600]),
+                  style: TextStyle(fontSize: 10, color: cs.onSurfaceVariant),
                 ),
                 Text(
                   valor,
                   style: TextStyle(
                     fontSize: 13,
-                    color: selecionado ? Colors.green[800] : Colors.grey,
+                    color: selecionado ? cs.primary : cs.onSurfaceVariant,
                     fontWeight:
                         selecionado ? FontWeight.w600 : FontWeight.normal,
                   ),
@@ -57,7 +58,7 @@ class BotaoData extends StatelessWidget {
           if (onLimpar != null)
             GestureDetector(
               onTap: onLimpar,
-              child: Icon(Icons.close, size: 16, color: Colors.grey[500]),
+              child: Icon(Icons.close, size: 16, color: cs.onSurfaceVariant),
             ),
         ],
       ),

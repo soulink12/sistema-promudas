@@ -7,6 +7,7 @@ import '../../../core/services/api_service.dart';
 import '../../../core/widgets/botao_data.dart';
 import '../../../core/widgets/campo_busca_cliente.dart';
 import '../../../core/widgets/chip_status.dart';
+import '../../../core/theme/cores_semanticas.dart';
 import '../../../core/utils/formatadores.dart';
 
 class TelaRelatorioPedidos extends StatefulWidget {
@@ -60,7 +61,7 @@ class _TelaRelatorioPedidosState extends State<TelaRelatorioPedidos> {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('Erro ao gerar relatório. Tente novamente.'),
-            backgroundColor: Colors.red,
+            backgroundColor: CoresSemanticas.erro,
           ),
         );
       }
@@ -102,7 +103,7 @@ class _TelaRelatorioPedidosState extends State<TelaRelatorioPedidos> {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('Não foi possível gerar o PDF do relatório.'),
-            backgroundColor: Colors.red,
+            backgroundColor: CoresSemanticas.erro,
             duration: Duration(seconds: 3),
           ),
         );
@@ -163,7 +164,7 @@ class _TelaRelatorioPedidosState extends State<TelaRelatorioPedidos> {
                     style: TextStyle(
                       fontSize: 11,
                       fontWeight: FontWeight.bold,
-                      color: Colors.grey[600],
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
                       letterSpacing: 0.8,
                     ),
                   ),
@@ -215,7 +216,7 @@ class _TelaRelatorioPedidosState extends State<TelaRelatorioPedidos> {
                     style: TextStyle(
                       fontSize: 11,
                       fontWeight: FontWeight.bold,
-                      color: Colors.grey[600],
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
                       letterSpacing: 0.8,
                     ),
                   ),
@@ -231,7 +232,8 @@ class _TelaRelatorioPedidosState extends State<TelaRelatorioPedidos> {
                     Row(
                       children: [
                         Icon(Icons.person_outline,
-                            color: Colors.green[700], size: 20),
+                            color: Theme.of(context).colorScheme.primary,
+                            size: 20),
                         const SizedBox(width: 8),
                         Expanded(
                           child: Text(
@@ -241,7 +243,10 @@ class _TelaRelatorioPedidosState extends State<TelaRelatorioPedidos> {
                         ),
                         IconButton(
                           icon: Icon(Icons.close,
-                              size: 18, color: Colors.grey[500]),
+                              size: 18,
+                              color: Theme.of(context)
+                                  .colorScheme
+                                  .onSurfaceVariant),
                           tooltip: 'Remover filtro de cliente',
                           onPressed: () =>
                               setState(() => _clienteSelecionado = null),
@@ -302,8 +307,9 @@ class _TelaRelatorioPedidosState extends State<TelaRelatorioPedidos> {
                         onPressed: _baixarPdf,
                         tooltip: 'Exportar PDF',
                         style: IconButton.styleFrom(
-                          backgroundColor: Colors.green[800],
-                          foregroundColor: Colors.white,
+                          backgroundColor: Theme.of(context).colorScheme.primary,
+                          foregroundColor:
+                              Theme.of(context).colorScheme.onPrimary,
                         ),
                         icon: const Icon(Icons.picture_as_pdf),
                       ),
@@ -325,13 +331,14 @@ class _TelaRelatorioPedidosState extends State<TelaRelatorioPedidos> {
             ],
             const SizedBox(height: 8),
             if (lista.isEmpty)
-              const Padding(
-                padding: EdgeInsets.symmetric(vertical: 24),
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 24),
                 child: Center(
                   child: Text(
                     'Nenhum pedido encontrado para os filtros selecionados.',
                     textAlign: TextAlign.center,
-                    style: TextStyle(color: Colors.grey),
+                    style: TextStyle(
+                        color: Theme.of(context).colorScheme.onSurfaceVariant),
                   ),
                 ),
               )
@@ -372,7 +379,7 @@ class _FiltroStatus extends StatelessWidget {
           style: TextStyle(
             fontSize: 11,
             fontWeight: FontWeight.bold,
-            color: Colors.grey[600],
+            color: Theme.of(context).colorScheme.onSurfaceVariant,
             letterSpacing: 0.8,
           ),
         ),
@@ -411,8 +418,9 @@ class _CardResumo extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
     return Card(
-      color: Colors.green[700],
+      color: cs.primary,
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
         child: Column(
@@ -420,15 +428,16 @@ class _CardResumo extends StatelessWidget {
           children: [
             Text(
               valor,
-              style: const TextStyle(
-                color: Colors.white,
+              style: TextStyle(
+                color: cs.onPrimary,
                 fontWeight: FontWeight.bold,
                 fontSize: 18,
               ),
             ),
             Text(
               label,
-              style: const TextStyle(color: Colors.white70, fontSize: 12),
+              style: TextStyle(
+                  color: cs.onPrimary.withValues(alpha: 0.7), fontSize: 12),
             ),
           ],
         ),
@@ -476,7 +485,7 @@ class _CardPedido extends StatelessWidget {
                   style: TextStyle(
                     fontWeight: FontWeight.bold,
                     fontSize: 14,
-                    color: Colors.green[700],
+                    color: Theme.of(context).colorScheme.primary,
                   ),
                 ),
               ],
@@ -487,11 +496,11 @@ class _CardPedido extends StatelessWidget {
               children: [
                 Text(
                   '#$id · $data',
-                  style: TextStyle(color: Colors.grey[600], fontSize: 12),
+                  style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant, fontSize: 12),
                 ),
                 Text(
                   '$qtdItens ${qtdItens == 1 ? 'item' : 'itens'}',
-                  style: TextStyle(color: Colors.grey[600], fontSize: 12),
+                  style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant, fontSize: 12),
                 ),
               ],
             ),

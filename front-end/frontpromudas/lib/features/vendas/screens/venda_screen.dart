@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import '../../../core/services/api_service.dart';
 import '../../../core/services/auth_service.dart';
 import '../../../core/services/carrinho_service.dart';
+import '../../../core/theme/cores_semanticas.dart';
 import '../../../core/utils/formatadores.dart';
 import '../../auth/screens/login_screen.dart';
 import '../../clientes/screens/widgets/dialog_cadastro_cliente.dart';
@@ -429,8 +430,8 @@ class _TelaVendaState extends State<TelaVenda> {
           const Spacer(),
           const Divider(height: 1),
           ListTile(
-            leading: const Icon(Icons.logout, color: Colors.red),
-            title: const Text('Sair', style: TextStyle(color: Colors.red)),
+            leading: const Icon(Icons.logout, color: CoresSemanticas.erro),
+            title: const Text('Sair', style: TextStyle(color: CoresSemanticas.erro)),
             onTap: () {
               AuthService.logout();
               Navigator.pushAndRemoveUntil(
@@ -550,7 +551,9 @@ class _TelaVendaState extends State<TelaVenda> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(mensagem),
-            backgroundColor: creditoGerado > 0.01 ? Colors.orange[800] : Colors.green,
+            backgroundColor: creditoGerado > 0.01
+                ? CoresSemanticas.aviso
+                : CoresSemanticas.sucesso,
             duration: Duration(seconds: creditoGerado > 0.01 ? 5 : 3),
           ),
         );
@@ -562,7 +565,7 @@ class _TelaVendaState extends State<TelaVenda> {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('Erro ao atualizar pedido. Tente novamente.'),
-            backgroundColor: Colors.red,
+            backgroundColor: CoresSemanticas.erro,
             duration: Duration(seconds: 4),
           ),
         );
@@ -629,7 +632,7 @@ class _TelaVendaState extends State<TelaVenda> {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('Pedido registrado com sucesso!'),
-            backgroundColor: Colors.green,
+            backgroundColor: CoresSemanticas.sucesso,
           ),
         );
         await PdfDownloadService.baixarESalvar(context, pedidoId);
@@ -640,7 +643,7 @@ class _TelaVendaState extends State<TelaVenda> {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('Erro ao registrar pedido. Tente novamente.'),
-            backgroundColor: Colors.red,
+            backgroundColor: CoresSemanticas.erro,
             duration: Duration(seconds: 4),
           ),
         );

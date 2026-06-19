@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../../../core/widgets/chip_status.dart';
 import '../../../../core/widgets/seletor_data_hora.dart';
+import '../../../../core/theme/cores_semanticas.dart';
 import '../../../../core/utils/formatadores.dart';
 
 class DetalhesPedido extends StatelessWidget {
@@ -199,18 +200,18 @@ class DetalhesPedido extends StatelessWidget {
                               style: TextStyle(
                                   fontSize: 12,
                                   color: ajuste < 0
-                                      ? Colors.blue[700]
-                                      : Colors.orange[800]),
+                                      ? CoresSemanticas.desconto
+                                      : CoresSemanticas.acrescimo),
                             ),
                           ],
                           if (saldoCredito > 0.005) ...[
                             const SizedBox(height: 4),
                             Text(
                               'A receber: ${formatarMoeda(saldoCredito)}',
-                              style: TextStyle(
+                              style: const TextStyle(
                                   fontSize: 13,
                                   fontWeight: FontWeight.w600,
-                                  color: Colors.orange[800]),
+                                  color: CoresSemanticas.aviso),
                             ),
                           ],
                           if (totalPagoReal > total + 0.01) ...[
@@ -218,13 +219,13 @@ class DetalhesPedido extends StatelessWidget {
                             Row(
                               mainAxisSize: MainAxisSize.min,
                               children: [
-                                Icon(Icons.info_outline,
-                                    size: 14, color: Colors.amber[800]),
+                                const Icon(Icons.info_outline,
+                                    size: 14, color: CoresSemanticas.aviso),
                                 const SizedBox(width: 4),
                                 Text(
                                   'Crédito de ${formatarMoeda(totalPagoReal - total)} adicionado ao cliente.',
-                                  style: TextStyle(
-                                      fontSize: 12, color: Colors.amber[800]),
+                                  style: const TextStyle(
+                                      fontSize: 12, color: CoresSemanticas.aviso),
                                 ),
                               ],
                             ),
@@ -395,7 +396,7 @@ class _TituloSecao extends StatelessWidget {
         style: TextStyle(
           fontSize: 12,
           fontWeight: FontWeight.w600,
-          color: Colors.green[700],
+          color: Theme.of(context).colorScheme.primary,
           letterSpacing: 0.8,
         ),
       ),
@@ -469,7 +470,7 @@ class _LinhaPagamento extends StatelessWidget {
                   const SizedBox(height: 2),
                   Text('Conta: pendente',
                       style: TextStyle(
-                          fontSize: 12, color: Colors.orange[800])),
+                          fontSize: 12, color: CoresSemanticas.aviso)),
                 ],
                 if (temPagador) ...[
                   const SizedBox(height: 2),
@@ -706,13 +707,13 @@ String? _formatarDataNota(dynamic valor) {
 Color _corStatusNota(String status, ColorScheme cs) {
   switch (status) {
     case 'Emitida':
-      return Colors.green.shade700;
+      return CoresSemanticas.sucesso;
     case 'Rejeitada':
       return cs.error;
     case 'Processando':
-      return Colors.blue.shade700;
+      return CoresSemanticas.info;
     default: // Pendente
-      return Colors.orange.shade800;
+      return CoresSemanticas.aviso;
   }
 }
 

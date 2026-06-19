@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../../core/theme/cores_semanticas.dart';
 import '../../../../core/utils/formatadores.dart';
 
 /// Widget que exibe a tabela de itens adicionados à venda (carrinho).
@@ -155,11 +156,11 @@ class _FormularioVendaWidgetState extends State<FormularioVendaWidget> {
     String? tooltipOriginal;
 
     if (preco < precoOriginal) {
-      cor = Colors.blue[700];
+      cor = CoresSemanticas.desconto;
       icone = Icons.arrow_downward_rounded;
       tooltipOriginal = 'Sistema: ${formatarMoeda(precoOriginal)}';
     } else if (preco > precoOriginal) {
-      cor = Colors.orange[800];
+      cor = CoresSemanticas.acrescimo;
       icone = Icons.arrow_upward_rounded;
       tooltipOriginal = 'Sistema: ${formatarMoeda(precoOriginal)}';
     }
@@ -232,12 +233,15 @@ class _FormularioVendaWidgetState extends State<FormularioVendaWidget> {
 
         // Exibe mensagem de orientação quando o carrinho está vazio
         if (widget.carrinho.isEmpty)
-          const Expanded(
+          Expanded(
             child: Center(
               child: Text(
                 'Nenhum produto adicionado ainda.\nUtilize a barra de pesquisa no rodapé.',
                 textAlign: TextAlign.center,
-                style: TextStyle(color: Colors.grey, fontSize: 16),
+                style: TextStyle(
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  fontSize: 16,
+                ),
               ),
             ),
           )
@@ -277,7 +281,7 @@ class _FormularioVendaWidgetState extends State<FormularioVendaWidget> {
                           IconButton(
                             icon: const Icon(
                               Icons.delete_outline,
-                              color: Colors.redAccent,
+                              color: CoresSemanticas.erro,
                             ),
                             tooltip: 'Remover item',
                             onPressed: () {
@@ -343,14 +347,18 @@ class _FormularioVendaWidgetState extends State<FormularioVendaWidget> {
                       ? Icons.arrow_downward_rounded
                       : Icons.arrow_upward_rounded,
                   size: 13,
-                  color: widget.ajuste < 0 ? Colors.blue[700] : Colors.orange[800],
+                  color: widget.ajuste < 0
+                      ? CoresSemanticas.desconto
+                      : CoresSemanticas.acrescimo,
                 ),
                 const SizedBox(width: 4),
                 Text(
                   widget.descricaoAjuste ?? '',
                   style: TextStyle(
                     fontSize: 13,
-                    color: widget.ajuste < 0 ? Colors.blue[700] : Colors.orange[800],
+                    color: widget.ajuste < 0
+                        ? CoresSemanticas.desconto
+                        : CoresSemanticas.acrescimo,
                   ),
                 ),
                 const SizedBox(width: 8),
@@ -359,7 +367,9 @@ class _FormularioVendaWidgetState extends State<FormularioVendaWidget> {
                   style: TextStyle(
                     fontSize: 13,
                     fontWeight: FontWeight.bold,
-                    color: widget.ajuste < 0 ? Colors.blue[700] : Colors.orange[800],
+                    color: widget.ajuste < 0
+                        ? CoresSemanticas.desconto
+                        : CoresSemanticas.acrescimo,
                   ),
                 ),
               ],
@@ -603,8 +613,8 @@ class _DialogAjusteState extends State<_DialogAjuste> {
                             _ehDesconto ? 'Desconto:' : 'Acréscimo:',
                             style: TextStyle(
                               color: _ehDesconto
-                                  ? Colors.blue[700]
-                                  : Colors.orange[800],
+                                  ? CoresSemanticas.desconto
+                                  : CoresSemanticas.acrescimo,
                             ),
                           ),
                           Text(
@@ -612,8 +622,8 @@ class _DialogAjusteState extends State<_DialogAjuste> {
                             style: TextStyle(
                               fontWeight: FontWeight.bold,
                               color: _ehDesconto
-                                  ? Colors.blue[700]
-                                  : Colors.orange[800],
+                                  ? CoresSemanticas.desconto
+                                  : CoresSemanticas.acrescimo,
                             ),
                           ),
                         ],

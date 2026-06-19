@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../../core/services/api_service.dart';
 import '../../../core/services/auth_service.dart';
+import '../../../core/theme/cores_semanticas.dart';
 import '../../../core/widgets/pesquisa_cliente_lista.dart';
 import '../../auth/screens/login_screen.dart';
 import '../../configuracoes/screens/configuracoes_screen.dart';
@@ -84,7 +85,7 @@ class _TelaEntregasState extends State<TelaEntregas> {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('Erro ao carregar pedidos. Tente novamente.'),
-            backgroundColor: Colors.red,
+            backgroundColor: CoresSemanticas.erro,
           ),
         );
       }
@@ -281,8 +282,8 @@ class _TelaEntregasState extends State<TelaEntregas> {
           const Spacer(),
           const Divider(height: 1),
           ListTile(
-            leading: const Icon(Icons.logout, color: Colors.red),
-            title: const Text('Sair', style: TextStyle(color: Colors.red)),
+            leading: const Icon(Icons.logout, color: CoresSemanticas.erro),
+            title: const Text('Sair', style: TextStyle(color: CoresSemanticas.erro)),
             onTap: () {
               AuthService.logout();
               Navigator.pushAndRemoveUntil(

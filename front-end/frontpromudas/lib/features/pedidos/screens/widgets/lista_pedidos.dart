@@ -15,10 +15,10 @@ class ListaPedidos extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (pedidos.isEmpty) {
-      return const Center(
+      return Center(
         child: Text(
           'Nenhum pedido encontrado.',
-          style: TextStyle(color: Colors.grey),
+          style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant),
         ),
       );
     }

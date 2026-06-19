@@ -4,6 +4,7 @@ import 'package:dio/dio.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'api_service.dart';
+import '../theme/cores_semanticas.dart';
 
 class PdfDownloadService {
   static Future<void> baixarESalvar(BuildContext context, int pedidoId) async {
@@ -30,7 +31,7 @@ class PdfDownloadService {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('Não foi possível gerar o PDF do pedido.'),
-            backgroundColor: Colors.red,
+            backgroundColor: CoresSemanticas.erro,
             duration: Duration(seconds: 3),
           ),
         );

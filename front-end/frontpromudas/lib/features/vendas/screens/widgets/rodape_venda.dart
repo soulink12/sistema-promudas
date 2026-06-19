@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../../../core/services/produto_service.dart';
+import '../../../../core/theme/cores_semanticas.dart';
 
 /// Widget do rodapé da tela de venda.
 /// Exibe a barra de pesquisa de produtos (com autocomplete) e o atalho de finalização.
@@ -105,12 +106,14 @@ class _RodapeVendaState extends State<RodapeVenda> {
               padding: const EdgeInsets.only(bottom: 4),
               child: Row(
                 children: [
-                  const Icon(Icons.error_outline, color: Colors.red, size: 16),
+                  const Icon(Icons.error_outline,
+                      color: CoresSemanticas.erro, size: 16),
                   const SizedBox(width: 6),
                   Expanded(
                     child: Text(
                       _erroCarregamento!,
-                      style: const TextStyle(color: Colors.red, fontSize: 12),
+                      style: const TextStyle(
+                          color: CoresSemanticas.erro, fontSize: 12),
                     ),
                   ),
                   TextButton(

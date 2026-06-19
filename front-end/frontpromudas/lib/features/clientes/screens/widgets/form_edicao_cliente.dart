@@ -135,13 +135,13 @@ class _FormEdicaoClienteState extends State<FormEdicaoCliente> {
                 ),
                 const Divider(height: 24),
                 _campo(_nome, 'Nome *', obrigatorio: true),
-                _subtitulo('Identificação'),
+                _subtitulo(context, 'Identificação'),
                 _campo(_cpf, 'CPF / CNPJ'),
                 _campo(_inscricao, 'Inscrição Estadual'),
-                _subtitulo('Contato'),
+                _subtitulo(context, 'Contato'),
                 _campo(_tel1, 'Telefone'),
                 _campo(_tel2, 'Telefone 2'),
-                _subtitulo('Endereço'),
+                _subtitulo(context, 'Endereço'),
                 Row(children: [
                   Expanded(flex: 2, child: _campo(_cep, 'CEP')),
                   const SizedBox(width: 12),
@@ -165,7 +165,7 @@ class _FormEdicaoClienteState extends State<FormEdicaoCliente> {
 
 // ── Widgets auxiliares ──────────────────────────────────────────────────────
 
-Widget _subtitulo(String texto) {
+Widget _subtitulo(BuildContext context, String texto) {
   return Padding(
     padding: const EdgeInsets.only(top: 12, bottom: 8),
     child: Text(
@@ -173,7 +173,7 @@ Widget _subtitulo(String texto) {
       style: TextStyle(
           fontSize: 11,
           fontWeight: FontWeight.bold,
-          color: Colors.grey[600],
+          color: Theme.of(context).colorScheme.onSurfaceVariant,
           letterSpacing: 0.8),
     ),
   );

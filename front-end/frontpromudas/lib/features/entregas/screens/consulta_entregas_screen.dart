@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../../core/services/api_service.dart';
+import '../../../core/theme/cores_semanticas.dart';
 import '../../../core/widgets/pesquisa_cliente_lista.dart';
 import '../../../core/widgets/dialog_confirmacao.dart';
 import 'widgets/card_entrega.dart';
@@ -51,7 +52,7 @@ class _TelaConsultaEntregasState extends State<TelaConsultaEntregas> {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('Erro ao carregar entregas. Tente novamente.'),
-            backgroundColor: Colors.red,
+            backgroundColor: CoresSemanticas.erro,
           ),
         );
       }
@@ -72,7 +73,7 @@ class _TelaConsultaEntregasState extends State<TelaConsultaEntregas> {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('Erro ao carregar o pedido. Tente novamente.'),
-            backgroundColor: Colors.red,
+            backgroundColor: CoresSemanticas.erro,
           ),
         );
       }
@@ -118,7 +119,7 @@ class _TelaConsultaEntregasState extends State<TelaConsultaEntregas> {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('Erro ao excluir entrega. Tente novamente.'),
-            backgroundColor: Colors.red,
+            backgroundColor: CoresSemanticas.erro,
           ),
         );
       }

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../theme/cores_semanticas.dart';
 
 /// Chip de status colorido, reutilizado em listas, detalhes e relatórios.
 /// A cor é derivada do [status]; [prefixo] precede o texto (ex.: 'Entrega: ')
@@ -23,20 +24,20 @@ class ChipStatus extends StatelessWidget {
       case 'realizada':
       case 'entregue':
       case 'emitida':
-        cor = Colors.green;
+        cor = CoresSemanticas.sucesso;
         break;
       case 'crédito':
       case 'processando':
-        cor = Colors.blue;
+        cor = CoresSemanticas.info;
         break;
       case 'parcial':
-        cor = Colors.orange;
+        cor = CoresSemanticas.aviso;
         break;
       case 'rejeitada':
-        cor = Colors.red;
+        cor = CoresSemanticas.erro;
         break;
       default:
-        cor = Colors.grey; // Pendente / não informado
+        cor = CoresSemanticas.neutro; // Pendente / não informado
     }
     final label = '$prefixo$status${count != null ? ': $count' : ''}';
     return Chip(

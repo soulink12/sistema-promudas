@@ -2,6 +2,7 @@ import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import '../../../core/services/api_service.dart';
 import '../../../core/services/auth_service.dart';
+import '../../../core/theme/cores_semanticas.dart';
 import 'modulos_screen.dart';
 
 class TelaLogin extends StatefulWidget {
@@ -132,7 +133,7 @@ class _TelaLoginState extends State<TelaLogin> {
                       Text(
                         _erro!,
                         textAlign: TextAlign.center,
-                        style: const TextStyle(color: Colors.red),
+                        style: const TextStyle(color: CoresSemanticas.erro),
                       ),
                     ],
                     const SizedBox(height: 24),

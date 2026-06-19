@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../../core/theme/cores_semanticas.dart';
 
 class CardPedidoEntrega extends StatelessWidget {
   final Map<String, dynamic> pedido;
@@ -29,7 +30,7 @@ class CardPedidoEntrega extends StatelessWidget {
     final qtdItens = itens?.length ?? 0;
 
     final corStatus = statusRet == 'Parcial'
-        ? Colors.orange[700]!
+        ? CoresSemanticas.aviso
         : Theme.of(context).colorScheme.outline;
 
     return Card(
