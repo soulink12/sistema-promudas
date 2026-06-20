@@ -1,146 +1,153 @@
-// Teste e2e do backend — fluxo financeiro de pagamentos (HTTP → service → Prisma → banco).
-// Runner nativo do Node (`node --test`) + `fetch` global — sem dependências novas.
-//
-// ⚠️ ESCREVE NO BANCO configurado no .env. Rodar só contra o banco de TESTE/descartável.
-// O teste é autolimpante: cria apenas os próprios dados (um produto descartável e
-// alguns pedidos) e apaga só eles no final. NUNCA roda migrate reset / seed.
-//
-// Uso: npm test   (ou: node --test tests/)
-// Override de credenciais: TEST_USER_EMAIL / TEST_USER_SENHA.
+// e2e — fluxo financeiro de pagamentos (status, edição, exclusão, nota fiscal, conta pendente).
+// Ver tests/helpers.js para a infra (app em porta efêmera, login, limpeza autolimpante).
 
 const { test, before, after } = require('node:test');
 const assert = require('node:assert/strict');
+const { criarAmbiente } = require('./helpers');
 
-const app = require('../src/server');
-const prisma = require('../src/config/database');
-
-const EMAIL = process.env.TEST_USER_EMAIL || 'lucasgsalbuquerque@gmail.com';
-const SENHA = process.env.TEST_USER_SENHA || '987741';
-
-let server;
-let baseUrl;
-let token;
+let amb;
 let produtoId;
-const pedidosCriados = [];
-
-// Helper: chamada autenticada à API. Retorna { status, body } (body já parseado).
-async function api(method, path, corpo) {
-    const res = await fetch(`${baseUrl}${path}`, {
-        method,
-        headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${token}`,
-        },
-        body: corpo ? JSON.stringify(corpo) : undefined,
-    });
-    const texto = await res.text();
-    let body = null;
-    try { body = texto ? JSON.parse(texto) : null; } catch { body = texto; }
-    return { status: res.status, body };
-}
-
-// Cria um pedido total 100 (Consumidor id=1, produto descartável × 2 a 50) e
-// registra o id para limpeza posterior. Retorna o id do pedido.
-async function criarPedido() {
-    const res = await api('POST', '/api/pedidos', {
-        cliente_id: 1,
-        valor_total: 100,
-        itens: [{ produto_id: produtoId, quantidade: 2, valor_unitario: 50 }],
-    });
-    assert.equal(res.status, 201, `criar pedido falhou: ${JSON.stringify(res.body)}`);
-    const id = res.body.data.id;
-    pedidosCriados.push(id);
-    return id;
-}
-
-// Lê o status_pagamento atual do pedido via API.
-async function statusPagamento(pedidoId) {
-    const res = await api('GET', `/api/pedidos/${pedidoId}`);
-    assert.equal(res.status, 200, `buscar pedido falhou: ${JSON.stringify(res.body)}`);
-    return res.body.status_pagamento;
-}
 
 before(async () => {
-    // Sobe o app numa porta efêmera (não colide com o backend que talvez esteja na 6072).
-    server = app.listen(0);
-    await new Promise((resolve) => server.once('listening', resolve));
-    baseUrl = `http://127.0.0.1:${server.address().port}`;
-
-    // Login → token JWT.
-    const res = await fetch(`${baseUrl}/api/auth/login`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: EMAIL, senha: SENHA }),
-    });
-    const body = await res.json();
-    assert.equal(res.status, 200, `login falhou (${res.status}): ${JSON.stringify(body)}`);
-    token = body.token;
-    assert.ok(token, 'login não retornou token');
-
-    // Produto descartável criado direto via Prisma (id usado nos pedidos do teste).
-    const produto = await prisma.produtos.create({
-        data: { nome: `__e2e_produto_${Date.now()}`, preco: 50 },
-    });
+    amb = await criarAmbiente();
+    await amb.login();
+    const produto = await amb.criarProduto({ preco: 50 });
     produtoId = produto.id;
 });
 
 after(async () => {
-    // Limpeza: apaga os pedidos criados (cascade remove itens_pedido e pagamentos),
-    // depois o produto (ordem importa por causa da FK itens_pedido → produtos).
-    for (const id of pedidosCriados) {
-        try { await prisma.pedidos.delete({ where: { id } }); } catch { /* já removido */ }
-    }
-    if (produtoId) {
-        try { await prisma.produtos.delete({ where: { id: produtoId } }); } catch { /* idem */ }
-    }
-    await prisma.$disconnect();
-    await new Promise((resolve) => server.close(resolve));
+    await amb.encerrar();
 });
 
-test('pagamento parcial leva a Parcial e depois a Pago', async () => {
-    const pedidoId = await criarPedido();
-    assert.equal(await statusPagamento(pedidoId), 'Pendente', 'status inicial deveria ser Pendente');
-
-    // Paga 40 de 100 → Parcial.
-    let pg = await api('POST', '/api/pagamentos', {
-        pedido_id: pedidoId, valor_pago: 40, forma_pagamento: 'PIX',
-        data_pagamento: new Date().toISOString(),
+// Cria um pedido total 100 (Consumidor id=1, produto descartável × 2 a 50).
+async function novoPedido() {
+    return amb.criarPedido({
+        cliente_id: 1,
+        itens: [{ produto_id: produtoId, quantidade: 2, valor_unitario: 50 }],
     });
-    assert.equal(pg.status, 201, `1º pagamento falhou: ${JSON.stringify(pg.body)}`);
+}
+
+async function statusPagamento(pedidoId) {
+    const res = await amb.api('GET', `/api/pedidos/${pedidoId}`);
+    assert.equal(res.status, 200, `buscar pedido: ${JSON.stringify(res.body)}`);
+    return res.body.status_pagamento;
+}
+
+function pagar(pedidoId, valor, forma = 'PIX', extra = {}) {
+    return amb.api('POST', '/api/pagamentos', {
+        body: {
+            pedido_id: pedidoId,
+            valor_pago: valor,
+            forma_pagamento: forma,
+            data_pagamento: new Date().toISOString(),
+            ...extra,
+        },
+    });
+}
+
+test('pagamento parcial leva a Parcial e depois a Pago', async () => {
+    const pedidoId = await novoPedido();
+    assert.equal(await statusPagamento(pedidoId), 'Pendente');
+
+    let pg = await pagar(pedidoId, 40);
+    assert.equal(pg.status, 201, `1º pagamento: ${JSON.stringify(pg.body)}`);
     assert.equal(await statusPagamento(pedidoId), 'Parcial');
 
-    // Paga os 60 restantes → Pago.
-    pg = await api('POST', '/api/pagamentos', {
-        pedido_id: pedidoId, valor_pago: 60, forma_pagamento: 'PIX',
-        data_pagamento: new Date().toISOString(),
-    });
-    assert.equal(pg.status, 201, `2º pagamento falhou: ${JSON.stringify(pg.body)}`);
+    pg = await pagar(pedidoId, 60);
+    assert.equal(pg.status, 201, `2º pagamento: ${JSON.stringify(pg.body)}`);
     assert.equal(await statusPagamento(pedidoId), 'Pago');
 });
 
 test('pagamento que excede o total é rejeitado e não altera o status', async () => {
-    const pedidoId = await criarPedido();
-
-    const pg = await api('POST', '/api/pagamentos', {
-        pedido_id: pedidoId, valor_pago: 150, forma_pagamento: 'PIX',
-        data_pagamento: new Date().toISOString(),
-    });
-    assert.equal(pg.status, 400, `esperava 400, veio: ${JSON.stringify(pg.body)}`);
+    const pedidoId = await novoPedido();
+    const pg = await pagar(pedidoId, 150);
+    assert.equal(pg.status, 400, `esperava 400: ${JSON.stringify(pg.body)}`);
     assert.match(pg.body.erro, /excede/i);
-
-    // Nada foi gravado → segue Pendente.
     assert.equal(await statusPagamento(pedidoId), 'Pendente');
 });
 
 test('crediário (pagamento posterior) não conta como recebido', async () => {
-    const pedidoId = await criarPedido();
-
-    const pg = await api('POST', '/api/pagamentos', {
-        pedido_id: pedidoId, valor_pago: 100, forma_pagamento: 'Crediário',
-        data_pagamento: new Date().toISOString(),
-    });
-    assert.equal(pg.status, 201, `crediário falhou: ${JSON.stringify(pg.body)}`);
-
-    // Crediário é "a receber", não soma ao total real → status segue Pendente.
+    const pedidoId = await novoPedido();
+    const pg = await pagar(pedidoId, 100, 'Crediário');
+    assert.equal(pg.status, 201, `crediário: ${JSON.stringify(pg.body)}`);
     assert.equal(await statusPagamento(pedidoId), 'Pendente');
+});
+
+test('editar pagamento recalcula o status (Pago → Parcial) e respeita o saldo', async () => {
+    const pedidoId = await novoPedido();
+    const pg = await pagar(pedidoId, 100);
+    assert.equal(pg.status, 201);
+    const pagamentoId = pg.body.id;
+    assert.equal(await statusPagamento(pedidoId), 'Pago');
+
+    // Editar acima do saldo permitido (100) é rejeitado.
+    const excede = await amb.api('PUT', `/api/pagamentos/${pagamentoId}`, {
+        body: { valor_pago: 150 },
+    });
+    assert.equal(excede.status, 400, `esperava 400: ${JSON.stringify(excede.body)}`);
+    assert.match(excede.body.erro, /excede/i);
+
+    // Reduzir o valor recalcula para Parcial.
+    const ok = await amb.api('PUT', `/api/pagamentos/${pagamentoId}`, {
+        body: { valor_pago: 40 },
+    });
+    assert.equal(ok.status, 200, `editar: ${JSON.stringify(ok.body)}`);
+    assert.equal(await statusPagamento(pedidoId), 'Parcial');
+});
+
+test('excluir pagamento volta o status para Pendente', async () => {
+    const pedidoId = await novoPedido();
+    const pg = await pagar(pedidoId, 100);
+    const pagamentoId = pg.body.id;
+    assert.equal(await statusPagamento(pedidoId), 'Pago');
+
+    const del = await amb.api('DELETE', `/api/pagamentos/${pagamentoId}`);
+    assert.equal(del.status, 200, `excluir: ${JSON.stringify(del.body)}`);
+    assert.equal(await statusPagamento(pedidoId), 'Pendente');
+});
+
+test('nota fiscal é persistida e lida no pedido', async () => {
+    const pedidoId = await novoPedido();
+    const pg = await pagar(pedidoId, 100);
+    const pagamentoId = pg.body.id;
+
+    const put = await amb.api('PUT', `/api/pagamentos/${pagamentoId}`, {
+        body: {
+            status_nota: 'Emitida',
+            numero_nota: '12345',
+            data_emissao_nota: '2026-06-20T00:00:00.000Z',
+        },
+    });
+    assert.equal(put.status, 200, `nota: ${JSON.stringify(put.body)}`);
+
+    const ped = await amb.api('GET', `/api/pedidos/${pedidoId}`);
+    const pago = ped.body.pagamentos.find((p) => p.id === pagamentoId);
+    assert.ok(pago, 'pagamento não encontrado no pedido');
+    assert.equal(pago.status_nota, 'Emitida');
+    assert.equal(pago.numero_nota, '12345');
+});
+
+test('pagamento em Dinheiro fica sem conta e some após definir a conta', async () => {
+    const pedidoId = await novoPedido();
+    // Dinheiro = conta_posterior (não escolhe conta no PDV) → fica pendente de conta.
+    const pg = await pagar(pedidoId, 100, 'Dinheiro');
+    assert.equal(pg.status, 201, `dinheiro: ${JSON.stringify(pg.body)}`);
+    const pagamentoId = pg.body.id;
+
+    const antes = await amb.api('GET', '/api/pagamentos/pendentes-conta');
+    assert.ok(
+        antes.body.some((p) => p.id === pagamentoId),
+        'pagamento em dinheiro deveria estar pendente de conta',
+    );
+
+    const def = await amb.api('PUT', `/api/pagamentos/${pagamentoId}`, {
+        body: { conta: 'Lucas' },
+    });
+    assert.equal(def.status, 200, `definir conta: ${JSON.stringify(def.body)}`);
+
+    const depois = await amb.api('GET', '/api/pagamentos/pendentes-conta');
+    assert.ok(
+        !depois.body.some((p) => p.id === pagamentoId),
+        'pagamento não deveria mais estar pendente de conta',
+    );
 });
