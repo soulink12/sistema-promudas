@@ -43,7 +43,14 @@ app.use('/api/contas', contaRoutes);
 // Tratamento central de erro — sempre por último, depois de todas as rotas.
 app.use(errorHandler);
 
-const PORT = process.env.PORT || 6072;
-app.listen(PORT, () => {
-    console.log(`Servidor rodando na porta ${PORT}`);
-});
+// Só sobe o servidor quando este arquivo é executado diretamente
+// (node src/server.js / nodemon). Quando importado (ex.: testes e2e), apenas
+// exporta o `app` para que o teste suba numa porta efêmera própria.
+if (require.main === module) {
+    const PORT = process.env.PORT || 6072;
+    app.listen(PORT, () => {
+        console.log(`Servidor rodando na porta ${PORT}`);
+    });
+}
+
+module.exports = app;
