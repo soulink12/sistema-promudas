@@ -1,5 +1,6 @@
 const prisma = require('../config/database');
 const BusinessError = require('../utils/BusinessError');
+const { parseData, normalizarDatas } = require('../utils/parseData');
 
 // Recalcula o status de entrega do pedido comparando o total pedido com o total já entregue
 const recalcularStatusEntrega = async (pedido_id) => {
@@ -89,7 +90,7 @@ const criarEntrega = async (dadosEntrega) => {
             ...dadosPrincipais,
             // Na criação, a data da entrega é o momento atual (= criado_em).
             // Pode ser alterada depois na consulta (PUT /entregas/:id).
-            data_entrega: dadosPrincipais.data_entrega ?? new Date(),
+            data_entrega: parseData(dadosPrincipais.data_entrega, 'data_entrega') ?? new Date(),
             itens_entrega: {
                 create: itens.map(item => ({
                     produto_id: parseInt(item.produto_id),
@@ -184,7 +185,7 @@ const atualizarEntrega = async (id, dados) => {
         }
     }
 
-    let dataParaAtualizar = { ...dadosPrincipais };
+    let dataParaAtualizar = normalizarDatas(dadosPrincipais, ['data_entrega']);
 
     if (itens && Array.isArray(itens)) {
         dataParaAtualizar.itens_entrega = {

@@ -73,6 +73,24 @@ test('crediário (pagamento posterior) não conta como recebido', async () => {
     assert.equal(await statusPagamento(pedidoId), 'Pendente');
 });
 
+test('data de pagamento realmente inválida retorna 400 (não 500)', async () => {
+    const pedidoId = await novoPedido();
+    const pg = await pagar(pedidoId, 50, 'PIX', { data_pagamento: 'data-ruim' });
+    assert.equal(pg.status, 400, `esperava 400: ${JSON.stringify(pg.body)}`);
+    assert.match(pg.body.erro, /data inválida/i);
+    assert.equal(await statusPagamento(pedidoId), 'Pendente');
+});
+
+test('aceita data ISO sem "Z" e com microssegundos (formato do Dart)', async () => {
+    const pedidoId = await novoPedido();
+    // DateTime.toIso8601String() do Dart: microssegundos e sem fuso. Antes
+    // estourava 500 no Prisma; agora é normalizada e aceita.
+    const pg = await pagar(pedidoId, 100, 'PIX',
+        { data_pagamento: '2026-06-20T16:55:31.123456' });
+    assert.equal(pg.status, 201, `esperava 201: ${JSON.stringify(pg.body)}`);
+    assert.equal(await statusPagamento(pedidoId), 'Pago');
+});
+
 test('editar pagamento recalcula o status (Pago → Parcial) e respeita o saldo', async () => {
     const pedidoId = await novoPedido();
     const pg = await pagar(pedidoId, 100);

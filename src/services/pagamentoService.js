@@ -1,5 +1,6 @@
 const prisma = require('../config/database');
 const BusinessError = require('../utils/BusinessError');
+const { normalizarDatas } = require('../utils/parseData');
 const formaPagamentoService = require('./formaPagamentoService');
 
 // Recalcula o status de pagamento do pedido com base na soma real dos pagamentos no banco.
@@ -92,7 +93,7 @@ const criarPagamento = async (dadosPagamento) => {
     }
 
     const novoPagamento = await prisma.pagamentos.create({
-        data: dadosPagamento
+        data: normalizarDatas(dadosPagamento, ['data_pagamento', 'data_emissao_nota'])
     });
 
     await recalcularStatusPedido(pedido_id);
@@ -185,7 +186,7 @@ const atualizarPagamento = async (id, dados) => {
 
     const pagamentoAtualizado = await prisma.pagamentos.update({
         where: { id: parseInt(id) },
-        data: dados,
+        data: normalizarDatas(dados, ['data_pagamento', 'data_emissao_nota']),
     });
 
     await recalcularStatusPedido(pagamentoAtualizado.pedido_id);

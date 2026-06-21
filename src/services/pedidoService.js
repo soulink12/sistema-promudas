@@ -1,5 +1,6 @@
 const prisma = require('../config/database');
 const { recalcularStatusPedido } = require('./pagamentoService');
+const { parseData, normalizarDatas } = require('../utils/parseData');
 const formaPagamentoService = require('./formaPagamentoService');
 
 // Campos de pagamento retornados ao montar um pedido completo (listar/buscar).
@@ -45,7 +46,7 @@ const criarPedido = async (dados) => {
             observacoes: dados.observacoes,
             // Na criação, a data do pedido é o momento atual (= criado_em).
             // Pode ser alterada depois na consulta (PUT /pedidos/:id).
-            data_pedido: dados.data_pedido ?? new Date(),
+            data_pedido: parseData(dados.data_pedido, 'data_pedido') ?? new Date(),
             status_geral: 'Ativa',
             ativo: true,
 
@@ -100,7 +101,8 @@ const listarPedidos = async (filtros = {}) => {
 };
 
 const atualizarPedido = async (id, dados) => {
-    const { itens, ...camposPedido } = dados;
+    const { itens, ...camposBrutos } = dados;
+    const camposPedido = normalizarDatas(camposBrutos, ['data_pedido']);
 
     if (!itens) {
         return await prisma.pedidos.update({
