@@ -13,6 +13,8 @@ import 'widgets/rodape_venda.dart';
 import 'widgets/modal_pagamento.dart';
 import 'widgets/dialog_observacoes.dart';
 import 'widgets/drawer_pdv.dart';
+import 'widgets/barra_atalhos.dart';
+import '../../pedidos/screens/pedidos_screen.dart';
 import '../../../core/services/pdf_download_service.dart';
 import '../../../core/widgets/dialog_confirmacao.dart';
 
@@ -135,7 +137,8 @@ class _TelaVendaState extends State<TelaVenda> {
   }
 
   /// Intercepta atalhos da tela, independente de qual campo tem foco:
-  /// F5 (buscar cliente), F12 (finalizar) e Ctrl+C (cadastrar novo cliente).
+  /// F5 (buscar cliente), F12 (finalizar), Ctrl+C (cadastrar novo cliente)
+  /// e Ctrl+E (pesquisar pedido).
   /// Só responde quando a TelaVenda é a rota atual — assim os atalhos não
   /// vazam para telas empilhadas por cima (Clientes, Pedidos, etc.).
   bool _onTecla(KeyEvent event) {
@@ -157,7 +160,20 @@ class _TelaVendaState extends State<TelaVenda> {
       _mostrarCadastroCliente();
       return true;
     }
+    if (HardwareKeyboard.instance.isControlPressed &&
+        event.logicalKey == LogicalKeyboardKey.keyE) {
+      _abrirPesquisaPedido();
+      return true;
+    }
     return false;
+  }
+
+  /// Abre a tela de pedidos para pesquisar (atalho Ctrl+E).
+  void _abrirPesquisaPedido() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => const TelaPedidos()),
+    );
   }
 
   /// Verifica se há texto selecionado no campo que está com foco no momento.
@@ -254,6 +270,8 @@ class _TelaVendaState extends State<TelaVenda> {
                   ),
                 ),
                 RodapeVenda(onProdutoSelecionado: _adicionarAoCarrinho),
+                const SizedBox(height: 8),
+                const BarraAtalhos(),
               ],
             ),
           ),

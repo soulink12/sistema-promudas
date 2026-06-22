@@ -15,6 +15,23 @@ const formatarData = (d) => {
     return `${dia}/${mes}/${dt.getFullYear()}  ${hora}:${min}`;
 };
 
+// Pontos por milímetro (PDFKit trabalha em pontos: 72 pt = 1 polegada = 25,4 mm)
+const MM = 72 / 25.4;
+
+// Desenha os guias de furação no lado esquerdo, para arquivar o recibo numa pasta.
+// Dois furos espaçados 80 mm entre centros, centralizados na vertical da folha A4.
+// O furador tem furo de 6 mm; o guia é um círculo de 10 mm para sobrar margem de mira.
+const desenharGuiasFuro = (doc) => {
+    const centroX = 12 * MM;                   // 12 mm da borda esquerda (dentro da margem de 50 pt)
+    const centroVertical = doc.page.height / 2;
+    const meioVao = 40 * MM;                   // metade dos 80 mm entre os furos
+    const raioGuia = 5 * MM;                    // círculo-guia de 10 mm de diâmetro
+    [centroVertical - meioVao, centroVertical + meioVao].forEach((cy) => {
+        doc.circle(centroX, cy, raioGuia).lineWidth(0.7).strokeColor('black').stroke();
+    });
+    doc.lineWidth(1).strokeColor('black');     // restaura o padrão para o resto do desenho
+};
+
 // Desenha uma linha horizontal cinza
 const linha = (doc) => {
     doc.moveTo(50, doc.y).lineTo(545, doc.y).strokeColor('#cccccc').lineWidth(0.5).stroke();
@@ -72,6 +89,11 @@ const gerarPedidoPDF = async (pedidoId) => {
         doc.on('data', c => chunks.push(c));
         doc.on('end', () => resolve(Buffer.concat(chunks)));
         doc.on('error', reject);
+
+        // Guias de furação: na primeira página (já criada pelo construtor) e em cada
+        // página nova que vier a ser adicionada se o conteúdo passar de uma folha.
+        desenharGuiasFuro(doc);
+        doc.on('pageAdded', () => desenharGuiasFuro(doc));
 
         // ── CABEÇALHO ──────────────────────────────────────────────────────────
 
