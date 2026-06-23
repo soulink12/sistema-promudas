@@ -2,26 +2,16 @@ import 'package:flutter/material.dart';
 import '../../../../core/services/auth_service.dart';
 import '../../../../core/theme/cores_semanticas.dart';
 import '../../../auth/screens/login_screen.dart';
+import '../../../clientes/screens/clientes_screen.dart';
+import '../../../pedidos/screens/pedidos_screen.dart';
 import '../../../configuracoes/screens/configuracoes_screen.dart';
-import '../../../consulta/screens/consulta_hub_screen.dart';
-import '../../../relatorios/screens/relatorios_hub_screen.dart';
 
-/// Drawer (menu sanduíche) do módulo PDV. Cabeçalho com o usuário logado e o
-/// sino de pagamentos sem conta; itens de navegação para troca de módulo,
-/// Consulta, Relatórios, Configurações e logout.
+/// Drawer (menu sanduíche) do módulo PDV. Cabeçalho com o usuário logado e itens
+/// de navegação apenas das funções do PDV: Clientes, Pedidos, A receber (pedidos
+/// com pagamento pendente) e Aparência — além de Trocar Módulo e Sair.
+/// Relatórios, cadastros e conciliação financeira ficam no módulo Administração.
 class DrawerPdv extends StatelessWidget {
-  /// Quantidade de pagamentos sem conta — alimenta o badge do sino.
-  final int pendentesSemConta;
-
-  /// Acionado ao tocar o sino (abre os pagamentos sem conta e, ao voltar,
-  /// atualiza o badge — a tela dona cuida disso).
-  final VoidCallback onAbrirPagamentosSemConta;
-
-  const DrawerPdv({
-    super.key,
-    required this.pendentesSemConta,
-    required this.onAbrirPagamentosSemConta,
-  });
+  const DrawerPdv({super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -34,55 +24,30 @@ class DrawerPdv extends StatelessWidget {
         children: [
           DrawerHeader(
             decoration: BoxDecoration(color: cs.primary),
-            child: Stack(
-              children: [
-                Align(
-                  alignment: Alignment.bottomLeft,
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(Icons.storefront, color: cs.onPrimary, size: 36),
-                      const SizedBox(height: 8),
-                      Text(
-                        'Sistema Promudas',
-                        style: TextStyle(
-                            color: cs.onPrimary,
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold),
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        nomeUsuario,
-                        style: TextStyle(
-                            color: cs.onPrimary.withValues(alpha: 0.7),
-                            fontSize: 13),
-                      ),
-                    ],
-                  ),
-                ),
-                // Sino de notificações (canto superior direito do header).
-                // FUTURO: centro de notificações geral, agregando todos os tipos
-                // de alerta. Hoje a única fonte é "pagamentos sem conta".
-                Positioned(
-                  top: 0,
-                  right: 0,
-                  child: IconButton(
-                    tooltip: 'Pagamentos sem conta',
-                    icon: Badge(
-                      isLabelVisible: pendentesSemConta > 0,
-                      label: Text('$pendentesSemConta'),
-                      child: Icon(
-                        pendentesSemConta > 0
-                            ? Icons.notifications_active
-                            : Icons.notifications_none,
+            child: Align(
+              alignment: Alignment.bottomLeft,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.storefront, color: cs.onPrimary, size: 36),
+                  const SizedBox(height: 8),
+                  Text(
+                    'Sistema Promudas',
+                    style: TextStyle(
                         color: cs.onPrimary,
-                      ),
-                    ),
-                    onPressed: onAbrirPagamentosSemConta,
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold),
                   ),
-                ),
-              ],
+                  const SizedBox(height: 2),
+                  Text(
+                    nomeUsuario,
+                    style: TextStyle(
+                        color: cs.onPrimary.withValues(alpha: 0.7),
+                        fontSize: 13),
+                  ),
+                ],
+              ),
             ),
           ),
           ListTile(
@@ -102,37 +67,51 @@ class DrawerPdv extends StatelessWidget {
             onTap: () => Navigator.pop(context),
           ),
           ListTile(
-            leading: const Icon(Icons.search),
-            title: const Text('Consulta'),
+            leading: const Icon(Icons.people_outline),
+            title: const Text('Clientes'),
             onTap: () {
               Navigator.pop(context);
               Navigator.push(
                 context,
-                MaterialPageRoute(builder: (_) => const TelaConsultaHub()),
+                MaterialPageRoute(builder: (_) => const TelaListaClientes()),
               );
             },
           ),
           ListTile(
-            leading: const Icon(Icons.bar_chart_outlined),
-            title: const Text('Relatórios'),
+            leading: const Icon(Icons.receipt_long_outlined),
+            title: const Text('Pedidos'),
+            onTap: () {
+              Navigator.pop(context);
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const TelaPedidos()),
+              );
+            },
+          ),
+          ListTile(
+            leading: const Icon(Icons.account_balance_wallet_outlined),
+            title: const Text('A receber'),
             onTap: () {
               Navigator.pop(context);
               Navigator.push(
                 context,
                 MaterialPageRoute(
-                    builder: (_) => const TelaRelatoriosHub()),
+                  builder: (_) => const TelaPedidos(
+                    titulo: 'A receber',
+                    statusPagamentoFiltro: 'Pendente,Parcial',
+                  ),
+                ),
               );
             },
           ),
           ListTile(
             leading: const Icon(Icons.settings_outlined),
-            title: const Text('Configurações'),
+            title: const Text('Configuração'),
             onTap: () {
               Navigator.pop(context);
               Navigator.push(
                 context,
-                MaterialPageRoute(
-                    builder: (_) => const TelaConfiguracoes()),
+                MaterialPageRoute(builder: (_) => const TelaConfiguracoes()),
               );
             },
           ),

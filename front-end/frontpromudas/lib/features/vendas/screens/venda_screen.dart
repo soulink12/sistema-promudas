@@ -5,7 +5,6 @@ import '../../../core/services/carrinho_service.dart';
 import '../../../core/theme/cores_semanticas.dart';
 import '../../../core/utils/formatadores.dart';
 import '../../clientes/screens/widgets/dialog_cadastro_cliente.dart';
-import '../../pagamentos/screens/pagamentos_sem_conta_screen.dart';
 import 'widgets/detalhes_app_bar.dart';
 import 'widgets/modal_busca_cliente.dart';
 import 'widgets/formulario_venda.dart';
@@ -51,9 +50,6 @@ class _TelaVendaState extends State<TelaVenda> {
   // Total pago em pagamentos reais antes da edição (somente modo edição)
   double _totalPagoReal = 0.0;
 
-  // Quantidade de pagamentos reais sem conta definida (badge no drawer)
-  int _pendentesSemConta = 0;
-
   @override
   void initState() {
     super.initState();
@@ -62,30 +58,6 @@ class _TelaVendaState extends State<TelaVenda> {
     if (widget.pedidoParaEditar != null) {
       _preencherCarrinhoComPedido(widget.pedidoParaEditar!);
     }
-    _carregarPendentesSemConta();
-  }
-
-  /// Conta os pagamentos sem conta definida para alimentar o sino do drawer.
-  /// Falha silenciosa — o badge simplesmente não aparece se a chamada falhar.
-  Future<void> _carregarPendentesSemConta() async {
-    try {
-      final response = await ApiService.dio.get('/pagamentos/pendentes-conta');
-      final qtd = (response.data as List).length;
-      if (mounted) setState(() => _pendentesSemConta = qtd);
-    } catch (_) {
-      // Ignora — não atrapalha o PDV
-    }
-  }
-
-  /// Abre a tela de pagamentos sem conta (acionada pelo sino do drawer).
-  Future<void> _abrirPagamentosSemConta() async {
-    Navigator.pop(context); // fecha o drawer
-    await Navigator.push(
-      context,
-      MaterialPageRoute(builder: (_) => const TelaPagamentosSemConta()),
-    );
-    // Ao voltar, atualiza o sino (uma conta pode ter sido definida)
-    _carregarPendentesSemConta();
   }
 
   void _preencherCarrinhoComPedido(Map<String, dynamic> pedido) {
@@ -212,16 +184,7 @@ class _TelaVendaState extends State<TelaVenda> {
               modoEdicao ? 'Editando Pedido #$pedidoId' : null,
         ),
       ),
-      drawer: modoEdicao
-          ? null
-          : DrawerPdv(
-              pendentesSemConta: _pendentesSemConta,
-              onAbrirPagamentosSemConta: _abrirPagamentosSemConta,
-            ),
-      // Atualiza o badge de pagamentos sem conta sempre que o drawer abre
-      onDrawerChanged: (aberto) {
-        if (aberto) _carregarPendentesSemConta();
-      },
+      drawer: modoEdicao ? null : const DrawerPdv(),
       body: Stack(
         children: [
           Padding(

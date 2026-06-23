@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../../../core/services/auth_service.dart';
 import '../../vendas/screens/venda_screen.dart';
 import '../../entregas/screens/entrega_screen.dart';
+import '../../admin/screens/admin_screen.dart';
 import 'login_screen.dart';
 
 class TelaModulos extends StatelessWidget {
@@ -35,32 +36,39 @@ class TelaModulos extends StatelessWidget {
               ),
               const SizedBox(height: 48),
               ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 560),
+                constraints: const BoxConstraints(maxWidth: 760),
                 child: Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 24),
-                  child: Row(
+                  child: Wrap(
+                    alignment: WrapAlignment.center,
+                    spacing: 16,
+                    runSpacing: 16,
                     children: [
-                      Expanded(
-                        child: _CardModulo(
-                          icon: Icons.point_of_sale,
-                          titulo: 'PDV',
-                          descricao: 'Registrar vendas e pedidos',
-                          onTap: () => Navigator.push(
-                            context,
-                            MaterialPageRoute(builder: (_) => const TelaVenda()),
-                          ),
+                      _CardModulo(
+                        icon: Icons.point_of_sale,
+                        titulo: 'PDV',
+                        descricao: 'Registrar vendas e pedidos',
+                        onTap: () => Navigator.push(
+                          context,
+                          MaterialPageRoute(builder: (_) => const TelaVenda()),
                         ),
                       ),
-                      const SizedBox(width: 16),
-                      Expanded(
-                        child: _CardModulo(
-                          icon: Icons.inventory_2_outlined,
-                          titulo: 'Entregas',
-                          descricao: 'Registrar entregas de produtos',
-                          onTap: () => Navigator.push(
-                            context,
-                            MaterialPageRoute(builder: (_) => const TelaEntregas()),
-                          ),
+                      _CardModulo(
+                        icon: Icons.inventory_2_outlined,
+                        titulo: 'Entregas',
+                        descricao: 'Registrar entregas de produtos',
+                        onTap: () => Navigator.push(
+                          context,
+                          MaterialPageRoute(builder: (_) => const TelaEntregas()),
+                        ),
+                      ),
+                      _CardModulo(
+                        icon: Icons.admin_panel_settings_outlined,
+                        titulo: 'Administração',
+                        descricao: 'Relatórios e cadastros',
+                        onTap: () => Navigator.push(
+                          context,
+                          MaterialPageRoute(builder: (_) => const TelaAdmin()),
                         ),
                       ),
                     ],
@@ -105,7 +113,9 @@ class _CardModulo extends StatelessWidget {
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
 
-    return Card(
+    return SizedBox(
+      width: 240,
+      child: Card(
       elevation: 2,
       child: InkWell(
         onTap: onTap,
@@ -117,11 +127,15 @@ class _CardModulo extends StatelessWidget {
             children: [
               Icon(icon, size: 52, color: cs.primary),
               const SizedBox(height: 14),
-              Text(
-                titulo,
-                style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                  fontWeight: FontWeight.bold,
-                  color: cs.onSurface,
+              FittedBox(
+                fit: BoxFit.scaleDown,
+                child: Text(
+                  titulo,
+                  maxLines: 1,
+                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                    fontWeight: FontWeight.bold,
+                    color: cs.onSurface,
+                  ),
                 ),
               ),
               const SizedBox(height: 6),
@@ -133,6 +147,7 @@ class _CardModulo extends StatelessWidget {
             ],
           ),
         ),
+      ),
       ),
     );
   }

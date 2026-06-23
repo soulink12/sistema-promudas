@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
 import '../../../core/services/theme_service.dart';
-import 'formas_pagamento_screen.dart';
-import 'produtos_screen.dart';
 
+/// Tela de Aparência — preferências pessoais do operador (tema + tamanho da fonte).
+/// É transversal aos módulos (acessível em PDV, Entregas e Administração), por isso
+/// fica separada dos cadastros (Produtos/Formas), que pertencem à Administração.
 class TelaConfiguracoes extends StatefulWidget {
   const TelaConfiguracoes({super.key});
 
@@ -15,11 +16,10 @@ class _TelaConfiguracoesState extends State<TelaConfiguracoes> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Configurações'),
+        title: const Text('Configuração'),
       ),
       body: ListView(
         children: [
-          _buildSecao(context, 'Aparência'),
           ValueListenableBuilder<ThemeMode>(
             valueListenable: ThemeService.themeMode,
             builder: (context, mode, _) {
@@ -62,44 +62,7 @@ class _TelaConfiguracoesState extends State<TelaConfiguracoes> {
               );
             },
           ),
-          _buildSecao(context, 'Cadastros'),
-          ListTile(
-            leading: const Icon(Icons.eco_outlined),
-            title: const Text('Produtos'),
-            subtitle: const Text('Adicionar, editar ou desativar produtos'),
-            trailing: const Icon(Icons.chevron_right),
-            onTap: () => Navigator.push(
-              context,
-              MaterialPageRoute(builder: (_) => const TelaProdutos()),
-            ),
-          ),
-          ListTile(
-            leading: const Icon(Icons.payment_outlined),
-            title: const Text('Formas de Pagamento'),
-            subtitle: const Text('Adicionar, editar ou remover formas de pagamento'),
-            trailing: const Icon(Icons.chevron_right),
-            onTap: () => Navigator.push(
-              context,
-              MaterialPageRoute(
-                  builder: (_) => const TelaFormasPagamento()),
-            ),
-          ),
         ],
-      ),
-    );
-  }
-
-  Widget _buildSecao(BuildContext context, String titulo) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 20, 16, 4),
-      child: Text(
-        titulo,
-        style: TextStyle(
-          fontSize: 12,
-          fontWeight: FontWeight.w600,
-          color: Theme.of(context).colorScheme.primary,
-          letterSpacing: 0.8,
-        ),
       ),
     );
   }

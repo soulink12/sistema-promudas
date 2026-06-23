@@ -270,7 +270,7 @@ class _TelaEntregasState extends State<TelaEntregas> {
           ),
           ListTile(
             leading: const Icon(Icons.settings_outlined),
-            title: const Text('Configurações'),
+            title: const Text('Configuração'),
             onTap: () {
               Navigator.pop(context);
               Navigator.push(
