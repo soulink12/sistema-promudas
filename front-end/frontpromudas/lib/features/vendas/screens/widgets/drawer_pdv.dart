@@ -90,7 +90,7 @@ class DrawerPdv extends StatelessWidget {
           ),
           ListTile(
             leading: const Icon(Icons.settings_outlined),
-            title: const Text('Configuração'),
+            title: const Text('Configurações do app'),
             onTap: () {
               Navigator.pop(context);
               Navigator.push(

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../../core/services/api_service.dart';
 import '../../configuracoes/screens/configuracoes_screen.dart';
+import '../../configuracoes/screens/configuracoes_sistema_screen.dart';
 import '../../relatorios/screens/relatorios_hub_screen.dart';
 import '../../notificacoes/screens/notificacoes_screen.dart';
 import '../../clientes/screens/clientes_screen.dart';
@@ -102,10 +103,17 @@ class _TelaAdminState extends State<TelaAdmin> {
           ),
           const SizedBox(height: 12),
           _CardAdmin(
-            icon: Icons.settings_outlined,
-            titulo: 'Configuração',
+            icon: Icons.tune_outlined,
+            titulo: 'Configurações do Sistema',
             descricao:
-                'Aparência (tema e fonte) e cadastros: produtos e formas de pagamento.',
+                'Cadastros do sistema: produtos e formas de pagamento.',
+            onTap: () => _abrir(const TelaConfiguracoesSistema()),
+          ),
+          const SizedBox(height: 12),
+          _CardAdmin(
+            icon: Icons.settings_outlined,
+            titulo: 'Configurações do Aplicativo',
+            descricao: 'Aparência: tema e tamanho da fonte.',
             onTap: () => _abrir(const TelaConfiguracoes()),
           ),
         ],

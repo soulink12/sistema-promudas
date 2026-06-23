@@ -47,8 +47,11 @@ class FiltroMultiStatus extends StatelessWidget {
         return OutlinedButton.icon(
           onPressed: () =>
               controller.isOpen ? controller.close() : controller.open(),
-          // Seta de dropdown à esquerda do rótulo.
-          icon: const Icon(Icons.arrow_drop_down, size: 22),
+          // Ícone de funil à esquerda do rótulo.
+          icon: Icon(
+            ativo ? Icons.filter_alt : Icons.filter_alt_outlined,
+            size: 18,
+          ),
           label: Text(ativo ? '$rotulo (${selecionados.length})' : rotulo),
           style: OutlinedButton.styleFrom(
             foregroundColor: ativo ? cs.primary : cs.onSurfaceVariant,
