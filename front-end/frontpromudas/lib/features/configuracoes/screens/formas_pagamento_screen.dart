@@ -105,12 +105,17 @@ class _TelaFormasPagamentoState extends State<TelaFormasPagamento> {
                         f['pagamento_posterior'] as bool? ?? false;
                     final contaPosterior =
                         f['conta_posterior'] as bool? ?? false;
+                    final depositoPosterior =
+                        f['deposito_posterior'] as bool? ?? false;
                     final parceladoEmAte = f['parcelado_em_ate'] as int? ?? 1;
                     final partes = <String>[];
                     if (posterior) {
                       partes.add('Crediário');
                     } else if (contaPosterior) {
                       partes.add('Conta definida depois');
+                    }
+                    if (depositoPosterior) {
+                      partes.add('Cheque (depósito posterior)');
                     }
                     if (parceladoEmAte > 1) {
                       partes.add('Parcela em até ${parceladoEmAte}x');
@@ -181,6 +186,7 @@ class _DialogFormaState extends State<_DialogForma> {
   final _formKey = GlobalKey<FormState>();
   bool _posterior = false;
   bool _contaPosterior = false;
+  bool _depositoPosterior = false;
   bool _salvando = false;
   String? _erro;
 
@@ -193,6 +199,8 @@ class _DialogFormaState extends State<_DialogForma> {
       _nomeController.text = widget.forma!['nome'] as String? ?? '';
       _posterior = widget.forma!['pagamento_posterior'] as bool? ?? false;
       _contaPosterior = widget.forma!['conta_posterior'] as bool? ?? false;
+      _depositoPosterior =
+          widget.forma!['deposito_posterior'] as bool? ?? false;
       _parceladoController.text =
           (widget.forma!['parcelado_em_ate'] as int? ?? 1).toString();
     }
@@ -216,6 +224,7 @@ class _DialogFormaState extends State<_DialogForma> {
         'nome': _nomeController.text.trim(),
         'pagamento_posterior': _posterior,
         'conta_posterior': _contaPosterior,
+        'deposito_posterior': _depositoPosterior,
         'parcelado_em_ate':
             (int.tryParse(_parceladoController.text.trim()) ?? 1).clamp(1, 99),
       };
@@ -284,7 +293,10 @@ class _DialogFormaState extends State<_DialogForma> {
               value: _posterior,
               onChanged: (v) => setState(() {
                 _posterior = v;
-                if (v) _contaPosterior = false; // mutuamente exclusivos
+                if (v) {
+                  _contaPosterior = false; // mutuamente exclusivos
+                  _depositoPosterior = false;
+                }
               }),
             ),
             SwitchListTile(
@@ -299,6 +311,20 @@ class _DialogFormaState extends State<_DialogForma> {
               onChanged: (v) => setState(() {
                 _contaPosterior = v;
                 if (v) _posterior = false; // mutuamente exclusivos
+              }),
+            ),
+            SwitchListTile(
+              contentPadding: EdgeInsets.zero,
+              title: const Text('Depósito posterior (cheque)'),
+              subtitle: const Text(
+                'Gera cheques a depositar — a data do pagamento é a do depósito, '
+                'feito depois na tela de notificações.',
+                style: TextStyle(fontSize: 12),
+              ),
+              value: _depositoPosterior,
+              onChanged: (v) => setState(() {
+                _depositoPosterior = v;
+                if (v) _posterior = false; // crediário e cheque são exclusivos
               }),
             ),
             if (_erro != null)

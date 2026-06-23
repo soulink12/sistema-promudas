@@ -17,6 +17,19 @@ const PAGAMENTO_SELECT = {
     numero_nota: true,
     data_emissao_nota: true,
     criado_em: true,
+    cheques: {
+        select: {
+            id: true,
+            numero: true,
+            banco: true,
+            agencia: true,
+            conta_corrente: true,
+            valor: true,
+            bom_para: true,
+            data_deposito: true,
+            depositado: true,
+        },
+    },
 };
 
 // Include padrão de um pedido completo: cliente, itens (com nome do produto),

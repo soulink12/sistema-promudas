@@ -462,11 +462,14 @@ class _TelaVendaState extends State<TelaVenda> {
           'pedido_id': pedidoId,
           'valor_pago': valorPago,
           'forma_pagamento': p['forma'],
-          'data_pagamento': DateTime.now().toUtc().toIso8601String(),
+          // Cheque (depósito posterior): data fica nula até o depósito.
+          if (p['depositoPosterior'] != true)
+            'data_pagamento': DateTime.now().toUtc().toIso8601String(),
           if (p['parcelas'] != null) 'parcelas': p['parcelas'],
           if (p['conta'] != null) 'conta': p['conta'],
           if (p['nomePagador'] != null) 'nome_pagador': p['nomePagador'],
           if (p['cpfPagador'] != null) 'cpf_cnpj_pagador': p['cpfPagador'],
+          if (p['cheques'] != null) 'cheques': p['cheques'],
         });
         restante -= valorPago;
       }

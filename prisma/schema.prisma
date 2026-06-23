@@ -110,8 +110,29 @@ model pagamentos {
   data_emissao_nota DateTime? @db.Date
   criado_em         DateTime? @default(now()) @db.Timestamp(0)
   pedidos           pedidos?  @relation(fields: [pedido_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  cheques           cheques[]
 
   @@index([pedido_id])
+}
+
+// Cheques de um pagamento (1 pagamento pode ter vários cheques, ex.: pré-datados).
+// Cada cheque é depositado individualmente: data_deposito null = ainda a depositar
+// (alimenta a notificação "cheques a depositar").
+model cheques {
+  id             Int        @id @default(autoincrement())
+  pagamento_id   Int
+  numero         String?    @db.VarChar(50)
+  banco          String?    @db.VarChar(50)
+  agencia        String?    @db.VarChar(20)
+  conta_corrente String?    @db.VarChar(30)
+  valor          Decimal    @db.Decimal(10, 2)
+  bom_para       DateTime?  @db.Timestamp(0)
+  data_deposito  DateTime?  @db.Timestamp(0)
+  depositado     Boolean    @default(false)
+  criado_em      DateTime?  @default(now()) @db.Timestamp(0)
+  pagamentos     pagamentos @relation(fields: [pagamento_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([pagamento_id])
 }
 
 model usuarios {
@@ -129,6 +150,7 @@ model formas_pagamento {
   ativo               Boolean @default(true)
   pagamento_posterior Boolean @default(false)
   conta_posterior     Boolean @default(false)
+  deposito_posterior  Boolean @default(false)
   parcelado_em_ate    Int     @default(1)
 }
 

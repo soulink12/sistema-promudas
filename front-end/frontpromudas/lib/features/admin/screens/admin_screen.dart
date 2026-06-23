@@ -4,7 +4,9 @@ import '../../configuracoes/screens/configuracoes_screen.dart';
 import '../../configuracoes/screens/produtos_screen.dart';
 import '../../configuracoes/screens/formas_pagamento_screen.dart';
 import '../../relatorios/screens/relatorios_hub_screen.dart';
-import '../../pagamentos/screens/pagamentos_sem_conta_screen.dart';
+import '../../notificacoes/screens/notificacoes_screen.dart';
+import '../../clientes/screens/clientes_screen.dart';
+import '../../pedidos/screens/pedidos_screen.dart';
 
 /// Módulo de Administração — agrupa as funções que não são do operador de caixa:
 /// relatórios, cadastros (produtos/formas), conciliação de pagamentos sem conta e
@@ -18,25 +20,29 @@ class TelaAdmin extends StatefulWidget {
 }
 
 class _TelaAdminState extends State<TelaAdmin> {
-  // Quantidade de pagamentos reais sem conta definida (badge do card).
-  // Herda o papel do antigo sino do drawer, agora dentro da Administração.
-  int _pendentesSemConta = 0;
+  // Total de pendências (cheques a depositar + pagamentos sem conta) exibido como
+  // badge do card de Notificações — o sino geral do sistema, agora na Administração.
+  int _totalNotificacoes = 0;
 
   @override
   void initState() {
     super.initState();
-    _carregarPendentesSemConta();
+    _carregarNotificacoes();
   }
 
-  /// Conta os pagamentos sem conta. Falha silenciosa — o badge só não aparece.
-  Future<void> _carregarPendentesSemConta() async {
+  /// Soma as pendências de todos os tipos. Falha silenciosa por tipo — o badge
+  /// apenas não conta aquele tipo se o endpoint falhar.
+  Future<void> _carregarNotificacoes() async {
+    int total = 0;
     try {
-      final response = await ApiService.dio.get('/pagamentos/pendentes-conta');
-      final qtd = (response.data as List).length;
-      if (mounted) setState(() => _pendentesSemConta = qtd);
-    } catch (_) {
-      // Ignora — não atrapalha o módulo
-    }
+      final r = await ApiService.dio.get('/cheques/a-depositar');
+      total += (r.data as List).length;
+    } catch (_) {}
+    try {
+      final r = await ApiService.dio.get('/pagamentos/pendentes-conta');
+      total += (r.data as List).length;
+    } catch (_) {}
+    if (mounted) setState(() => _totalNotificacoes = total);
   }
 
   /// Abre uma sub-tela e, ao voltar, recarrega a contagem (pode ter mudado).
@@ -45,7 +51,7 @@ class _TelaAdminState extends State<TelaAdmin> {
       context,
       MaterialPageRoute(builder: (_) => tela),
     );
-    _carregarPendentesSemConta();
+    _carregarNotificacoes();
   }
 
   @override
@@ -55,6 +61,21 @@ class _TelaAdminState extends State<TelaAdmin> {
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
+          _CardAdmin(
+            icon: Icons.people_outline,
+            titulo: 'Clientes',
+            descricao: 'Consultar, cadastrar e editar clientes.',
+            onTap: () => _abrir(const TelaListaClientes()),
+          ),
+          const SizedBox(height: 12),
+          _CardAdmin(
+            icon: Icons.receipt_long_outlined,
+            titulo: 'Pedidos',
+            descricao:
+                'Consultar pedidos e seus pagamentos; registrar pagamento e emitir PDF.',
+            onTap: () => _abrir(const TelaPedidos()),
+          ),
+          const SizedBox(height: 12),
           _CardAdmin(
             icon: Icons.bar_chart_outlined,
             titulo: 'Relatórios',
@@ -78,12 +99,12 @@ class _TelaAdminState extends State<TelaAdmin> {
           ),
           const SizedBox(height: 12),
           _CardAdmin(
-            icon: Icons.account_balance_outlined,
-            titulo: 'Pagamentos sem conta',
+            icon: Icons.notifications_outlined,
+            titulo: 'Notificações',
             descricao:
-                'Pagamentos sem conta definida (ex: dinheiro, cheque). Defina a conta de cada um.',
-            badge: _pendentesSemConta,
-            onTap: () => _abrir(const TelaPagamentosSemConta()),
+                'Pendências do sistema: cheques a depositar e pagamentos sem conta.',
+            badge: _totalNotificacoes,
+            onTap: () => _abrir(const TelaNotificacoes()),
           ),
           const SizedBox(height: 12),
           _CardAdmin(

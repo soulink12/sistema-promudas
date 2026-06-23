@@ -6,22 +6,34 @@ const formaPagamentoService = require('./formaPagamentoService');
 // Recalcula o status de pagamento do pedido com base na soma real dos pagamentos no banco.
 // Pagamentos com forma de pagamento posterior (ex: crediário) não contam como valor recebido.
 const recalcularStatusPedido = async (pedido_id) => {
-    const [pedido, formasPosteriores] = await Promise.all([
+    const [pedido, formasPosteriores, formasDeposito] = await Promise.all([
         prisma.pedidos.findUnique({
             where: { id: parseInt(pedido_id) },
-            include: { pagamentos: true }
+            include: { pagamentos: { include: { cheques: true } } }
         }),
-        formaPagamentoService.listarPosteriores()
+        formaPagamentoService.listarPosteriores(),
+        formaPagamentoService.listarDepositoPosterior()
     ]);
 
     if (!pedido) return;
 
     const nomesPosteriores = new Set(formasPosteriores.map(f => f.nome));
+    const nomesDeposito = new Set(formasDeposito.map(f => f.nome));
 
-    // Só conta pagamentos efetivamente recebidos (exclui crediário e similares)
-    const totalPago = pedido.pagamentos
-        .filter(p => !nomesPosteriores.has(p.forma_pagamento))
-        .reduce((soma, p) => soma + parseFloat(p.valor_pago), 0);
+    // Só conta o que foi efetivamente recebido:
+    // - crediário (pagamento posterior) não conta;
+    // - cheque (depósito posterior) só conta a parte já depositada;
+    // - demais formas contam o valor pago integral.
+    const totalPago = pedido.pagamentos.reduce((soma, p) => {
+        if (nomesPosteriores.has(p.forma_pagamento)) return soma;
+        if (nomesDeposito.has(p.forma_pagamento)) {
+            const depositado = (p.cheques || [])
+                .filter(c => c.depositado)
+                .reduce((a, c) => a + parseFloat(c.valor), 0);
+            return soma + depositado;
+        }
+        return soma + parseFloat(p.valor_pago);
+    }, 0);
 
     const valorTotal = parseFloat(pedido.valor_total);
 
@@ -92,9 +104,36 @@ const criarPagamento = async (dadosPagamento) => {
         }
     }
 
-    const novoPagamento = await prisma.pagamentos.create({
-        data: normalizarDatas(dadosPagamento, ['data_pagamento', 'data_emissao_nota'])
-    });
+    // Cheques (opcionais) são criados junto ao pagamento. Cada cheque entra sem
+    // data_deposito (= "a depositar") salvo se já vier informada.
+    const { cheques, ...dadosSemCheques } = dadosPagamento;
+    const dados = normalizarDatas(dadosSemCheques, ['data_pagamento', 'data_emissao_nota']);
+
+    if (Array.isArray(cheques) && cheques.length > 0) {
+        dados.cheques = {
+            create: cheques.map((c) => {
+                const valor = parseFloat(c.valor);
+                if (isNaN(valor) || valor <= 0) {
+                    throw new BusinessError('Cada cheque precisa de um valor maior que zero.');
+                }
+                return normalizarDatas(
+                    {
+                        numero: c.numero ?? null,
+                        banco: c.banco ?? null,
+                        agencia: c.agencia ?? null,
+                        conta_corrente: c.conta_corrente ?? null,
+                        valor,
+                        bom_para: c.bom_para ?? null,
+                        data_deposito: c.data_deposito ?? null,
+                        depositado: c.data_deposito ? true : (c.depositado ?? false),
+                    },
+                    ['bom_para', 'data_deposito']
+                );
+            }),
+        };
+    }
+
+    const novoPagamento = await prisma.pagamentos.create({ data: dados });
 
     await recalcularStatusPedido(pedido_id);
 
@@ -119,18 +158,22 @@ const listarPagamentos = async () => {
 };
 
 // Lista pagamentos reais que ainda não foram colocados em uma conta (conta pendente).
-// Ex: pagamentos em dinheiro (e futuramente cheque) que entram no PDV sem conta definida.
-// Exclui crediário/posterior (esses são "a receber", não dinheiro recebido sem conta).
+// Ex: pagamentos em dinheiro que entram no PDV sem conta definida.
+// Exclui crediário/posterior (são "a receber", não dinheiro sem conta) e também
+// cheque/depósito-posterior (a conta do cheque é definida no depósito, não aqui).
 const listarPagamentosPendentesDeConta = async () => {
-    const formasPosteriores = await formaPagamentoService.listarPosteriores();
-    const nomesPosteriores = formasPosteriores.map(f => f.nome);
+    const [formasPosteriores, formasDeposito] = await Promise.all([
+        formaPagamentoService.listarPosteriores(),
+        formaPagamentoService.listarDepositoPosterior(),
+    ]);
+    const nomesExcluidos = [...formasPosteriores, ...formasDeposito].map(f => f.nome);
 
     const where = {
         OR: [{ conta: null }, { conta: '' }],
         pedidos: { ativo: true },
     };
-    if (nomesPosteriores.length > 0) {
-        where.forma_pagamento = { notIn: nomesPosteriores };
+    if (nomesExcluidos.length > 0) {
+        where.forma_pagamento = { notIn: nomesExcluidos };
     }
 
     return await prisma.pagamentos.findMany({
@@ -184,9 +227,11 @@ const atualizarPagamento = async (id, dados) => {
         }
     }
 
+    // Cheques são gerenciados pelos endpoints de /api/cheques, não por aqui.
+    const { cheques: _ignorado, ...dadosSemCheques } = dados;
     const pagamentoAtualizado = await prisma.pagamentos.update({
         where: { id: parseInt(id) },
-        data: normalizarDatas(dados, ['data_pagamento', 'data_emissao_nota']),
+        data: normalizarDatas(dadosSemCheques, ['data_pagamento', 'data_emissao_nota']),
     });
 
     await recalcularStatusPedido(pagamentoAtualizado.pedido_id);

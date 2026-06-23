@@ -10,6 +10,7 @@ const pagamentoRoutes = require('./routes/pagamentoRoutes');
 const entregaRoutes = require('./routes/entregaRoutes');
 const locaisEntregaRoutes = require('./routes/locaisEntregaRoutes');
 const contaRoutes = require('./routes/contaRoutes');
+const chequeRoutes = require('./routes/chequeRoutes');
 const formaPagamentoRoutes = require('./routes/formaPagamentoRoutes');
 const relatorioRoutes = require('./routes/relatorioRoutes');
 
@@ -39,6 +40,7 @@ app.use('/api/pagamentos', pagamentoRoutes);
 app.use('/api/entregas', entregaRoutes);
 app.use('/api/locais-entrega', locaisEntregaRoutes);
 app.use('/api/contas', contaRoutes);
+app.use('/api/cheques', chequeRoutes);
 
 // Tratamento central de erro — sempre por último, depois de todas as rotas.
 app.use(errorHandler);

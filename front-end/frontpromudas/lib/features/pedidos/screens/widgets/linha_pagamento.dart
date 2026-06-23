@@ -36,6 +36,10 @@ class LinhaPagamento extends StatelessWidget {
     final contaPendente = !temConta && !posterior;
     final nomePagador = pag['nome_pagador'] as String?;
     final temPagador = nomePagador != null && nomePagador.isNotEmpty;
+    final cheques = (pag['cheques'] as List?)
+            ?.map((e) => Map<String, dynamic>.from(e as Map))
+            .toList() ??
+        const <Map<String, dynamic>>[];
 
     final statusNota = pag['status_nota'] as String? ?? 'Pendente';
     final numeroNota = pag['numero_nota'] as String?;
@@ -77,6 +81,18 @@ class LinhaPagamento extends StatelessWidget {
                   Text('Pago por: $nomePagador',
                       style: TextStyle(fontSize: 12, color: cs.primary)),
                 ],
+                ...cheques.map((c) {
+                  final depositado =
+                      c['depositado'] == true || c['data_deposito'] != null;
+                  final cor = depositado
+                      ? CoresSemanticas.sucesso
+                      : CoresSemanticas.aviso;
+                  return Padding(
+                    padding: const EdgeInsets.only(top: 2),
+                    child: Text(_textoCheque(c),
+                        style: TextStyle(fontSize: 12, color: cor)),
+                  );
+                }),
                 const SizedBox(height: 4),
                 Row(
                   children: [
@@ -155,6 +171,28 @@ class LinhaPagamento extends StatelessWidget {
 
 double _toDouble(dynamic v) =>
     v == null ? 0.0 : double.tryParse(v.toString()) ?? 0.0;
+
+/// Resumo de um cheque na linha de pagamento: identificação, valor e situação
+/// (a depositar / depositado em dd/mm/aaaa).
+String _textoCheque(Map<String, dynamic> c) {
+  final numero = c['numero'] as String?;
+  final banco = c['banco'] as String?;
+  final partes = <String>['Cheque'];
+  if (numero != null && numero.isNotEmpty) partes.add('nº $numero');
+  if (banco != null && banco.isNotEmpty) partes.add(banco);
+  var texto = '${partes.join(' ')} · ${formatarMoeda(_toDouble(c['valor']))}';
+  final dep = c['data_deposito'];
+  if (dep != null) {
+    final dt = DateTime.tryParse(dep.toString())?.toLocal();
+    texto += dt != null
+        ? ' · depositado ${dt.day.toString().padLeft(2, '0')}/'
+            '${dt.month.toString().padLeft(2, '0')}/${dt.year}'
+        : ' · depositado';
+  } else {
+    texto += ' · a depositar';
+  }
+  return texto;
+}
 
 /// Formata a data de emissão da nota (coluna só-data). Usa componentes UTC
 /// para não deslocar o dia ao converter para o fuso local.

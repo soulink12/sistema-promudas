@@ -4,13 +4,13 @@ const BusinessError = require('../utils/BusinessError');
 const listarFormasPagamento = async () => {
     return await prisma.formas_pagamento.findMany({
         orderBy: { nome: 'asc' },
-        select: { id: true, nome: true, ativo: true, pagamento_posterior: true, conta_posterior: true, parcelado_em_ate: true }
+        select: { id: true, nome: true, ativo: true, pagamento_posterior: true, conta_posterior: true, deposito_posterior: true, parcelado_em_ate: true }
     });
 };
 
-const criarForma = async (nome, pagamentoPosterior = false, contaPosterior = false, parceladoEmAte = 1) => {
+const criarForma = async (nome, pagamentoPosterior = false, contaPosterior = false, parceladoEmAte = 1, depositoPosterior = false) => {
     return await prisma.formas_pagamento.create({
-        data: { nome, pagamento_posterior: pagamentoPosterior, conta_posterior: contaPosterior, parcelado_em_ate: parceladoEmAte }
+        data: { nome, pagamento_posterior: pagamentoPosterior, conta_posterior: contaPosterior, deposito_posterior: depositoPosterior, parcelado_em_ate: parceladoEmAte }
     });
 };
 
@@ -37,4 +37,12 @@ const listarPosteriores = () =>
         select: { nome: true }
     });
 
-module.exports = { listarFormasPagamento, criarForma, atualizarForma, deletarForma, listarPosteriores };
+// Lista as formas de depósito posterior (cheque). Usado para tratar os cheques
+// como recebidos só após o depósito no cálculo de status do pedido.
+const listarDepositoPosterior = () =>
+    prisma.formas_pagamento.findMany({
+        where: { deposito_posterior: true },
+        select: { nome: true }
+    });
+
+module.exports = { listarFormasPagamento, criarForma, atualizarForma, deletarForma, listarPosteriores, listarDepositoPosterior };

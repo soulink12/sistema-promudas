@@ -4,6 +4,7 @@ import '../../../../core/services/conta_service.dart';
 import '../../../../core/theme/cores_semanticas.dart';
 import '../../../../core/utils/formatadores.dart';
 import 'linha_parcela.dart';
+import 'campos_cheque.dart';
 
 /// Modal de registro de pagamento do pedido.
 /// Suporta pagamento dividido em múltiplas formas.
@@ -51,6 +52,13 @@ class _ModalPagamentoState extends State<ModalPagamento> {
   String? _contaSelecionada;
   // Nº de parcelas escolhido (só relevante para formas com parceladoEmAte > 1)
   int _parcelasSelecionadas = 1;
+  // Detalhes do cheque atual (só formas de depósito posterior). Cada "Adicionar"
+  // vira um cheque com estes dados + o valor digitado; os campos zeram depois.
+  final TextEditingController _chequeNumeroCtrl = TextEditingController();
+  final TextEditingController _chequeBancoCtrl = TextEditingController();
+  final TextEditingController _chequeAgenciaCtrl = TextEditingController();
+  final TextEditingController _chequeContaCtrl = TextEditingController();
+  DateTime? _chequeBomPara;
   bool _carregando = true;
   String? _erroCarregamento;
 
@@ -89,6 +97,10 @@ class _ModalPagamentoState extends State<ModalPagamento> {
     _valorFocusNode.dispose();
     _nomePagadorCtrl.dispose();
     _cpfPagadorCtrl.dispose();
+    _chequeNumeroCtrl.dispose();
+    _chequeBancoCtrl.dispose();
+    _chequeAgenciaCtrl.dispose();
+    _chequeContaCtrl.dispose();
     super.dispose();
   }
 
@@ -118,6 +130,40 @@ class _ModalPagamentoState extends State<ModalPagamento> {
   // Conta não se aplica: crediário (a receber) ou formas de conta definida depois.
   bool get _semContaNoPdv =>
       _formaSelecionadaPosterior || _formaSelecionadaContaPosterior;
+
+  // Retorna true se a forma selecionada é de depósito posterior (cheque) — nesse
+  // caso a parcela pode ter cheques e a data do pagamento fica para o depósito.
+  bool get _formaSelecionadaDepositoPosterior {
+    if (_formaSelecionada == null) return false;
+    for (final f in _formasPagamento) {
+      if (f['nome'] == _formaSelecionada) {
+        return f['depositoPosterior'] == true;
+      }
+    }
+    return false;
+  }
+
+  String? _ouNulo(String s) => s.trim().isEmpty ? null : s.trim();
+
+  // Limpa os campos do cheque após adicionar uma parcela (cada cheque é individual).
+  void _limparCamposCheque() {
+    _chequeNumeroCtrl.clear();
+    _chequeBancoCtrl.clear();
+    _chequeAgenciaCtrl.clear();
+    _chequeContaCtrl.clear();
+    _chequeBomPara = null;
+  }
+
+  Future<void> _escolherBomPara() async {
+    final hoje = DateTime.now();
+    final escolhido = await showDatePicker(
+      context: context,
+      initialDate: _chequeBomPara ?? hoje,
+      firstDate: DateTime(hoje.year - 1),
+      lastDate: DateTime(hoje.year + 5),
+    );
+    if (escolhido != null) setState(() => _chequeBomPara = escolhido);
+  }
 
   // Máximo de parcelas permitido pela forma selecionada (1 = à vista).
   int get _maxParcelasSelecionada {
@@ -162,19 +208,42 @@ class _ModalPagamentoState extends State<ModalPagamento> {
     // Parcelas só fazem sentido para formas que permitem parcelar (ex.: crédito).
     final parcelas = _permiteParcelar ? _parcelasSelecionadas : 1;
 
+    // Cheque (forma de depósito posterior): cada "Adicionar" gera um cheque
+    // individual com o valor desta parcela + os campos inline.
+    final deposito = _formaSelecionadaDepositoPosterior;
+    final bomParaIso = _chequeBomPara == null
+        ? null
+        : DateTime(_chequeBomPara!.year, _chequeBomPara!.month,
+                _chequeBomPara!.day, 12)
+            .toUtc()
+            .toIso8601String();
+
     setState(() {
       _pagamentos.add({
         'forma': _formaSelecionada,
         'valor': valor,
         'pagamentoPosterior': posterior,
+        'depositoPosterior': deposito,
         'parcelas': parcelas,
         if (!semConta) 'conta': _contaSelecionada,
         if (!posterior && nomePagador.isNotEmpty) 'nomePagador': nomePagador,
         if (!posterior && cpfPagador.isNotEmpty) 'cpfPagador': cpfPagador,
+        if (deposito)
+          'cheques': [
+            {
+              'valor': valor,
+              'numero': _ouNulo(_chequeNumeroCtrl.text),
+              'banco': _ouNulo(_chequeBancoCtrl.text),
+              'agencia': _ouNulo(_chequeAgenciaCtrl.text),
+              'conta_corrente': _ouNulo(_chequeContaCtrl.text),
+              'bom_para': bomParaIso,
+            }
+          ],
       });
       final restante = _restante;
       _valorCtrl.text = restante > 0.005 ? restante.toStringAsFixed(2) : '';
       _parcelasSelecionadas = 1;
+      _limparCamposCheque();
       _nomePagadorCtrl.clear();
       _cpfPagadorCtrl.clear();
     });
@@ -368,6 +437,7 @@ class _ModalPagamentoState extends State<ModalPagamento> {
                               _formaSelecionada = v;
                               _parcelasSelecionadas =
                                   1; // reinicia ao trocar de forma
+                              _limparCamposCheque(); // cheque é da forma anterior
                             });
                             _valorFocusNode.requestFocus();
                           },
@@ -477,6 +547,18 @@ class _ModalPagamentoState extends State<ModalPagamento> {
                     ),
                   ],
                 ),
+
+                // Campos do cheque (opcional) — só para formas de depósito posterior.
+                if (_formaSelecionadaDepositoPosterior)
+                  CamposCheque(
+                    numeroCtrl: _chequeNumeroCtrl,
+                    bancoCtrl: _chequeBancoCtrl,
+                    agenciaCtrl: _chequeAgenciaCtrl,
+                    contaCtrl: _chequeContaCtrl,
+                    bomPara: _chequeBomPara,
+                    onEscolherData: _escolherBomPara,
+                    onLimparData: () => setState(() => _chequeBomPara = null),
+                  ),
 
                 // Pagador (opcional) — escondido quando a forma é crediário
                 // (pagamento posterior), pois ainda não há quem pagou.
