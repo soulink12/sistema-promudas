@@ -7,8 +7,8 @@ import '../../../pedidos/screens/pedidos_screen.dart';
 import '../../../configuracoes/screens/configuracoes_screen.dart';
 
 /// Drawer (menu sanduíche) do módulo PDV. Cabeçalho com o usuário logado e itens
-/// de navegação apenas das funções do PDV: Clientes, Pedidos, A receber (pedidos
-/// com pagamento pendente) e Aparência — além de Trocar Módulo e Sair.
+/// de navegação apenas das funções do PDV: Clientes, Pedidos e Aparência — além
+/// de Trocar Módulo e Sair.
 /// Relatórios, cadastros e conciliação financeira ficam no módulo Administração.
 class DrawerPdv extends StatelessWidget {
   const DrawerPdv({super.key});
@@ -85,22 +85,6 @@ class DrawerPdv extends StatelessWidget {
               Navigator.push(
                 context,
                 MaterialPageRoute(builder: (_) => const TelaPedidos()),
-              );
-            },
-          ),
-          ListTile(
-            leading: const Icon(Icons.account_balance_wallet_outlined),
-            title: const Text('A receber'),
-            onTap: () {
-              Navigator.pop(context);
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (_) => const TelaPedidos(
-                    titulo: 'A receber',
-                    statusPagamentoFiltro: 'Pendente,Parcial',
-                  ),
-                ),
               );
             },
           ),

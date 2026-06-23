@@ -34,11 +34,14 @@ const buscarPedido = async (req, res, next) => {
 
 const listarPedidos = async (req, res, next) => {
     try {
-        const { cliente, statusEntrega, statusPagamento } = req.query;
+        const { cliente, statusEntrega, statusPagamento, statusNota, de, ate } = req.query;
         const filtros = {};
         if (cliente) filtros.cliente = cliente;
         if (statusEntrega) filtros.statusEntrega = statusEntrega;
         if (statusPagamento) filtros.statusPagamento = statusPagamento;
+        if (statusNota) filtros.statusNota = statusNota;
+        if (de) filtros.de = de;
+        if (ate) filtros.ate = ate;
         const pedidos = await pedidoService.listarPedidos(filtros);
         return res.status(200).json(pedidos);
     } catch (erro) {

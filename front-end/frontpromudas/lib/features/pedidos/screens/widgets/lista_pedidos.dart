@@ -107,6 +107,7 @@ class ListaPedidos extends StatelessWidget {
 /// Status da nota fiscal do pedido, agregado a partir dos pagamentos reais
 /// (crediário/"a receber" não conta — ainda não há nota). Prioridade:
 /// Rejeitada > Processando > Emitida (todas) > Parcial (algumas) > Pendente.
+/// O backend replica esta mesma regra para o filtro de status de nota (pedidoService.js).
 String _statusNotaPedido(List pagamentos) {
   final reais = pagamentos
       .where((p) => (p as Map)['pagamento_posterior'] != true)

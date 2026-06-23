@@ -77,6 +77,24 @@ const criarPedido = async (dados) => {
     });
 };
 
+// Status da nota fiscal do pedido, agregado a partir dos pagamentos reais
+// (crediário/"a receber" não conta — ainda não há nota). Mesma regra do front
+// (lista_pedidos.dart). Prioridade: Rejeitada > Processando > Emitida (todas) >
+// Parcial (algumas) > Pendente. Recebe os pagamentos já com a flag pagamento_posterior.
+const statusNotaPedido = (pagamentos) => {
+    const reais = pagamentos.filter(p => p.pagamento_posterior !== true);
+    if (reais.length === 0) return 'Pendente';
+
+    const statuses = reais.map(p => p.status_nota ?? 'Pendente');
+    if (statuses.includes('Rejeitada')) return 'Rejeitada';
+    if (statuses.includes('Processando')) return 'Processando';
+
+    const emitidas = statuses.filter(s => s === 'Emitida').length;
+    if (emitidas === 0) return 'Pendente';
+    if (emitidas === statuses.length) return 'Emitida';
+    return 'Parcial';
+};
+
 const listarPedidos = async (filtros = {}) => {
     const where = { ativo: true };
     if (filtros.cliente) {
@@ -90,12 +108,18 @@ const listarPedidos = async (filtros = {}) => {
     if (filtros.statusPagamento) {
         where.status_pagamento = { in: filtros.statusPagamento.split(',') };
     }
+    // Intervalo de datas (criado_em) — obrigatório no front (padrão: última semana).
+    if (filtros.de || filtros.ate) {
+        where.criado_em = {
+            ...(filtros.de && { gte: new Date(filtros.de) }),
+            ...(filtros.ate && { lte: new Date(filtros.ate) }),
+        };
+    }
 
     const [pedidos, formasPosteriores] = await Promise.all([
         prisma.pedidos.findMany({
             where,
             orderBy: { criado_em: 'desc' },
-            take: (filtros.cliente || filtros.statusPagamento) ? 100 : 20,
             include: PEDIDO_INCLUDE
         }),
         formaPagamentoService.listarPosteriores()
@@ -104,13 +128,21 @@ const listarPedidos = async (filtros = {}) => {
     const nomesPosteriores = new Set(formasPosteriores.map(f => f.nome));
 
     // Adiciona flag pagamento_posterior em cada pagamento
-    return pedidos.map(pedido => ({
+    const comFlag = pedidos.map(pedido => ({
         ...pedido,
         pagamentos: pedido.pagamentos.map(pag => ({
             ...pag,
             pagamento_posterior: nomesPosteriores.has(pag.forma_pagamento)
         }))
     }));
+
+    // Filtra por status de nota (agregado dos pagamentos reais) — feito em memória,
+    // pois a nota não é uma coluna do pedido.
+    if (filtros.statusNota) {
+        const alvo = new Set(filtros.statusNota.split(','));
+        return comFlag.filter(p => alvo.has(statusNotaPedido(p.pagamentos)));
+    }
+    return comFlag;
 };
 
 const atualizarPedido = async (id, dados) => {

@@ -4,6 +4,8 @@ import '../../../core/theme/cores_semanticas.dart';
 import '../../../core/utils/api_feedback.dart';
 import '../../../core/widgets/pesquisa_cliente_lista.dart';
 import '../../../core/widgets/dialog_confirmacao.dart';
+import '../../../core/widgets/filtro_multi_status.dart';
+import '../../../core/widgets/botao_data.dart';
 import '../../vendas/screens/widgets/modal_pagamento.dart';
 import 'widgets/lista_pedidos.dart';
 import 'widgets/detalhes_pedido.dart';
@@ -43,36 +45,61 @@ class _TelaPedidosState extends State<TelaPedidos> {
   Map<String, dynamic>? _clienteFiltro;
   Map<String, dynamic>? _pedidoSelecionado;
 
+  // Filtros de status (seleção múltipla). Vazio = sem filtro. Todos filtrados no backend.
+  final Set<String> _statusPagamento = {};
+  final Set<String> _statusEntrega = {};
+  final Set<String> _statusNota = {};
+
+  // Intervalo de datas — obrigatório. Padrão: última semana (hoje − 7 dias … hoje).
+  late DateTime _de;
+  late DateTime _ate;
+
   @override
   void initState() {
     super.initState();
-    if (widget.clienteInicial != null) {
-      _clienteFiltro = widget.clienteInicial;
-      _carregarPedidos(widget.clienteInicial!['nome'] as String?);
-    } else {
-      _carregarPedidos();
+    _clienteFiltro = widget.clienteInicial;
+    final agora = DateTime.now();
+    _ate = DateTime(agora.year, agora.month, agora.day);
+    _de = _ate.subtract(const Duration(days: 7));
+    // Semeia o filtro de pagamento quando a tela já abre filtrada
+    // (ex.: "Pagamentos pendentes" passa 'Pendente,Parcial').
+    if (widget.statusPagamentoFiltro != null) {
+      _statusPagamento.addAll(widget.statusPagamentoFiltro!.split(','));
     }
+    _carregarPedidos();
     if (widget.pedidoInicial != null) {
       _pedidoSelecionado = widget.pedidoInicial;
     }
   }
 
-  Future<void> _carregarPedidos([String? clienteNome]) async {
+  Future<void> _carregarPedidos() async {
     setState(() {
       _carregando = true;
       _erro = null;
     });
     try {
-      final params = <String, dynamic>{};
+      final params = <String, dynamic>{
+        'de': _de.toIso8601String(),
+        // Inclui o dia inteiro do "até".
+        'ate': DateTime(_ate.year, _ate.month, _ate.day, 23, 59, 59)
+            .toIso8601String(),
+      };
+      final clienteNome = _clienteFiltro?['nome'] as String?;
       if (clienteNome != null && clienteNome.isNotEmpty) {
         params['cliente'] = clienteNome;
       }
-      if (widget.statusPagamentoFiltro != null) {
-        params['statusPagamento'] = widget.statusPagamentoFiltro;
+      if (_statusPagamento.isNotEmpty) {
+        params['statusPagamento'] = _statusPagamento.join(',');
+      }
+      if (_statusEntrega.isNotEmpty) {
+        params['statusEntrega'] = _statusEntrega.join(',');
+      }
+      if (_statusNota.isNotEmpty) {
+        params['statusNota'] = _statusNota.join(',');
       }
       final response = await ApiService.dio.get(
         '/pedidos',
-        queryParameters: params.isEmpty ? null : params,
+        queryParameters: params,
       );
       final dados = response.data as List;
       setState(() {
@@ -110,13 +137,47 @@ class _TelaPedidosState extends State<TelaPedidos> {
       _clienteFiltro = cliente;
       _pedidoSelecionado = null;
     });
-    _carregarPedidos(cliente['nome'] as String?);
+    _carregarPedidos();
   }
 
   void _limparFiltro() {
     setState(() {
       _clienteFiltro = null;
       _pedidoSelecionado = null;
+    });
+    _carregarPedidos();
+  }
+
+  Future<void> _selecionarData(bool isDe) async {
+    final data = await showDatePicker(
+      context: context,
+      initialDate: isDe ? _de : _ate,
+      firstDate: DateTime(2020),
+      lastDate: DateTime(2100),
+    );
+    if (data == null) return;
+    setState(() {
+      if (isDe) {
+        _de = data;
+        if (_ate.isBefore(_de)) _ate = _de;
+      } else {
+        _ate = data;
+        if (_de.isAfter(_ate)) _de = _ate;
+      }
+    });
+    _carregarPedidos();
+  }
+
+  String _formatarData(DateTime dt) =>
+      '${dt.day.toString().padLeft(2, '0')}/'
+      '${dt.month.toString().padLeft(2, '0')}/${dt.year}';
+
+  // Substitui o conteúdo de um filtro de status e recarrega (todos no backend).
+  void _aplicarFiltroStatus(Set<String> filtro, Set<String> selecao) {
+    setState(() {
+      filtro
+        ..clear()
+        ..addAll(selecao);
     });
     _carregarPedidos();
   }
@@ -433,6 +494,67 @@ class _TelaPedidosState extends State<TelaPedidos> {
           clienteSelecionado: _clienteFiltro,
           onSelecionado: _selecionarClienteFiltro,
           onLimpar: _limparFiltro,
+        ),
+        // Filtros (datas obrigatórias + status) — logo abaixo da pesquisa
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Expanded(
+                    child: BotaoData(
+                      label: 'De',
+                      valor: _formatarData(_de),
+                      selecionado: true,
+                      onTap: () => _selecionarData(true),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: BotaoData(
+                      label: 'Até',
+                      valor: _formatarData(_ate),
+                      selecionado: true,
+                      onTap: () => _selecionarData(false),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  FiltroMultiStatus(
+                    rotulo: 'Status de pagamento',
+                    opcoes: const ['Pago', 'Crédito', 'Parcial', 'Pendente'],
+                    selecionados: _statusPagamento,
+                    onChanged: (sel) => _aplicarFiltroStatus(_statusPagamento, sel),
+                  ),
+                  FiltroMultiStatus(
+                    rotulo: 'Status de entrega',
+                    opcoes: const ['Entregue', 'Parcial', 'Pendente'],
+                    selecionados: _statusEntrega,
+                    onChanged: (sel) => _aplicarFiltroStatus(_statusEntrega, sel),
+                  ),
+                  FiltroMultiStatus(
+                    rotulo: 'Status da nota',
+                    opcoes: const [
+                      'Emitida',
+                      'Parcial',
+                      'Pendente',
+                      'Processando',
+                      'Rejeitada',
+                    ],
+                    selecionados: _statusNota,
+                    onChanged: (sel) => _aplicarFiltroStatus(_statusNota, sel),
+                  ),
+                ],
+              ),
+            ],
+          ),
         ),
         Expanded(
           child: _carregando
