@@ -16,79 +16,103 @@ class TelaModulos extends StatelessWidget {
     return Scaffold(
       backgroundColor: cs.surfaceContainerLow,
       body: SafeArea(
-        child: Center(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(Icons.eco_outlined, size: 56, color: cs.primary),
-              const SizedBox(height: 10),
-              Text(
-                'Sistema Promudas',
-                style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                  fontWeight: FontWeight.bold,
-                  color: cs.onSurface,
-                ),
-              ),
-              const SizedBox(height: 6),
-              Text(
-                'Bem-vindo, $nomeUsuario',
-                style: TextStyle(color: cs.onSurfaceVariant, fontSize: 14),
-              ),
-              const SizedBox(height: 48),
-              ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 760),
+        child: LayoutBuilder(
+          builder: (context, constraints) => SingleChildScrollView(
+            child: ConstrainedBox(
+              constraints: BoxConstraints(minHeight: constraints.maxHeight),
+              child: Center(
                 child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 24),
-                  child: Wrap(
-                    alignment: WrapAlignment.center,
-                    spacing: 16,
-                    runSpacing: 16,
+                  padding: const EdgeInsets.symmetric(vertical: 24),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      _CardModulo(
-                        icon: Icons.point_of_sale,
-                        titulo: 'PDV',
-                        descricao: 'Registrar vendas e pedidos',
-                        onTap: () => Navigator.push(
-                          context,
-                          MaterialPageRoute(builder: (_) => const TelaVenda()),
+                      Icon(Icons.eco_outlined, size: 56, color: cs.primary),
+                      const SizedBox(height: 10),
+                      Text(
+                        'Sistema Promudas',
+                        style: Theme.of(context).textTheme.headlineSmall
+                            ?.copyWith(
+                              fontWeight: FontWeight.bold,
+                              color: cs.onSurface,
+                            ),
+                      ),
+                      const SizedBox(height: 6),
+                      Text(
+                        'Bem-vindo, $nomeUsuario',
+                        style: TextStyle(
+                          color: cs.onSurfaceVariant,
+                          fontSize: 14,
                         ),
                       ),
-                      _CardModulo(
-                        icon: Icons.inventory_2_outlined,
-                        titulo: 'Entregas',
-                        descricao: 'Registrar entregas de produtos',
-                        onTap: () => Navigator.push(
-                          context,
-                          MaterialPageRoute(builder: (_) => const TelaEntregas()),
+                      const SizedBox(height: 48),
+                      ConstrainedBox(
+                        constraints: const BoxConstraints(maxWidth: 760),
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 24),
+                          child: Wrap(
+                            alignment: WrapAlignment.center,
+                            spacing: 16,
+                            runSpacing: 16,
+                            children: [
+                              _CardModulo(
+                                icon: Icons.point_of_sale,
+                                titulo: 'PDV',
+                                descricao: 'Registrar vendas e pedidos',
+                                onTap: () => Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (_) => const TelaVenda(),
+                                  ),
+                                ),
+                              ),
+                              _CardModulo(
+                                icon: Icons.inventory_2_outlined,
+                                titulo: 'Entregas',
+                                descricao: 'Registrar entregas de produtos',
+                                onTap: () => Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (_) => const TelaEntregas(),
+                                  ),
+                                ),
+                              ),
+                              _CardModulo(
+                                icon: Icons.admin_panel_settings_outlined,
+                                titulo: 'Administração',
+                                descricao: 'Relatórios e cadastros',
+                                onTap: () => Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (_) => const TelaAdmin(),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
                       ),
-                      _CardModulo(
-                        icon: Icons.admin_panel_settings_outlined,
-                        titulo: 'Administração',
-                        descricao: 'Relatórios e cadastros',
-                        onTap: () => Navigator.push(
-                          context,
-                          MaterialPageRoute(builder: (_) => const TelaAdmin()),
+                      const SizedBox(height: 48),
+                      TextButton.icon(
+                        onPressed: () {
+                          AuthService.logout();
+                          Navigator.pushReplacement(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => const TelaLogin(),
+                            ),
+                          );
+                        },
+                        icon: const Icon(Icons.logout, size: 16),
+                        label: const Text('Sair'),
+                        style: TextButton.styleFrom(
+                          foregroundColor: cs.onSurfaceVariant,
                         ),
                       ),
                     ],
                   ),
                 ),
               ),
-              const SizedBox(height: 48),
-              TextButton.icon(
-                onPressed: () {
-                  AuthService.logout();
-                  Navigator.pushReplacement(
-                    context,
-                    MaterialPageRoute(builder: (_) => const TelaLogin()),
-                  );
-                },
-                icon: const Icon(Icons.logout, size: 16),
-                label: const Text('Sair'),
-                style: TextButton.styleFrom(foregroundColor: cs.onSurfaceVariant),
-              ),
-            ],
+            ),
           ),
         ),
       ),
@@ -116,38 +140,38 @@ class _CardModulo extends StatelessWidget {
     return SizedBox(
       width: 240,
       child: Card(
-      elevation: 2,
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(12),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 36, horizontal: 20),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(icon, size: 52, color: cs.primary),
-              const SizedBox(height: 14),
-              FittedBox(
-                fit: BoxFit.scaleDown,
-                child: Text(
-                  titulo,
-                  maxLines: 1,
-                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                    fontWeight: FontWeight.bold,
-                    color: cs.onSurface,
+        elevation: 2,
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(12),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 36, horizontal: 20),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(icon, size: 52, color: cs.primary),
+                const SizedBox(height: 14),
+                FittedBox(
+                  fit: BoxFit.scaleDown,
+                  child: Text(
+                    titulo,
+                    maxLines: 1,
+                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                      fontWeight: FontWeight.bold,
+                      color: cs.onSurface,
+                    ),
                   ),
                 ),
-              ),
-              const SizedBox(height: 6),
-              Text(
-                descricao,
-                textAlign: TextAlign.center,
-                style: TextStyle(color: cs.onSurfaceVariant, fontSize: 13),
-              ),
-            ],
+                const SizedBox(height: 6),
+                Text(
+                  descricao,
+                  textAlign: TextAlign.center,
+                  style: TextStyle(color: cs.onSurfaceVariant, fontSize: 13),
+                ),
+              ],
+            ),
           ),
         ),
-      ),
       ),
     );
   }

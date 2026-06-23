@@ -1,8 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../../core/services/api_service.dart';
 import '../../configuracoes/screens/configuracoes_screen.dart';
-import '../../configuracoes/screens/produtos_screen.dart';
-import '../../configuracoes/screens/formas_pagamento_screen.dart';
 import '../../relatorios/screens/relatorios_hub_screen.dart';
 import '../../notificacoes/screens/notificacoes_screen.dart';
 import '../../clientes/screens/clientes_screen.dart';
@@ -57,7 +55,26 @@ class _TelaAdminState extends State<TelaAdmin> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Administração')),
+      appBar: AppBar(
+        title: const Text('Administração'),
+        actions: [
+          // Sino de notificações — pendências do sistema (cheques a depositar,
+          // pagamentos sem conta). Badge com a soma de todas elas.
+          Padding(
+            padding: const EdgeInsets.only(right: 8),
+            child: Badge(
+              isLabelVisible: _totalNotificacoes > 0,
+              label: Text('$_totalNotificacoes'),
+              child: IconButton(
+                icon: const Icon(Icons.notifications),
+                iconSize: 28,
+                tooltip: 'Notificações',
+                onPressed: () => _abrir(const TelaNotificacoes()),
+              ),
+            ),
+          ),
+        ],
+      ),
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
@@ -85,32 +102,10 @@ class _TelaAdminState extends State<TelaAdmin> {
           ),
           const SizedBox(height: 12),
           _CardAdmin(
-            icon: Icons.eco_outlined,
-            titulo: 'Produtos',
-            descricao: 'Adicionar, editar ou desativar produtos do catálogo.',
-            onTap: () => _abrir(const TelaProdutos()),
-          ),
-          const SizedBox(height: 12),
-          _CardAdmin(
-            icon: Icons.payment_outlined,
-            titulo: 'Formas de Pagamento',
-            descricao: 'Adicionar, editar ou remover formas de pagamento.',
-            onTap: () => _abrir(const TelaFormasPagamento()),
-          ),
-          const SizedBox(height: 12),
-          _CardAdmin(
-            icon: Icons.notifications_outlined,
-            titulo: 'Notificações',
-            descricao:
-                'Pendências do sistema: cheques a depositar e pagamentos sem conta.',
-            badge: _totalNotificacoes,
-            onTap: () => _abrir(const TelaNotificacoes()),
-          ),
-          const SizedBox(height: 12),
-          _CardAdmin(
             icon: Icons.settings_outlined,
             titulo: 'Configuração',
-            descricao: 'Tema claro/escuro e tamanho da fonte do sistema.',
+            descricao:
+                'Aparência (tema e fonte) e cadastros: produtos e formas de pagamento.',
             onTap: () => _abrir(const TelaConfiguracoes()),
           ),
         ],
@@ -124,15 +119,12 @@ class _CardAdmin extends StatelessWidget {
   final String titulo;
   final String descricao;
   final VoidCallback onTap;
-  // Contagem opcional exibida como Badge sobre o ícone (0 = oculto).
-  final int badge;
 
   const _CardAdmin({
     required this.icon,
     required this.titulo,
     required this.descricao,
     required this.onTap,
-    this.badge = 0,
   });
 
   @override
@@ -142,13 +134,9 @@ class _CardAdmin extends StatelessWidget {
       child: ListTile(
         contentPadding:
             const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-        leading: Badge(
-          isLabelVisible: badge > 0,
-          label: Text('$badge'),
-          child: CircleAvatar(
-            backgroundColor: cs.primaryContainer,
-            child: Icon(icon, color: cs.onPrimaryContainer),
-          ),
+        leading: CircleAvatar(
+          backgroundColor: cs.primaryContainer,
+          child: Icon(icon, color: cs.onPrimaryContainer),
         ),
         title: Text(
           titulo,
