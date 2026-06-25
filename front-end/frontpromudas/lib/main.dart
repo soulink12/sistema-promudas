@@ -1,6 +1,8 @@
+import 'package:desktop_updater/desktop_updater.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'core/services/app_config.dart';
+import 'core/services/atualizador_service.dart';
 import 'core/services/theme_service.dart';
 import 'core/utils/observador_rotas.dart';
 import 'features/auth/screens/login_screen.dart';
@@ -15,8 +17,29 @@ void main() async {
   runApp(const MeuViveiroApp());
 }
 
-class MeuViveiroApp extends StatelessWidget {
+class MeuViveiroApp extends StatefulWidget {
   const MeuViveiroApp({super.key});
+
+  @override
+  State<MeuViveiroApp> createState() => _MeuViveiroAppState();
+}
+
+class _MeuViveiroAppState extends State<MeuViveiroApp> {
+  /// Controller do auto-update. Ao ser criado, já dispara a checagem de versão
+  /// contra o servidor. `null` fora de plataformas desktop (sem auto-update).
+  DesktopUpdaterController? _updaterController;
+
+  @override
+  void initState() {
+    super.initState();
+    _updaterController = AtualizadorService.criarController();
+  }
+
+  @override
+  void dispose() {
+    _updaterController?.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -58,9 +81,35 @@ class MeuViveiroApp extends StatelessWidget {
             useMaterial3: true,
           ),
           themeMode: mode,
-          home: const TelaLogin(),
+          home: _TelaInicial(updaterController: _updaterController),
         );
       },
+    );
+  }
+}
+
+/// Tela inicial: a tela de login com o "ouvinte" de atualização sobreposto.
+///
+/// O [UpdateDialogListener] fica abaixo do `Navigator` (dentro da rota inicial)
+/// para conseguir abrir o diálogo modal. Quando há atualização obrigatória, o
+/// diálogo bloqueia o uso até o app ser atualizado; quando não há (ou a checagem
+/// falha), nada aparece e o login segue normal.
+class _TelaInicial extends StatelessWidget {
+  final DesktopUpdaterController? updaterController;
+
+  const _TelaInicial({required this.updaterController});
+
+  @override
+  Widget build(BuildContext context) {
+    final controller = updaterController;
+    if (controller == null) {
+      return const TelaLogin();
+    }
+    return Stack(
+      children: [
+        const TelaLogin(),
+        UpdateDialogListener(controller: controller),
+      ],
     );
   }
 }

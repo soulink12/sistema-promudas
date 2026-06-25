@@ -1,5 +1,6 @@
 const express = require('express');
 const cors = require('cors');
+const path = require('path');
 require('dotenv').config();
 
 const authRoutes = require('./routes/authRoutes.js');
@@ -28,6 +29,12 @@ app.use(express.json());
 
 // Rota pública — login e registro
 app.use('/api/auth', authRoutes);
+
+// Atualizações do app desktop — arquivos servidos publicamente (a checagem de
+// versão acontece antes do login, então não pode exigir JWT). A pasta `updates/`
+// fica na raiz do projeto e recebe o manifesto (app-archive.json), os descritores
+// de release e os zips gerados por `dart run desktop_updater:release publish`.
+app.use('/updates', express.static(path.join(__dirname, '..', 'updates')));
 
 // Todas as rotas abaixo exigem token JWT válido
 app.use(verificarToken);

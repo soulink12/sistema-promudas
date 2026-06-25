@@ -1,0 +1,22 @@
+# Configuração de release do auto-update (pacote desktop_updater).
+#
+# `baseUrl` é o endereço PELO QUAL as PDVs alcançam o servidor de atualizações.
+# Ele é gravado como URL ABSOLUTA dentro do manifesto (app-archive.json / release.json),
+# então precisa ser o MESMO host que está no config.txt das PDVs (LAN/ZeroTier),
+# acrescido de `/updates`.
+#
+# Exemplos:
+#   - Teste local:   http://localhost:6072/updates
+#   - Servidor LAN:  http://192.168.0.50:6072/updates
+#   - ZeroTier:      http://10.147.0.10:6072/updates
+#
+# Fluxo de publicação (rodar na pasta front-end/frontpromudas):
+#   1. Subir a versão em pubspec.yaml (ex.: 0.1.0+1 -> 0.2.0+2)
+#   2. flutter build windows
+#   3. dart run desktop_updater:release publish --platform windows --mandatory
+#   4. Copiar os arquivos gerados (em dist/desktop_updater) para a pasta `updates/`
+#      do servidor (a que o Express serve em /updates).
+#
+# Antes da primeira publicação de produção: dart run desktop_updater:release doctor --platform windows
+updates:
+  baseUrl: http://localhost:6072/updates

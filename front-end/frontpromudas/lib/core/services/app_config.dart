@@ -8,6 +8,21 @@ class AppConfig {
   /// É sobrescrito por `carregar()` quando há um `config.txt` válido.
   static String apiBaseUrl = 'http://localhost:6072/api';
 
+  /// URL do manifesto de atualização (`app-archive.json`), servido pelo mesmo
+  /// backend na rota pública `/updates`. Derivada de [apiBaseUrl] trocando o
+  /// sufixo `/api` por `/updates/...`, para que o mesmo `config.txt` aponte a
+  /// API e as atualizações para o mesmo servidor — sem segunda configuração.
+  static Uri get updateArchiveUrl {
+    var base = apiBaseUrl.trim();
+    while (base.endsWith('/')) {
+      base = base.substring(0, base.length - 1);
+    }
+    if (base.endsWith('/api')) {
+      base = base.substring(0, base.length - '/api'.length);
+    }
+    return Uri.parse('$base/updates/app-archive.json');
+  }
+
   /// Nome do arquivo de configuração, procurado na pasta do executável.
   static const String _nomeArquivo = 'config.txt';
 

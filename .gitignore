@@ -13,6 +13,11 @@ yarn-error.log*
 
 /generated/prisma
 
+# Artefatos de atualização do app desktop (gerados pelo desktop_updater).
+# A pasta é versionada (existe no servidor), mas o conteúdo gerado não.
+/updates/*
+!/updates/.gitkeep
+
 # ==========================================
 # FRONTEND (Flutter Web/App)
 # ==========================================
