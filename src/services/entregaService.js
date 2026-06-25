@@ -231,5 +231,6 @@ module.exports = {
     criarEntrega,
     listarEntregas,
     atualizarEntrega,
-    eliminarEntrega
+    eliminarEntrega,
+    recalcularStatusEntrega
 };
