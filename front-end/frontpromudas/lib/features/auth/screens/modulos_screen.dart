@@ -26,17 +26,11 @@ class TelaModulos extends StatelessWidget {
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Icon(Icons.eco_outlined, size: 56, color: cs.primary),
-                      const SizedBox(height: 10),
-                      Text(
-                        'Sistema Promudas',
-                        style: Theme.of(context).textTheme.headlineSmall
-                            ?.copyWith(
-                              fontWeight: FontWeight.bold,
-                              color: cs.onSurface,
-                            ),
+                      Image.asset(
+                        'assets/images/promudas_logo.png',
+                        height: 132,
                       ),
-                      const SizedBox(height: 6),
+                      const SizedBox(height: 12),
                       Text(
                         'Bem-vindo, $nomeUsuario',
                         style: TextStyle(
