@@ -79,9 +79,7 @@ class _ModalPagamentoState extends State<ModalPagamento> {
       final contas = await ContaService().listar();
       setState(() {
         _formasPagamento = formas;
-        _formaSelecionada = formas.isNotEmpty
-            ? formas.first['nome'] as String
-            : null;
+        _formaSelecionada = _formaPadrao(formas);
         _contas = contas;
         _contaSelecionada = contas.isNotEmpty ? contas.first : null;
         _valorCtrl.text = widget.totalPedido.toStringAsFixed(2);
@@ -94,6 +92,18 @@ class _ModalPagamentoState extends State<ModalPagamento> {
       });
     }
     if (mounted) _valorFocusNode.requestFocus();
+  }
+
+  // Forma de pagamento pré-selecionada ao abrir o modal: "Dinheiro" quando
+  // existir (caso mais comum no balcão), caindo para a primeira da lista.
+  String? _formaPadrao(List<Map<String, dynamic>> formas) {
+    if (formas.isEmpty) return null;
+    for (final f in formas) {
+      if ((f['nome'] as String).trim().toLowerCase() == 'dinheiro') {
+        return f['nome'] as String;
+      }
+    }
+    return formas.first['nome'] as String;
   }
 
   @override
