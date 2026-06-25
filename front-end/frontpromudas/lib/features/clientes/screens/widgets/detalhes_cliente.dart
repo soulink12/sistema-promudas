@@ -237,8 +237,13 @@ class DetalhesCliente extends StatelessWidget {
                       ListTile(
                         dense: true,
                         leading: Container(
-                          width: 40,
-                          height: 40,
+                          // Sem tamanho fixo: a caixa expande para caber o
+                          // número (ex.: "#1234"), com um mínimo para manter
+                          // o formato de badge nos números curtos.
+                          constraints: const BoxConstraints(
+                              minWidth: 40, minHeight: 40),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 8, vertical: 4),
                           decoration: BoxDecoration(
                             color: cs.primaryContainer,
                             borderRadius: BorderRadius.circular(8),
@@ -246,6 +251,7 @@ class DetalhesCliente extends StatelessWidget {
                                 color: cs.primary.withValues(alpha: 0.3)),
                           ),
                           child: Center(
+                            widthFactor: 1,
                             child: Text(
                               numero,
                               style: TextStyle(

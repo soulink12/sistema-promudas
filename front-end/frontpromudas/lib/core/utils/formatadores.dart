@@ -1,8 +1,22 @@
 // Formatadores puros reutilizados em todo o app (moeda e data/hora).
 
-/// Formata um valor monetário como `R$ 1234.56` — mesmo formato usado hoje
-/// em todas as telas (ponto decimal, prefixo `R$ `).
-String formatarMoeda(num valor) => 'R\$ ${valor.toStringAsFixed(2)}';
+/// Formata um valor monetário no padrão brasileiro: `R$ 1.234,56`
+/// (ponto separando o milhar, vírgula separando os centavos, prefixo `R$ `).
+String formatarMoeda(num valor) {
+  final negativo = valor < 0;
+  final partes = valor.abs().toStringAsFixed(2).split('.');
+  final inteiro = partes[0];
+  final centavos = partes[1];
+
+  // Insere o ponto de milhar a cada 3 dígitos, da direita para a esquerda.
+  final buffer = StringBuffer();
+  for (var i = 0; i < inteiro.length; i++) {
+    if (i > 0 && (inteiro.length - i) % 3 == 0) buffer.write('.');
+    buffer.write(inteiro[i]);
+  }
+
+  return 'R\$ ${negativo ? '-' : ''}$buffer,$centavos';
+}
 
 /// Número de exibição do pedido a partir da temporada: `26-1`, `27-3`, etc.
 /// (ano em 2 dígitos + sequencial). Cai para `#id` quando o pedido não tem
