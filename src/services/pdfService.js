@@ -3,8 +3,9 @@ const prisma = require('../config/database');
 const BusinessError = require('../utils/BusinessError');
 const formaPagamentoService = require('./formaPagamentoService');
 const { formatarNumeroPedido } = require('../utils/numeroPedido');
+const { formatarMoeda } = require('../utils/moeda');
 
-const moeda = (v) => `R$ ${parseFloat(v || 0).toFixed(2).replace('.', ',')}`;
+const moeda = formatarMoeda;
 
 const formatarData = (d) => {
     if (!d) return '—';
