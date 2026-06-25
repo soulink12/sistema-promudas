@@ -32,8 +32,15 @@ class LinhaPagamento extends StatelessWidget {
     final conta = pag['conta'] as String?;
     final temConta = conta != null && conta.isNotEmpty;
     final posterior = pag['pagamento_posterior'] == true;
-    // Pagamento real sem conta = conta ainda pendente (ex: dinheiro/cheque)
-    final contaPendente = !temConta && !posterior;
+    // Escambo (troca): kg de produção recebidos; não tem conta.
+    // Decimal vem como String no JSON — parse robusto.
+    final escamboKg = pag['escambo_quantidade'] == null
+        ? null
+        : double.tryParse(pag['escambo_quantidade'].toString());
+    final isEscambo = escamboKg != null;
+    // Pagamento real sem conta = conta ainda pendente (ex: dinheiro/cheque).
+    // Escambo não conta como "sem conta" (não é dinheiro).
+    final contaPendente = !temConta && !posterior && !isEscambo;
     final nomePagador = pag['nome_pagador'] as String?;
     final temPagador = nomePagador != null && nomePagador.isNotEmpty;
     final cheques = (pag['cheques'] as List?)
@@ -75,6 +82,12 @@ class LinhaPagamento extends StatelessWidget {
                   Text('Conta: pendente',
                       style: TextStyle(
                           fontSize: 12, color: CoresSemanticas.aviso)),
+                ],
+                if (isEscambo) ...[
+                  const SizedBox(height: 2),
+                  Text('Pimenta: ${formatarQuantidade(escamboKg)} kg',
+                      style: TextStyle(
+                          fontSize: 12, color: cs.onSurfaceVariant)),
                 ],
                 if (temPagador) ...[
                   const SizedBox(height: 2),

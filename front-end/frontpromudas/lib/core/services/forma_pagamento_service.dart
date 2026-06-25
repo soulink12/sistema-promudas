@@ -14,6 +14,11 @@ class FormaPagamentoService {
               'contaPosterior': item['conta_posterior'] as bool? ?? false,
               'depositoPosterior': item['deposito_posterior'] as bool? ?? false,
               'parceladoEmAte': item['parcelado_em_ate'] as int? ?? 1,
+              'escambo': item['escambo'] as bool? ?? false,
+              // Decimal vem como String no JSON — parse robusto.
+              'valorKgEscambo': item['valor_kg_escambo'] == null
+                  ? null
+                  : double.tryParse(item['valor_kg_escambo'].toString()),
             })
         .toList();
   }

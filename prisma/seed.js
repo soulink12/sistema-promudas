@@ -42,12 +42,14 @@ async function main() {
             // conta_posterior = a conta é definida depois (não no PDV); fica "pendente"
             // deposito_posterior = gera cheques a depositar; a data do pagamento é a do depósito
             // parcelado_em_ate > 1 = libera a escolha de parcelas no PDV (ex.: crédito até 6x)
+            // escambo = troca por produção (pimenta); valor calculado por kg via valor_kg_escambo
             { nome: 'Dinheiro', pagamento_posterior: false, conta_posterior: true, deposito_posterior: false, parcelado_em_ate: 1 },
             { nome: 'PIX', pagamento_posterior: false, conta_posterior: false, deposito_posterior: false, parcelado_em_ate: 1 },
             { nome: 'Cartão de Débito', pagamento_posterior: false, conta_posterior: false, deposito_posterior: false, parcelado_em_ate: 1 },
             { nome: 'Cartão de Crédito', pagamento_posterior: false, conta_posterior: false, deposito_posterior: false, parcelado_em_ate: 6 },
             { nome: 'Crediário', pagamento_posterior: true, conta_posterior: false, deposito_posterior: false, parcelado_em_ate: 1 },
             { nome: 'Cheque', pagamento_posterior: false, conta_posterior: true, deposito_posterior: true, parcelado_em_ate: 1 },
+            { nome: 'Escambo', pagamento_posterior: false, conta_posterior: false, deposito_posterior: false, parcelado_em_ate: 1, escambo: true, valor_kg_escambo: 25.50 },
         ],
     });
 

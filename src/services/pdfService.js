@@ -283,6 +283,14 @@ const gerarPedidoPDF = async (pedidoId) => {
                     doc.moveDown(0.4);
                 }
 
+                // Escambo (troca): quantidade de produção recebida em kg
+                if (pag.escambo_quantidade != null) {
+                    doc.font('Helvetica-Oblique').fontSize(8).fillColor('#666666')
+                        .text(`Pimenta: ${parseFloat(pag.escambo_quantidade)} kg`, 60, doc.y, { width: 470 });
+                    doc.fillColor('black');
+                    doc.moveDown(0.4);
+                }
+
                 // Pagador, quando diferente do cliente
                 if (pag.nome_pagador) {
                     const detalhePagador = pag.cpf_cnpj_pagador

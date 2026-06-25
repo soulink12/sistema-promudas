@@ -107,6 +107,7 @@ class _TelaFormasPagamentoState extends State<TelaFormasPagamento> {
                         f['conta_posterior'] as bool? ?? false;
                     final depositoPosterior =
                         f['deposito_posterior'] as bool? ?? false;
+                    final escambo = f['escambo'] as bool? ?? false;
                     final parceladoEmAte = f['parcelado_em_ate'] as int? ?? 1;
                     final partes = <String>[];
                     if (posterior) {
@@ -116,6 +117,9 @@ class _TelaFormasPagamentoState extends State<TelaFormasPagamento> {
                     }
                     if (depositoPosterior) {
                       partes.add('Cheque (depósito posterior)');
+                    }
+                    if (escambo) {
+                      partes.add('Escambo (troca)');
                     }
                     if (parceladoEmAte > 1) {
                       partes.add('Parcela em até ${parceladoEmAte}x');
@@ -183,10 +187,12 @@ class _DialogForma extends StatefulWidget {
 class _DialogFormaState extends State<_DialogForma> {
   final _nomeController = TextEditingController();
   final _parceladoController = TextEditingController(text: '1');
+  final _valorKgController = TextEditingController();
   final _formKey = GlobalKey<FormState>();
   bool _posterior = false;
   bool _contaPosterior = false;
   bool _depositoPosterior = false;
+  bool _escambo = false;
   bool _salvando = false;
   String? _erro;
 
@@ -201,8 +207,16 @@ class _DialogFormaState extends State<_DialogForma> {
       _contaPosterior = widget.forma!['conta_posterior'] as bool? ?? false;
       _depositoPosterior =
           widget.forma!['deposito_posterior'] as bool? ?? false;
+      _escambo = widget.forma!['escambo'] as bool? ?? false;
       _parceladoController.text =
           (widget.forma!['parcelado_em_ate'] as int? ?? 1).toString();
+      // Decimal vem do backend como String no JSON — parse robusto.
+      final valorKgRaw = widget.forma!['valor_kg_escambo'];
+      final valorKg =
+          valorKgRaw == null ? null : double.tryParse(valorKgRaw.toString());
+      if (valorKg != null) {
+        _valorKgController.text = valorKg.toStringAsFixed(2);
+      }
     }
   }
 
@@ -210,6 +224,7 @@ class _DialogFormaState extends State<_DialogForma> {
   void dispose() {
     _nomeController.dispose();
     _parceladoController.dispose();
+    _valorKgController.dispose();
     super.dispose();
   }
 
@@ -225,6 +240,10 @@ class _DialogFormaState extends State<_DialogForma> {
         'pagamento_posterior': _posterior,
         'conta_posterior': _contaPosterior,
         'deposito_posterior': _depositoPosterior,
+        'escambo': _escambo,
+        'valor_kg_escambo': _escambo
+            ? double.tryParse(_valorKgController.text.trim().replaceAll(',', '.'))
+            : null,
         'parcelado_em_ate':
             (int.tryParse(_parceladoController.text.trim()) ?? 1).clamp(1, 99),
       };
@@ -296,6 +315,7 @@ class _DialogFormaState extends State<_DialogForma> {
                 if (v) {
                   _contaPosterior = false; // mutuamente exclusivos
                   _depositoPosterior = false;
+                  _escambo = false;
                 }
               }),
             ),
@@ -310,7 +330,10 @@ class _DialogFormaState extends State<_DialogForma> {
               value: _contaPosterior,
               onChanged: (v) => setState(() {
                 _contaPosterior = v;
-                if (v) _posterior = false; // mutuamente exclusivos
+                if (v) {
+                  _posterior = false; // mutuamente exclusivos
+                  _escambo = false;
+                }
               }),
             ),
             SwitchListTile(
@@ -324,9 +347,51 @@ class _DialogFormaState extends State<_DialogForma> {
               value: _depositoPosterior,
               onChanged: (v) => setState(() {
                 _depositoPosterior = v;
-                if (v) _posterior = false; // crediário e cheque são exclusivos
+                if (v) {
+                  _posterior = false; // crediário e cheque são exclusivos
+                  _escambo = false;
+                }
               }),
             ),
+            SwitchListTile(
+              contentPadding: EdgeInsets.zero,
+              title: const Text('Escambo (troca por produção)'),
+              subtitle: const Text(
+                'Pagamento em produção (ex.: pimenta) — o valor é calculado por '
+                'kg pela taxa abaixo. Não tem conta.',
+                style: TextStyle(fontSize: 12),
+              ),
+              value: _escambo,
+              onChanged: (v) => setState(() {
+                _escambo = v;
+                if (v) {
+                  // Escambo é exclusivo com as demais classificações.
+                  _posterior = false;
+                  _contaPosterior = false;
+                  _depositoPosterior = false;
+                }
+              }),
+            ),
+            if (_escambo) ...[
+              const SizedBox(height: 8),
+              TextFormField(
+                controller: _valorKgController,
+                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                decoration: const InputDecoration(
+                  labelText: 'Valor por kg (R\$) *',
+                  helperText: 'Ex.: 3 mudas por kg a R\$ 8,50 = R\$ 25,50/kg.',
+                  helperMaxLines: 2,
+                  border: OutlineInputBorder(),
+                  isDense: true,
+                ),
+                validator: (v) {
+                  if (!_escambo) return null;
+                  final n = double.tryParse((v ?? '').trim().replaceAll(',', '.'));
+                  if (n == null || n <= 0) return 'Informe um valor por kg maior que zero';
+                  return null;
+                },
+              ),
+            ],
             if (_erro != null)
               Padding(
                 padding: const EdgeInsets.only(top: 8),

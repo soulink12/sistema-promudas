@@ -6,6 +6,7 @@ import '../../../../core/utils/formatadores.dart';
 import '../../../../core/widgets/campo_obrigatorio.dart';
 import 'linha_parcela.dart';
 import 'campos_cheque.dart';
+import 'campos_escambo.dart';
 
 /// Modal de registro de pagamento do pedido.
 /// Suporta pagamento dividido em múltiplas formas.
@@ -60,6 +61,9 @@ class _ModalPagamentoState extends State<ModalPagamento> {
   final TextEditingController _chequeAgenciaCtrl = TextEditingController();
   final TextEditingController _chequeContaCtrl = TextEditingController();
   DateTime? _chequeBomPara;
+  // Kg de produção do escambo atual (só formas de escambo). O valor em R$ é
+  // calculado pela taxa da forma e preenchido em _valorCtrl.
+  final TextEditingController _escamboKgCtrl = TextEditingController();
   bool _carregando = true;
   String? _erroCarregamento;
 
@@ -102,6 +106,7 @@ class _ModalPagamentoState extends State<ModalPagamento> {
     _chequeBancoCtrl.dispose();
     _chequeAgenciaCtrl.dispose();
     _chequeContaCtrl.dispose();
+    _escamboKgCtrl.dispose();
     super.dispose();
   }
 
@@ -128,9 +133,47 @@ class _ModalPagamentoState extends State<ModalPagamento> {
     return false;
   }
 
-  // Conta não se aplica: crediário (a receber) ou formas de conta definida depois.
+  // Retorna true se a forma selecionada é de escambo (troca por produção).
+  bool get _formaSelecionadaEscambo {
+    if (_formaSelecionada == null) return false;
+    for (final f in _formasPagamento) {
+      if (f['nome'] == _formaSelecionada) {
+        return f['escambo'] == true;
+      }
+    }
+    return false;
+  }
+
+  // Taxa (R$/kg) da forma de escambo selecionada, ou null se não houver.
+  double? get _valorKgEscambo {
+    if (_formaSelecionada == null) return null;
+    for (final f in _formasPagamento) {
+      if (f['nome'] == _formaSelecionada) {
+        return f['valorKgEscambo'] as double?;
+      }
+    }
+    return null;
+  }
+
+  // Conta não se aplica: crediário (a receber), formas de conta definida depois,
+  // ou escambo (não é dinheiro).
   bool get _semContaNoPdv =>
-      _formaSelecionadaPosterior || _formaSelecionadaContaPosterior;
+      _formaSelecionadaPosterior ||
+      _formaSelecionadaContaPosterior ||
+      _formaSelecionadaEscambo;
+
+  // Recalcula o valor em R$ do escambo a partir dos kg digitados e da taxa.
+  void _recalcularValorEscambo() {
+    final kg = double.tryParse(_escamboKgCtrl.text.trim().replaceAll(',', '.'));
+    final taxa = _valorKgEscambo;
+    setState(() {
+      if (kg != null && kg > 0 && taxa != null && taxa > 0) {
+        _valorCtrl.text = (kg * taxa).toStringAsFixed(2);
+      } else {
+        _valorCtrl.text = '';
+      }
+    });
+  }
 
   // Retorna true se a forma selecionada é de depósito posterior (cheque) — nesse
   // caso a parcela pode ter cheques e a data do pagamento fica para o depósito.
@@ -212,6 +255,10 @@ class _ModalPagamentoState extends State<ModalPagamento> {
     // Cheque (forma de depósito posterior): cada "Adicionar" gera um cheque
     // individual com o valor desta parcela + os campos inline.
     final deposito = _formaSelecionadaDepositoPosterior;
+    // Escambo: kg de produção recebidos nesta parcela (valor já calculado).
+    final escambo = _formaSelecionadaEscambo;
+    final escamboKg =
+        double.tryParse(_escamboKgCtrl.text.trim().replaceAll(',', '.'));
     final bomParaIso = _chequeBomPara == null
         ? null
         : DateTime(_chequeBomPara!.year, _chequeBomPara!.month,
@@ -226,6 +273,7 @@ class _ModalPagamentoState extends State<ModalPagamento> {
         'pagamentoPosterior': posterior,
         'depositoPosterior': deposito,
         'parcelas': parcelas,
+        if (escambo && escamboKg != null) 'escamboQuantidade': escamboKg,
         if (!semConta) 'conta': _contaSelecionada,
         if (!posterior && nomePagador.isNotEmpty) 'nomePagador': nomePagador,
         if (!posterior && cpfPagador.isNotEmpty) 'cpfPagador': cpfPagador,
@@ -245,6 +293,7 @@ class _ModalPagamentoState extends State<ModalPagamento> {
       _valorCtrl.text = restante > 0.005 ? restante.toStringAsFixed(2) : '';
       _parcelasSelecionadas = 1;
       _limparCamposCheque();
+      _escamboKgCtrl.clear();
       _nomePagadorCtrl.clear();
       _cpfPagadorCtrl.clear();
     });
@@ -439,6 +488,7 @@ class _ModalPagamentoState extends State<ModalPagamento> {
                               _parcelasSelecionadas =
                                   1; // reinicia ao trocar de forma
                               _limparCamposCheque(); // cheque é da forma anterior
+                              _escamboKgCtrl.clear(); // kg é da forma anterior
                             });
                             _valorFocusNode.requestFocus();
                           },
@@ -558,6 +608,14 @@ class _ModalPagamentoState extends State<ModalPagamento> {
                     bomPara: _chequeBomPara,
                     onEscolherData: _escolherBomPara,
                     onLimparData: () => setState(() => _chequeBomPara = null),
+                  ),
+
+                // Campo do escambo — só para formas de troca por produção.
+                if (_formaSelecionadaEscambo)
+                  CamposEscambo(
+                    kgCtrl: _escamboKgCtrl,
+                    valorKgEscambo: _valorKgEscambo,
+                    onKgChange: (_) => _recalcularValorEscambo(),
                   ),
 
                 // Pagador — escondido quando a forma é crediário

@@ -18,6 +18,16 @@ String formatarMoeda(num valor) {
   return 'R\$ ${negativo ? '-' : ''}$buffer,$centavos';
 }
 
+/// Formata uma quantidade (ex.: kg de escambo) de forma limpa, sem casas
+/// decimais inúteis: `4` em vez de `4,00`; `3,5` em vez de `3,50`.
+String formatarQuantidade(num valor) {
+  var s = valor.toStringAsFixed(2);
+  if (s.endsWith('0')) s = s.substring(0, s.length - 1);
+  if (s.endsWith('0')) s = s.substring(0, s.length - 1);
+  if (s.endsWith('.')) s = s.substring(0, s.length - 1);
+  return s.replaceAll('.', ',');
+}
+
 /// Número de exibição do pedido a partir da temporada: `26-1`, `27-3`, etc.
 /// (ano em 2 dígitos + sequencial). Cai para `#id` quando o pedido não tem
 /// temporada (dados antigos/importados sem número).

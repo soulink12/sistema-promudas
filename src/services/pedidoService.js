@@ -16,6 +16,7 @@ const PAGAMENTO_SELECT = {
     status_nota: true,
     numero_nota: true,
     data_emissao_nota: true,
+    escambo_quantidade: true,
     criado_em: true,
     cheques: {
         select: {

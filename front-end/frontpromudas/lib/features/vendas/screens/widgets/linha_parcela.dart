@@ -23,6 +23,9 @@ class LinhaParcela extends StatelessWidget {
     final cs = Theme.of(context).colorScheme;
     final p = pagamento;
     final isPosterior = p['pagamentoPosterior'] as bool;
+    // Escambo (troca): tem kg de produção e não tem conta.
+    final escamboKg = (p['escamboQuantidade'] as num?)?.toDouble();
+    final isEscambo = escamboKg != null;
     return Padding(
       padding: const EdgeInsets.only(bottom: 6),
       child: Row(
@@ -53,7 +56,15 @@ class LinhaParcela extends StatelessWidget {
                     color: isPosterior ? CoresSemanticas.aviso : null,
                   ),
                 ),
-                if (p['conta'] != null)
+                if (isEscambo)
+                  Text(
+                    'Pimenta: ${formatarQuantidade(escamboKg)} kg',
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: cs.onSurfaceVariant,
+                    ),
+                  )
+                else if (p['conta'] != null)
                   Text(
                     'Conta: ${p['conta']}',
                     style: TextStyle(

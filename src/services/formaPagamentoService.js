@@ -4,13 +4,31 @@ const BusinessError = require('../utils/BusinessError');
 const listarFormasPagamento = async () => {
     return await prisma.formas_pagamento.findMany({
         orderBy: { nome: 'asc' },
-        select: { id: true, nome: true, ativo: true, pagamento_posterior: true, conta_posterior: true, deposito_posterior: true, parcelado_em_ate: true }
+        select: { id: true, nome: true, ativo: true, pagamento_posterior: true, conta_posterior: true, deposito_posterior: true, parcelado_em_ate: true, escambo: true, valor_kg_escambo: true }
     });
 };
 
-const criarForma = async (nome, pagamentoPosterior = false, contaPosterior = false, parceladoEmAte = 1, depositoPosterior = false) => {
+// Cria uma forma de pagamento. Recebe um objeto para acomodar os vários flags
+// (crediário, conta posterior, cheque, escambo) sem uma lista posicional gigante.
+const criarForma = async ({
+    nome,
+    pagamento_posterior = false,
+    conta_posterior = false,
+    deposito_posterior = false,
+    parcelado_em_ate = 1,
+    escambo = false,
+    valor_kg_escambo = null,
+}) => {
     return await prisma.formas_pagamento.create({
-        data: { nome, pagamento_posterior: pagamentoPosterior, conta_posterior: contaPosterior, deposito_posterior: depositoPosterior, parcelado_em_ate: parceladoEmAte }
+        data: {
+            nome,
+            pagamento_posterior,
+            conta_posterior,
+            deposito_posterior,
+            parcelado_em_ate,
+            escambo,
+            valor_kg_escambo,
+        }
     });
 };
 
@@ -45,4 +63,12 @@ const listarDepositoPosterior = () =>
         select: { nome: true }
     });
 
-module.exports = { listarFormasPagamento, criarForma, atualizarForma, deletarForma, listarPosteriores, listarDepositoPosterior };
+// Lista as formas de escambo (troca). Usado para excluir esses pagamentos da
+// lista de "pagamentos sem conta" (escambo não é dinheiro, não tem conta).
+const listarEscambo = () =>
+    prisma.formas_pagamento.findMany({
+        where: { escambo: true },
+        select: { nome: true }
+    });
+
+module.exports = { listarFormasPagamento, criarForma, atualizarForma, deletarForma, listarPosteriores, listarDepositoPosterior, listarEscambo };

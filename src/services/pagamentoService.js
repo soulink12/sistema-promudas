@@ -159,14 +159,16 @@ const listarPagamentos = async () => {
 
 // Lista pagamentos reais que ainda não foram colocados em uma conta (conta pendente).
 // Ex: pagamentos em dinheiro que entram no PDV sem conta definida.
-// Exclui crediário/posterior (são "a receber", não dinheiro sem conta) e também
-// cheque/depósito-posterior (a conta do cheque é definida no depósito, não aqui).
+// Exclui crediário/posterior (são "a receber", não dinheiro sem conta), também
+// cheque/depósito-posterior (a conta do cheque é definida no depósito, não aqui)
+// e escambo/troca (não é dinheiro — não tem conta).
 const listarPagamentosPendentesDeConta = async () => {
-    const [formasPosteriores, formasDeposito] = await Promise.all([
+    const [formasPosteriores, formasDeposito, formasEscambo] = await Promise.all([
         formaPagamentoService.listarPosteriores(),
         formaPagamentoService.listarDepositoPosterior(),
+        formaPagamentoService.listarEscambo(),
     ]);
-    const nomesExcluidos = [...formasPosteriores, ...formasDeposito].map(f => f.nome);
+    const nomesExcluidos = [...formasPosteriores, ...formasDeposito, ...formasEscambo].map(f => f.nome);
 
     const where = {
         OR: [{ conta: null }, { conta: '' }],

@@ -169,3 +169,36 @@ test('pagamento em Dinheiro fica sem conta e some após definir a conta', async 
         'pagamento não deveria mais estar pendente de conta',
     );
 });
+
+test('escambo (troca): abate o pedido, grava os kg e não fica pendente de conta', async () => {
+    // Cria a forma de escambo pela API (taxa R$/kg); registra para limpeza.
+    const formaNome = `__e2e_escambo_${Date.now()}`;
+    const criar = await amb.api('POST', '/api/formas-pagamento', {
+        body: { nome: formaNome, escambo: true, valor_kg_escambo: 25.50 },
+    });
+    assert.equal(criar.status, 201, `criar forma escambo: ${JSON.stringify(criar.body)}`);
+    amb.registrar.forma(criar.body.id);
+
+    const pedidoId = await novoPedido(); // total 100
+    // Paga em escambo: 100 = 4 kg × 25,50? (o valor é independente — o teste
+    // só verifica que o valor abate o pedido e que os kg são gravados).
+    const pg = await pagar(pedidoId, 100, formaNome, { escambo_quantidade: 4 });
+    assert.equal(pg.status, 201, `pagamento escambo: ${JSON.stringify(pg.body)}`);
+    const pagamentoId = pg.body.id;
+
+    // Escambo conta como recebido → pedido fica Pago.
+    assert.equal(await statusPagamento(pedidoId), 'Pago');
+
+    // Os kg fazem round-trip no detalhe do pedido.
+    const ped = await amb.api('GET', `/api/pedidos/${pedidoId}`);
+    const pago = ped.body.pagamentos.find((p) => p.id === pagamentoId);
+    assert.ok(pago, 'pagamento de escambo não encontrado no pedido');
+    assert.equal(Number(pago.escambo_quantidade), 4);
+
+    // Escambo não é dinheiro → não aparece em "pagamentos sem conta".
+    const semConta = await amb.api('GET', '/api/pagamentos/pendentes-conta');
+    assert.ok(
+        !semConta.body.some((p) => p.id === pagamentoId),
+        'escambo não deveria aparecer como pendente de conta',
+    );
+});
