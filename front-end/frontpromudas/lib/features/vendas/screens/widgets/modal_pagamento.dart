@@ -3,6 +3,7 @@ import '../../../../core/services/forma_pagamento_service.dart';
 import '../../../../core/services/conta_service.dart';
 import '../../../../core/theme/cores_semanticas.dart';
 import '../../../../core/utils/formatadores.dart';
+import '../../../../core/widgets/campo_obrigatorio.dart';
 import 'linha_parcela.dart';
 import 'campos_cheque.dart';
 
@@ -512,21 +513,20 @@ class _ModalPagamentoState extends State<ModalPagamento> {
                   crossAxisAlignment: CrossAxisAlignment.center,
                   children: [
                     Expanded(
-                      child: TextField(
+                      child: CampoObrigatorio(
                         controller: _valorCtrl,
                         focusNode: _valorFocusNode,
                         autofocus: true,
+                        label: 'Valor',
+                        prefixText: 'R\$ ',
                         keyboardType: const TextInputType.numberWithOptions(
                           decimal: true,
                         ),
-                        decoration: const InputDecoration(
-                          labelText: 'Valor',
-                          prefixText: 'R\$ ',
-                          border: OutlineInputBorder(),
-                          isDense: true,
-                        ),
                         // Enter registra a parcela
                         onSubmitted: (_) => _adicionarPagamento(),
+                        // Não cobra valor quando o total já está coberto (campo
+                        // fica vazio de propósito após zerar o restante).
+                        validar: _restante > 0.005,
                       ),
                     ),
                     const SizedBox(width: 8),
@@ -548,7 +548,7 @@ class _ModalPagamentoState extends State<ModalPagamento> {
                   ],
                 ),
 
-                // Campos do cheque (opcional) — só para formas de depósito posterior.
+                // Campos do cheque — só para formas de depósito posterior.
                 if (_formaSelecionadaDepositoPosterior)
                   CamposCheque(
                     numeroCtrl: _chequeNumeroCtrl,
@@ -560,12 +560,12 @@ class _ModalPagamentoState extends State<ModalPagamento> {
                     onLimparData: () => setState(() => _chequeBomPara = null),
                   ),
 
-                // Pagador (opcional) — escondido quando a forma é crediário
+                // Pagador — escondido quando a forma é crediário
                 // (pagamento posterior), pois ainda não há quem pagou.
                 if (!_formaSelecionadaPosterior) ...[
                   const SizedBox(height: 16),
                   Text(
-                    'PAGADOR (SE DIFERENTE DO CLIENTE)',
+                    'PAGADOR',
                     style: TextStyle(
                       fontSize: 11,
                       fontWeight: FontWeight.bold,

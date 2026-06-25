@@ -40,7 +40,7 @@ class _DialogObservacoesState extends State<DialogObservacoes> {
           maxLines: 6,
           textCapitalization: TextCapitalization.sentences,
           decoration: const InputDecoration(
-            hintText: 'Digite observações sobre o pedido (opcional)',
+            hintText: 'Digite observações sobre o pedido',
             border: OutlineInputBorder(),
           ),
         ),

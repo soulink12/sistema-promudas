@@ -336,8 +336,8 @@ class _ModalEntregaState extends State<ModalEntrega> {
                 const SizedBox(height: 16),
               ],
 
-              // ── Veículo (opcional) ─────────────────────────────────────
-              _Secao(label: 'VEÍCULO (OPCIONAL)'),
+              // ── Veículo ────────────────────────────────────────────────
+              _Secao(label: 'VEÍCULO'),
               const SizedBox(height: 8),
               Row(
                 children: [

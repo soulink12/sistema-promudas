@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../../../core/services/api_service.dart';
 import '../../../../core/theme/cores_semanticas.dart';
+import '../../../../core/widgets/campo_obrigatorio.dart';
 
 class DialogCadastroCliente extends StatefulWidget {
   const DialogCadastroCliente({super.key});
@@ -10,9 +11,10 @@ class DialogCadastroCliente extends StatefulWidget {
 }
 
 class _DialogCadastroClienteState extends State<DialogCadastroCliente> {
-  final _formKey = GlobalKey<FormState>();
   bool _salvando = false;
   String? _erro;
+  // Vira true ao tentar salvar — força a exibição do erro nos campos obrigatórios.
+  bool _tentouSalvar = false;
 
   final _nome = TextEditingController();
   final _cpf = TextEditingController();
@@ -38,7 +40,11 @@ class _DialogCadastroClienteState extends State<DialogCadastroCliente> {
   }
 
   Future<void> _salvar() async {
-    if (!_formKey.currentState!.validate()) return;
+    // Nome é o único campo obrigatório do cadastro.
+    if (_nome.text.trim().isEmpty) {
+      setState(() => _tentouSalvar = true);
+      return;
+    }
     setState(() {
       _salvando = true;
       _erro = null;
@@ -101,12 +107,17 @@ class _DialogCadastroClienteState extends State<DialogCadastroCliente> {
             Flexible(
               child: SingleChildScrollView(
                 padding: const EdgeInsets.fromLTRB(24, 0, 24, 8),
-                child: Form(
-                  key: _formKey,
-                  child: Column(
+                child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      _campo(_nome, 'Nome *', obrigatorio: true),
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: 12),
+                        child: CampoObrigatorio(
+                          controller: _nome,
+                          label: 'Nome',
+                          mostrarErroForcado: _tentouSalvar,
+                        ),
+                      ),
                       _subtitulo(context, 'Identificação'),
                       _campo(_cpf, 'CPF / CNPJ'),
                       _campo(_inscricao, 'Inscrição Estadual'),
@@ -140,7 +151,6 @@ class _DialogCadastroClienteState extends State<DialogCadastroCliente> {
                   ),
                 ),
               ),
-            ),
             const Divider(height: 16),
             Padding(
               padding: const EdgeInsets.fromLTRB(24, 0, 24, 16),
@@ -192,21 +202,16 @@ Widget _subtitulo(BuildContext context, String texto) {
   );
 }
 
-Widget _campo(TextEditingController controller, String label,
-    {bool obrigatorio = false}) {
+Widget _campo(TextEditingController controller, String label) {
   return Padding(
     padding: const EdgeInsets.only(bottom: 12),
-    child: TextFormField(
+    child: TextField(
       controller: controller,
       decoration: InputDecoration(
         labelText: label,
         border: const OutlineInputBorder(),
         isDense: true,
       ),
-      validator: obrigatorio
-          ? (v) =>
-              (v == null || v.trim().isEmpty) ? 'Campo obrigatório' : null
-          : null,
     ),
   );
 }

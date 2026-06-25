@@ -31,7 +31,7 @@ class CamposCheque extends StatelessWidget {
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final bomParaTexto = bomPara == null
-        ? 'Bom para (opcional)'
+        ? 'Bom para'
         : 'Bom para: ${bomPara!.day.toString().padLeft(2, '0')}/'
             '${bomPara!.month.toString().padLeft(2, '0')}/${bomPara!.year}';
 
@@ -40,19 +40,13 @@ class CamposCheque extends StatelessWidget {
       children: [
         const SizedBox(height: 16),
         Text(
-          'DADOS DO CHEQUE (OPCIONAL)',
+          'DADOS DO CHEQUE',
           style: TextStyle(
             fontSize: 11,
             fontWeight: FontWeight.bold,
             color: cs.onSurfaceVariant,
             letterSpacing: 0.8,
           ),
-        ),
-        const SizedBox(height: 4),
-        Text(
-          'O valor do cheque é o do campo "Valor". Clique em "Adicionar" para '
-          'cada cheque; podem ser completados depois, no depósito.',
-          style: TextStyle(fontSize: 12, color: cs.onSurfaceVariant),
         ),
         const SizedBox(height: 8),
         Row(

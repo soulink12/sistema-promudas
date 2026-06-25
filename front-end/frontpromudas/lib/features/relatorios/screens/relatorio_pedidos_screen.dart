@@ -223,7 +223,7 @@ class _TelaRelatorioPedidosState extends State<TelaRelatorioPedidos> {
                   const SizedBox(height: 6),
                   if (_clienteSelecionado == null)
                     CampoBuscaCliente(
-                      labelText: 'Cliente (opcional)',
+                      labelText: 'Cliente',
                       hintText: 'Buscar por nome, CPF ou telefone',
                       onSelecionado: (c) =>
                           setState(() => _clienteSelecionado = c),

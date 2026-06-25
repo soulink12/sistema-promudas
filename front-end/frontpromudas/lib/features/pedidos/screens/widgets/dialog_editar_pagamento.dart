@@ -206,7 +206,7 @@ class _DialogEditarPagamentoState extends State<DialogEditarPagamento> {
                       TextField(
                         controller: _nomePagadorCtrl,
                         decoration: const InputDecoration(
-                          labelText: 'Nome do pagador (opcional)',
+                          labelText: 'Nome do pagador',
                           border: OutlineInputBorder(),
                         ),
                       ),
@@ -215,7 +215,7 @@ class _DialogEditarPagamentoState extends State<DialogEditarPagamento> {
                         controller: _cpfPagadorCtrl,
                         keyboardType: TextInputType.number,
                         decoration: const InputDecoration(
-                          labelText: 'CPF/CNPJ do pagador (opcional)',
+                          labelText: 'CPF/CNPJ do pagador',
                           border: OutlineInputBorder(),
                         ),
                       ),
