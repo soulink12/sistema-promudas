@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../../../core/services/produto_service.dart';
 import '../../../../core/theme/cores_semanticas.dart';
+import '../../../../core/utils/observador_rotas.dart';
 
 /// Widget do rodapé da tela de venda.
 /// Exibe a barra de pesquisa de produtos (com autocomplete) e o atalho de finalização.
@@ -24,7 +25,7 @@ class RodapeVenda extends StatefulWidget {
 }
 
 /// Estado do RodapeVenda. Mantém o controller do campo de busca e a lista de produtos.
-class _RodapeVendaState extends State<RodapeVenda> {
+class _RodapeVendaState extends State<RodapeVenda> with RouteAware {
   // Controller do campo de pesquisa; inicializado pelo fieldViewBuilder do Autocomplete
   late TextEditingController _pesquisaProdutoController;
 
@@ -36,6 +37,39 @@ class _RodapeVendaState extends State<RodapeVenda> {
   void initState() {
     super.initState();
     _carregarProdutos();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // Assina o observador para reagir quando o PDV volta ao topo da pilha.
+    final rota = ModalRoute.of(context);
+    if (rota != null) observadorRotas.subscribe(this, rota);
+  }
+
+  @override
+  void dispose() {
+    observadorRotas.unsubscribe(this);
+    super.dispose();
+  }
+
+  /// Chamado quando uma tela empilhada por cima (ex.: Configurações) é fechada
+  /// e o PDV volta a ficar visível. Recarrega os produtos para refletir
+  /// alterações de catálogo (ex.: produto desativado deve sumir da pesquisa).
+  @override
+  void didPopNext() {
+    _recarregarSilencioso();
+  }
+
+  /// Atualiza a lista sem exibir o indicador de carregamento; em caso de falha,
+  /// mantém a lista atual para não atrapalhar a venda em andamento.
+  Future<void> _recarregarSilencioso() async {
+    try {
+      final produtos = await ProdutoService().listar();
+      if (mounted) setState(() => _produtos = produtos);
+    } catch (_) {
+      // Mantém a lista atual.
+    }
   }
 
   Future<void> _carregarProdutos() async {

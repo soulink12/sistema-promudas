@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import '../services/cliente_service.dart';
-import '../theme/cores_semanticas.dart';
 
 /// Autocomplete de clientes reutilizável.
-/// Carrega a lista de clientes da API e exibe sugestões ao digitar.
+/// Pesquisa os clientes diretamente no backend conforme o usuário digita
+/// (busca server-side por nome, CPF ou telefone — alcança TODOS os clientes).
 /// [onSelecionado] é chamado com o cliente escolhido.
 class CampoBuscaCliente extends StatefulWidget {
   final Function(Map<String, dynamic>) onSelecionado;
@@ -24,65 +24,30 @@ class CampoBuscaCliente extends StatefulWidget {
 }
 
 class _CampoBuscaClienteState extends State<CampoBuscaCliente> {
-  List<Map<String, dynamic>> _clientes = [];
-  bool _carregando = true;
-  String? _erro;
+  // Guarda a última digitação para o debounce descartar buscas obsoletas.
+  String _ultimaDigitacao = '';
 
-  @override
-  void initState() {
-    super.initState();
-    _carregar();
-  }
+  /// Pesquisa clientes no backend. Faz debounce de 250ms: se o usuário continuar
+  /// digitando, a chamada anterior é descartada e só a mais recente vai à API.
+  Future<Iterable<Map<String, dynamic>>> _buscar(String texto) async {
+    final busca = texto.trim();
+    if (busca.isEmpty) return const Iterable.empty();
 
-  Future<void> _carregar() async {
-    setState(() {
-      _carregando = true;
-      _erro = null;
-    });
+    _ultimaDigitacao = busca;
+    await Future.delayed(const Duration(milliseconds: 250));
+    if (busca != _ultimaDigitacao) return const Iterable.empty();
+
     try {
-      final lista = await ClienteService().listar();
-      setState(() {
-        _clientes = lista;
-        _carregando = false;
-      });
+      return await ClienteService().listar(busca: busca);
     } catch (_) {
-      setState(() {
-        _erro = 'Não foi possível carregar os clientes.';
-        _carregando = false;
-      });
+      return const Iterable.empty();
     }
-  }
-
-  Iterable<Map<String, dynamic>> _filtrar(String texto) {
-    final busca = texto.toLowerCase();
-    return _clientes.where((c) =>
-        c['nome'].toString().toLowerCase().contains(busca) ||
-        c['cpf'].toString().toLowerCase().contains(busca) ||
-        c['telefone'].toString().toLowerCase().contains(busca));
   }
 
   @override
   Widget build(BuildContext context) {
-    if (_carregando) {
-      return const LinearProgressIndicator();
-    }
-
-    if (_erro != null) {
-      return Row(
-        children: [
-          const Icon(Icons.error_outline, color: CoresSemanticas.erro, size: 18),
-          const SizedBox(width: 8),
-          Expanded(child: Text(_erro!, style: const TextStyle(color: CoresSemanticas.erro, fontSize: 13))),
-          TextButton(onPressed: _carregar, child: const Text('Tentar novamente')),
-        ],
-      );
-    }
-
     return Autocomplete<Map<String, dynamic>>(
-      optionsBuilder: (valor) {
-        if (valor.text.isEmpty) return const Iterable.empty();
-        return _filtrar(valor.text);
-      },
+      optionsBuilder: (valor) => _buscar(valor.text),
       displayStringForOption: (c) => c['nome'] as String,
       onSelected: widget.onSelecionado,
       fieldViewBuilder: (context, controller, focusNode, onEditingComplete) {
@@ -97,8 +62,8 @@ class _CampoBuscaClienteState extends State<CampoBuscaCliente> {
             prefixIcon: const Icon(Icons.search),
           ),
           onEditingComplete: onEditingComplete,
-          onSubmitted: (texto) {
-            final matches = _filtrar(texto).toList();
+          onSubmitted: (texto) async {
+            final matches = (await _buscar(texto)).toList();
             if (matches.isNotEmpty) widget.onSelecionado(matches.first);
           },
         );

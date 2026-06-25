@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'core/services/app_config.dart';
 import 'core/services/theme_service.dart';
+import 'core/utils/observador_rotas.dart';
 import 'features/auth/screens/login_screen.dart';
 
 /// Chave do Navigator raiz — usada pelo atalho de teclado para voltar.
@@ -26,6 +27,7 @@ class MeuViveiroApp extends StatelessWidget {
           title: 'Sistema Promudas',
           debugShowCheckedModeBanner: false,
           navigatorKey: _navigatorKey,
+          navigatorObservers: [observadorRotas],
           // Envolve toda a aplicação: trata o Backspace como "voltar" e aplica
           // o tamanho de fonte global escolhido nas configurações.
           builder: (context, child) {
