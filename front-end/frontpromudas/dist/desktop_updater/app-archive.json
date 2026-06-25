@@ -1,0 +1,14 @@
+{
+  "schemaVersion": 3,
+  "appName": "Frontpromudas",
+  "items": [
+    {
+      "version": "0.1.0",
+      "buildNumber": 1,
+      "platform": "windows",
+      "channel": "stable",
+      "mandatory": true,
+      "release": "http://localhost:6072/updates/releases/0.1.0/windows/release.json"
+    }
+  ]
+}

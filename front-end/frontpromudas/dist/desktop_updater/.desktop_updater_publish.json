@@ -1,0 +1,23 @@
+{
+  "schemaVersion": 1,
+  "baseUrl": "http://localhost:6072/updates/",
+  "localRoot": "C:\\Users\\vivei\\Documents\\Projetos\\sistema-promudas\\front-end\\frontpromudas\\dist\\desktop_updater",
+  "appArchive": {
+    "path": "app-archive.json",
+    "url": "http://localhost:6072/updates/app-archive.json"
+  },
+  "release": {
+    "version": "0.1.0",
+    "buildNumber": 1,
+    "platform": "windows",
+    "channel": "stable",
+    "path": "releases/0.1.0/windows/release.json",
+    "url": "http://localhost:6072/updates/releases/0.1.0/windows/release.json"
+  },
+  "artifact": {
+    "path": "releases/0.1.0/windows/Frontpromudas-0.1.0-windows.zip",
+    "url": "http://localhost:6072/updates/releases/0.1.0/windows/Frontpromudas-0.1.0-windows.zip",
+    "sha256": "8f52e62f244f023b73c2ba8feb4250a1ebcf29be2eac278d4976d0f2e2bb11e1",
+    "length": 15374468
+  }
+}
