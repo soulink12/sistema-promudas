@@ -7,7 +7,8 @@
     "start": "node src/server.js",
     "test": "node --test \"tests/**/*.test.js\"",
     "postinstall": "prisma generate",
-    "deploy": "prisma migrate deploy && prisma generate"
+    "deploy": "prisma migrate deploy && prisma generate",
+    "update-front": "node scripts/lancarUpdateFront.js"
   },
   "repository": {
     "type": "git",

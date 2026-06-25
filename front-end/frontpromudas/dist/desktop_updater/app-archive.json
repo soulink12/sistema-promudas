@@ -9,6 +9,14 @@
       "channel": "stable",
       "mandatory": true,
       "release": "http://localhost:6072/updates/releases/0.1.0/windows/release.json"
+    },
+    {
+      "version": "0.1.1",
+      "buildNumber": 2,
+      "platform": "windows",
+      "channel": "stable",
+      "mandatory": true,
+      "release": "http://172.28.114.71:6072/updates/releases/0.1.1/windows/release.json"
     }
   ]
 }
