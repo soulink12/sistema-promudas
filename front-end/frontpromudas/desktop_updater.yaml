@@ -19,4 +19,4 @@
 #
 # Antes da primeira publicação de produção: dart run desktop_updater:release doctor --platform windows
 updates:
-  baseUrl: http://localhost:6072/updates
+  baseUrl: http://172.28.114.71:6072/updates
