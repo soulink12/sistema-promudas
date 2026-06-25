@@ -1,6 +1,7 @@
-// Seed inicial do banco — roda após `npx prisma db push`.
-// Insere: 1 usuário, formas de pagamento, locais de entrega e alguns clientes.
-// Uso: node prisma/seed.js
+// Seed inicial do banco — base de catálogos fixos + usuários (rodar na 1ª subida).
+// Insere: 2 usuários, formas de pagamento, locais de entrega, contas, temporada e Consumidor id=1.
+// Produtos (variedades) NÃO entram aqui — são criados pela importação da planilha.
+// Uso: node scripts/seed.js
 require('dotenv').config(); // carrega DATABASE_USER/PASSWORD/HOST/NAME/PORT do .env
 const prisma = require('../src/config/database');
 const bcrypt = require('bcrypt');

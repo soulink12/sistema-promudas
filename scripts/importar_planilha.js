@@ -76,13 +76,25 @@ function comoData(v) {
 }
 
 // Forma de pagamento: corta tudo após "/", aplica saneamento combinado pelo dono.
+// "Troca" NÃO cai aqui — é tratada como escambo no loop de pagamentos (valor em kg).
 function sanearForma(v) {
     let f = texto(v);
     if (!f) return null;
     f = f.split('/')[0].trim();
     const baixo = f.toLowerCase();
-    if (baixo === 'identificar' || baixo === 'troca') return 'Dinheiro';
+    if (baixo === 'identificar') return 'Dinheiro';
     return f;
+}
+
+// Extrai os kg de uma célula de troca/escambo (ex.: "33 Kg", "51 kg", "62,5 kg").
+// Pega o primeiro número (com vírgula ou ponto) e converte; null se não houver número.
+function parseKg(v) {
+    const t = texto(v);
+    if (!t) return null;
+    const m = t.match(/(\d+(?:[.,]\d+)?)/);
+    if (!m) return null;
+    const n = Number(m[1].replace(',', '.'));
+    return Number.isFinite(n) && n > 0 ? n : null;
 }
 
 // Conta: "BR" e "Pimenta" viram "Caixa"; demais ficam como estão.
@@ -188,6 +200,17 @@ async function main() {
     const contaCaixa = await prisma.contas.findFirst({ where: { nome: 'Caixa' } });
     if (!contaCaixa) await prisma.contas.create({ data: { nome: 'Caixa' } });
 
+    // Forma de escambo (criada no seed): nome usado nos pagamentos "Troca" + taxa R$/kg.
+    const formaEscambo = await prisma.formas_pagamento.findFirst({ where: { escambo: true } });
+    let FORMA_ESCAMBO_NOME = 'Escambo';
+    let TAXA_ESCAMBO = 25.5; // fallback: 3 mudas/kg × R$ 8,50
+    if (formaEscambo) {
+        FORMA_ESCAMBO_NOME = formaEscambo.nome;
+        if (formaEscambo.valor_kg_escambo != null) TAXA_ESCAMBO = Number(formaEscambo.valor_kg_escambo);
+    } else {
+        console.warn('      ⚠️  Nenhuma forma de escambo no banco — usando padrão "Escambo" e taxa R$ 25,50/kg. Rode o seed antes.');
+    }
+
     // ── 3. Clientes (mapa n° → id) ──────────────────────────────────────────
     console.log('[3/8] Importando clientes...');
     const clienteIdPorN = {};
@@ -282,7 +305,8 @@ async function main() {
     // ── 6. Pagamentos (+ cheque depositado quando forma = Cheque) ───────────
     console.log('[6/8] Importando pagamentos...');
     let pagOk = 0;
-    const puladosSemValor = []; // linhas com n° válido mas sem valor (ex.: escambo "Troca" em kg)
+    let escamboOk = 0; // pagamentos de troca/escambo importados
+    const puladosSemValor = []; // linhas com n° válido mas sem valor (ex.: troca sem kg legível)
     for (let i = 1; i < linhasPagamento.length; i++) {
         const r = linhasPagamento[i];
         const n = num(r[1]);
@@ -290,14 +314,37 @@ async function main() {
         const pedidoId = pedidoIdPorN[n];
         if (!pedidoId) continue;
 
-        const valorPago = num(r[7]);
-        if (valorPago === null) {
-            // valor_pago é NOT NULL no schema; sem valor não há como gravar.
-            puladosSemValor.push({ n, forma: texto(r[6]), valor: texto(r[7]) });
-            continue;
+        // Troca (escambo): o valor vem em kg de pimenta. Grava como pagamento de escambo:
+        // forma "Escambo", escambo_quantidade = kg, valor_pago = kg × taxa, sem conta.
+        const formaRaw = texto(r[6]);
+        const ehEscambo = formaRaw && formaRaw.split('/')[0].trim().toLowerCase() === 'troca';
+
+        let valorPago;
+        let escamboQuantidade = null;
+        let forma;
+        let conta;
+
+        if (ehEscambo) {
+            const kg = parseKg(r[7]);
+            if (kg === null) {
+                puladosSemValor.push({ n, forma: 'Troca', valor: texto(r[7]) });
+                continue;
+            }
+            escamboQuantidade = kg;
+            valorPago = Math.round(kg * TAXA_ESCAMBO * 100) / 100; // kg × taxa
+            forma = FORMA_ESCAMBO_NOME;
+            conta = null; // escambo é pimenta, não dinheiro: sem conta
+        } else {
+            valorPago = num(r[7]);
+            if (valorPago === null) {
+                // valor_pago é NOT NULL no schema; sem valor não há como gravar.
+                puladosSemValor.push({ n, forma: texto(r[6]), valor: texto(r[7]) });
+                continue;
+            }
+            forma = sanearForma(r[6]);
+            conta = sanearConta(r[5]);
         }
 
-        const forma = sanearForma(r[6]);
         const dataPag = comoData(r[4]);
 
         const data = {
@@ -305,8 +352,9 @@ async function main() {
             valor_pago: valorPago,
             data_pagamento: dataPag,
             forma_pagamento: forma,
-            conta: sanearConta(r[5]),
+            conta,
             nome_pagador: texto(r[8]),
+            escambo_quantidade: escamboQuantidade,
         };
 
         // Cheque histórico já compensado: cria 1 cheque depositado para contar como recebido.
@@ -322,6 +370,7 @@ async function main() {
 
         await prisma.pagamentos.create({ data });
         pagOk++;
+        if (ehEscambo) escamboOk++;
     }
     if (puladosSemValor.length > 0) {
         console.log(`      ⚠️  ${puladosSemValor.length} pagamento(s) sem valor em R$ — NÃO importados (revisar manualmente):`);
@@ -385,7 +434,7 @@ async function main() {
     console.log('  produtos   :', nProdutos);
     console.log('  clientes   :', nClientes, '(inclui Consumidor id=1)');
     console.log('  pedidos    :', nPedidos);
-    console.log('  pagamentos :', nPagamentos, `(${pagOk} importados)`);
+    console.log('  pagamentos :', nPagamentos, `(${pagOk} importados, ${escamboOk} de troca/escambo)`);
     console.log('  entregas   :', nEntregas, `(${entOk} importadas)`);
 }
 
