@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'produtos_screen.dart';
 import 'formas_pagamento_screen.dart';
+import 'temporadas_screen.dart';
 
 /// Configurações do Sistema — cadastros que afetam o funcionamento do sistema:
 /// produtos (catálogo) e formas de pagamento. Exclusiva da Administração.
@@ -34,6 +35,14 @@ class TelaConfiguracoesSistema extends StatelessWidget {
                 const Text('Adicionar, editar ou remover formas de pagamento.'),
             trailing: const Icon(Icons.chevron_right),
             onTap: () => _abrir(context, const TelaFormasPagamento()),
+          ),
+          ListTile(
+            leading: Icon(Icons.calendar_today_outlined, color: cs.primary),
+            title: const Text('Temporadas'),
+            subtitle: const Text(
+                'Definir a temporada ativa — numera os pedidos (ex.: 26-1).'),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () => _abrir(context, const TelaTemporadas()),
           ),
         ],
       ),

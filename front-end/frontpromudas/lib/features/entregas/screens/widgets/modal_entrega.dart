@@ -200,7 +200,7 @@ class _ModalEntregaState extends State<ModalEntrega> {
 
   @override
   Widget build(BuildContext context) {
-    final id = widget.pedido['id'] as int;
+    final numero = formatarNumeroPedido(widget.pedido);
     final clienteMap = widget.pedido['clientes'] as Map<String, dynamic>?;
     final cliente = clienteMap?['nome'] as String? ?? '—';
 
@@ -211,7 +211,7 @@ class _ModalEntregaState extends State<ModalEntrega> {
         children: [
           Text(_modoEdicao ? 'Editar Entrega' : 'Registrar Entrega'),
           Text(
-            '#$id · $cliente',
+            '$numero · $cliente',
             style: TextStyle(
               fontSize: 13,
               fontWeight: FontWeight.normal,

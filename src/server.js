@@ -12,6 +12,7 @@ const locaisEntregaRoutes = require('./routes/locaisEntregaRoutes');
 const contaRoutes = require('./routes/contaRoutes');
 const chequeRoutes = require('./routes/chequeRoutes');
 const formaPagamentoRoutes = require('./routes/formaPagamentoRoutes');
+const temporadaRoutes = require('./routes/temporadaRoutes');
 const relatorioRoutes = require('./routes/relatorioRoutes');
 
 const { verificarToken } = require('./middlewares/authMiddleware.js');
@@ -41,6 +42,7 @@ app.use('/api/entregas', entregaRoutes);
 app.use('/api/locais-entrega', locaisEntregaRoutes);
 app.use('/api/contas', contaRoutes);
 app.use('/api/cheques', chequeRoutes);
+app.use('/api/temporadas', temporadaRoutes);
 
 // Tratamento central de erro — sempre por último, depois de todas as rotas.
 app.use(errorHandler);

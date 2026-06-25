@@ -170,7 +170,6 @@ class _TelaVendaState extends State<TelaVenda> {
   @override
   Widget build(BuildContext context) {
     final modoEdicao = widget.pedidoParaEditar != null;
-    final pedidoId = modoEdicao ? widget.pedidoParaEditar!['id'] as int : null;
 
     return Scaffold(
       appBar: AppBar(
@@ -180,8 +179,9 @@ class _TelaVendaState extends State<TelaVenda> {
           onTap: modoEdicao || _salvando
               ? null
               : () => _mostrarBuscaClienteModal(context),
-          subtituloOverride:
-              modoEdicao ? 'Editando Pedido #$pedidoId' : null,
+          subtituloOverride: modoEdicao
+              ? 'Editando Pedido ${formatarNumeroPedido(widget.pedidoParaEditar!)}'
+              : null,
         ),
       ),
       drawer: modoEdicao ? null : const DrawerPdv(),
@@ -366,7 +366,8 @@ class _TelaVendaState extends State<TelaVenda> {
     final confirmado = await mostrarDialogConfirmacao(
       context: context,
       titulo: 'Confirmar edição',
-      mensagem: 'Deseja salvar as alterações no Pedido #$pedidoId?',
+      mensagem:
+          'Deseja salvar as alterações no Pedido ${formatarNumeroPedido(widget.pedidoParaEditar!)}?',
       textoConfirmar: 'Salvar',
     );
     if (!confirmado || !mounted) return;

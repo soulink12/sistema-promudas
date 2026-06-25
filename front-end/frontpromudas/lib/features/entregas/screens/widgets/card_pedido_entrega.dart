@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../../../core/theme/cores_semanticas.dart';
+import '../../../../core/utils/formatadores.dart';
 
 class CardPedidoEntrega extends StatelessWidget {
   final Map<String, dynamic> pedido;
@@ -21,7 +22,7 @@ class CardPedidoEntrega extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final id = pedido['id'] as int;
+    final numero = formatarNumeroPedido(pedido);
     final clienteMap = pedido['clientes'] as Map<String, dynamic>?;
     final cliente = clienteMap?['nome'] as String? ?? '—';
     final statusRet = pedido['status_entrega'] as String? ?? '—';
@@ -52,7 +53,7 @@ class CardPedidoEntrega extends StatelessWidget {
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    '#$id · $data · $qtdItens ${qtdItens == 1 ? 'item' : 'itens'}',
+                    '$numero · $data · $qtdItens ${qtdItens == 1 ? 'item' : 'itens'}',
                     style: TextStyle(
                       color: Theme.of(context).colorScheme.onSurfaceVariant,
                       fontSize: 12,

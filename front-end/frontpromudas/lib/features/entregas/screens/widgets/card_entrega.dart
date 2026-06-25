@@ -20,7 +20,7 @@ class CardEntrega extends StatelessWidget {
     final cs = Theme.of(context).colorScheme;
 
     final pedido = entrega['pedidos'] as Map<String, dynamic>?;
-    final pedidoId = pedido?['id'];
+    final numeroPedido = pedido != null ? formatarNumeroPedido(pedido) : '—';
     final cliente =
         (pedido?['clientes'] as Map<String, dynamic>?)?['nome'] as String? ??
             '—';
@@ -57,7 +57,7 @@ class CardEntrega extends StatelessWidget {
                       ),
                       const SizedBox(height: 4),
                       Text(
-                        'Pedido #$pedidoId · $data',
+                        'Pedido $numeroPedido · $data',
                         style: TextStyle(
                           color: cs.onSurfaceVariant,
                           fontSize: 12,

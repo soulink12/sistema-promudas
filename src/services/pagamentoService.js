@@ -189,6 +189,8 @@ const listarPagamentosPendentesDeConta = async () => {
             pedidos: {
                 select: {
                     id: true,
+                    temporada_ano: true,
+                    numero_temporada: true,
                     clientes: { select: { id: true, nome: true } }
                 }
             }

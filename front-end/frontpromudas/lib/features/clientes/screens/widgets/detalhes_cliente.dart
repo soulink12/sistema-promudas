@@ -215,7 +215,7 @@ class DetalhesCliente extends StatelessWidget {
             Card(
               child: Column(
                 children: pendentes.map((p) {
-                  final id = p['id'] as int;
+                  final numero = formatarNumeroPedido(p);
                   final total = _toDouble(p['valor_total']);
                   final status =
                       p['status_pagamento'] as String? ?? 'Pendente';
@@ -247,7 +247,7 @@ class DetalhesCliente extends StatelessWidget {
                           ),
                           child: Center(
                             child: Text(
-                              '#$id',
+                              numero,
                               style: TextStyle(
                                 fontSize: 11,
                                 fontWeight: FontWeight.bold,
@@ -257,7 +257,7 @@ class DetalhesCliente extends StatelessWidget {
                           ),
                         ),
                         title: Text(
-                          'Valor pendente do pedido #$id é ${formatarMoeda(valorPendente)}',
+                          'Valor pendente do pedido $numero é ${formatarMoeda(valorPendente)}',
                           style:
                               const TextStyle(fontWeight: FontWeight.w600),
                         ),

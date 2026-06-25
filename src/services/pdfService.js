@@ -2,6 +2,7 @@ const PDFDocument = require('pdfkit');
 const prisma = require('../config/database');
 const BusinessError = require('../utils/BusinessError');
 const formaPagamentoService = require('./formaPagamentoService');
+const { formatarNumeroPedido } = require('../utils/numeroPedido');
 
 const moeda = (v) => `R$ ${parseFloat(v || 0).toFixed(2).replace('.', ',')}`;
 
@@ -109,7 +110,7 @@ const gerarPedidoPDF = async (pedidoId) => {
 
         // Número e data
         const dataPedido = formatarData(pedido.data_pedido || pedido.criado_em);
-        doc.font('Helvetica-Bold').fontSize(14).text(`PEDIDO #${pedido.id}`, 50, doc.y, { continued: true });
+        doc.font('Helvetica-Bold').fontSize(14).text(`PEDIDO ${formatarNumeroPedido(pedido)}`, 50, doc.y, { continued: true });
         doc.font('Helvetica').fontSize(10).fillColor('#555555')
             .text(dataPedido, { align: 'right' });
         doc.fillColor('black');

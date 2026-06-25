@@ -124,6 +124,8 @@ const listarEntregas = async (filtros = {}) => {
             pedidos: {
                 select: {
                     id: true,
+                    temporada_ano: true,
+                    numero_temporada: true,
                     status_geral: true,
                     status_entrega: true,
                     cliente_id: true,

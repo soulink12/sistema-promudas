@@ -455,7 +455,7 @@ class _CardPedido extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final id = pedido['id'] as int;
+    final numero = formatarNumeroPedido(pedido);
     final cliente = pedido['cliente'] as String? ?? '—';
     final valor = formatarMoeda(pedido['valor_total'] as num);
     final qtdItens = pedido['qtd_itens'] as int? ?? 0;
@@ -495,7 +495,7 @@ class _CardPedido extends StatelessWidget {
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Text(
-                  '#$id · $data',
+                  '$numero · $data',
                   style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant, fontSize: 12),
                 ),
                 Text(

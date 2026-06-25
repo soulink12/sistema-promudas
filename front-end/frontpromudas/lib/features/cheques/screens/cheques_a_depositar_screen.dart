@@ -117,7 +117,7 @@ class _CardCheque extends StatelessWidget {
 
     final pagamento = cheque['pagamentos'] as Map<String, dynamic>?;
     final pedido = pagamento?['pedidos'] as Map<String, dynamic>?;
-    final pedidoId = pedido?['id'];
+    final numeroPedido = pedido != null ? formatarNumeroPedido(pedido) : '—';
     final cliente =
         (pedido?['clientes'] as Map<String, dynamic>?)?['nome'] as String? ??
             '—';
@@ -149,7 +149,7 @@ class _CardCheque extends StatelessWidget {
                               fontWeight: FontWeight.bold, fontSize: 15),
                           overflow: TextOverflow.ellipsis),
                       const SizedBox(height: 4),
-                      Text('Pedido #$pedidoId',
+                      Text('Pedido $numeroPedido',
                           style: TextStyle(
                               color: cs.onSurfaceVariant, fontSize: 12)),
                       if (detalhe.isNotEmpty) ...[

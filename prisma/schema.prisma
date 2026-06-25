@@ -36,6 +36,8 @@ model pedidos {
   status_pagamento String?        @default("Pendente") @db.VarChar(30)
   status_entrega   String?        @default("Pendente") @db.VarChar(30)
   observacoes      String?        @db.Text
+  temporada_ano    Int?
+  numero_temporada Int?
   criado_em        DateTime?      @default(now()) @db.Timestamp(0)
   clientes         clientes?      @relation(fields: [cliente_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
   entregas         entregas[]
@@ -43,6 +45,7 @@ model pedidos {
   pagamentos       pagamentos[]
 
   @@index([cliente_id])
+  @@index([temporada_ano])
 }
 
 model produtos {
@@ -164,4 +167,11 @@ model contas {
   id    Int     @id @default(autoincrement())
   nome  String  @db.VarChar(50)
   ativo Boolean @default(true)
+}
+
+model temporadas {
+  id        Int      @id @default(autoincrement())
+  ano       Int      @unique
+  ativo     Boolean  @default(false)
+  criado_em DateTime @default(now()) @db.Timestamp(0)
 }

@@ -1,5 +1,6 @@
 const PDFDocument = require('pdfkit');
 const prisma = require('../config/database');
+const { formatarNumeroPedido } = require('../utils/numeroPedido');
 
 const moeda = (v) => `R$ ${parseFloat(v || 0).toFixed(2).replace('.', ',')}`;
 
@@ -91,6 +92,8 @@ const gerarRelatorioPDF = async ({ de, ate, forma }) => {
                 pedidos: {
                     select: {
                         id: true,
+                        temporada_ano: true,
+                        numero_temporada: true,
                         clientes: { select: { nome: true } }
                     }
                 }
@@ -234,7 +237,7 @@ const gerarRelatorioPDF = async ({ de, ate, forma }) => {
                 // criado_em é Timestamp (tem a hora real); data_pagamento é só data
                 // (@db.Date) e renderiza sempre meia-noite UTC = 21:00 em UTC-3.
                 const dataEfetiva = pag.criado_em || pag.data_pagamento;
-                const pedidoId = pag.pedidos?.id ? `#${pag.pedidos.id}` : '—';
+                const pedidoId = pag.pedidos ? formatarNumeroPedido(pag.pedidos) : '—';
                 const cliente = pag.pedidos?.clientes?.nome ?? '—';
                 const formaPag = pag.forma_pagamento ?? '(não informado)';
 
@@ -288,6 +291,8 @@ const relatorioPedidos = async ({ de, ate, statusPagamento, statusEntrega, clien
         where,
         select: {
             id: true,
+            temporada_ano: true,
+            numero_temporada: true,
             valor_total: true,
             status_pagamento: true,
             status_entrega: true,
@@ -307,6 +312,8 @@ const relatorioPedidos = async ({ de, ate, statusPagamento, statusEntrega, clien
         resumo: { total: pedidos.length, valorTotal, porStatusPagamento },
         lista: pedidos.map(p => ({
             id: p.id,
+            temporada_ano: p.temporada_ano,
+            numero_temporada: p.numero_temporada,
             cliente: p.clientes?.nome ?? '—',
             criado_em: p.criado_em,
             valor_total: parseFloat(p.valor_total),
@@ -416,7 +423,7 @@ const gerarRelatorioPedidosPDF = async ({ de, ate, statusPagamento, statusEntreg
             const yPed = doc.y;
             doc.rect(50, yPed, 495, 20).fill('#e8f5e9');
             doc.font('Helvetica-Bold').fontSize(10).fillColor('#1b5e20')
-                .text(`Pedido #${pedido.id}`, 56, yPed + 4, { width: 160, lineBreak: false });
+                .text(`Pedido ${formatarNumeroPedido(pedido)}`, 56, yPed + 4, { width: 160, lineBreak: false });
             doc.font('Helvetica').fontSize(9).fillColor('#333333')
                 .text(pedido.clientes?.nome ?? '—', 220, yPed + 5, { width: 180, lineBreak: false });
             doc.font('Helvetica').fontSize(9).fillColor('#555555')

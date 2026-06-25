@@ -17,6 +17,7 @@ async function main() {
     await prisma.formas_pagamento.deleteMany();
     await prisma.locais_entrega.deleteMany();
     await prisma.contas.deleteMany();
+    await prisma.temporadas.deleteMany();
     await prisma.usuarios.deleteMany();
 
     // ── Usuários (login do sistema) ─────────────────────────────────────────
@@ -64,6 +65,9 @@ async function main() {
             { nome: 'Fábio' },
         ],
     });
+
+    // ── Temporadas (numeração dos pedidos por safra: 26-1, 26-2…) ───────────
+    await prisma.temporadas.create({ data: { ano: 2026, ativo: true } });
 
     // ── Clientes (id=1 = Consumidor Padrão / venda balcão) ──────────────────
     await prisma.clientes.create({ data: { id: 1, nome: 'Consumidor' } });

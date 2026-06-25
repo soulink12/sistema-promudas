@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../../core/services/api_service.dart';
+import '../../../core/services/temporada_service.dart';
 import '../../../core/theme/cores_semanticas.dart';
 import '../../../core/utils/api_feedback.dart';
 import '../../../core/widgets/pesquisa_cliente_lista.dart';
@@ -343,6 +344,88 @@ class _TelaPedidosState extends State<TelaPedidos> {
     }
   }
 
+  // Troca a temporada do pedido (numeração 26-1, 27-1…). O backend recomputa o
+  // numero_temporada na temporada escolhida.
+  Future<void> _editarTemporadaPedido() async {
+    final pedidoId = _pedidoSelecionado!['id'] as int;
+    final atual = _pedidoSelecionado!['temporada_ano'] as int?;
+
+    List<Map<String, dynamic>> temporadas;
+    try {
+      temporadas = await TemporadaService().listar();
+    } catch (e) {
+      if (mounted) {
+        mostrarErro(context, extrairErroApi(e, 'Erro ao carregar temporadas.'));
+      }
+      return;
+    }
+    if (temporadas.isEmpty) {
+      if (mounted) {
+        mostrarErro(context,
+            'Nenhuma temporada cadastrada. Cadastre uma em Configurações do Sistema.');
+      }
+      return;
+    }
+    if (!mounted) return;
+
+    int? selecionado = atual ?? temporadas.first['ano'] as int;
+    final escolhido = await showDialog<int>(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setLocal) => AlertDialog(
+          title: const Text('Temporada do pedido'),
+          content: DropdownButtonFormField<int>(
+            initialValue: selecionado,
+            decoration: const InputDecoration(
+              labelText: 'Temporada',
+              border: OutlineInputBorder(),
+              isDense: true,
+            ),
+            items: temporadas.map((t) {
+              final ano = t['ano'] as int;
+              final aa = (ano % 100).toString().padLeft(2, '0');
+              return DropdownMenuItem(value: ano, child: Text('$ano  ($aa-N)'));
+            }).toList(),
+            onChanged: (v) => setLocal(() => selecionado = v),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('Cancelar'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(ctx, selecionado),
+              child: const Text('Salvar'),
+            ),
+          ],
+        ),
+      ),
+    );
+
+    if (escolhido == null || escolhido == atual) return;
+    setState(() => _salvando = true);
+    try {
+      await ApiService.dio
+          .put('/pedidos/$pedidoId', data: {'temporada_ano': escolhido});
+      await _recarregarSilencioso(pedidoId);
+      setState(() => _salvando = false);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Temporada do pedido atualizada!'),
+            backgroundColor: CoresSemanticas.sucesso,
+          ),
+        );
+      }
+    } catch (e) {
+      setState(() => _salvando = false);
+      if (mounted) {
+        mostrarErro(context,
+            extrairErroApi(e, 'Erro ao atualizar a temporada do pedido.'));
+      }
+    }
+  }
+
   Future<void> _editarPagamento(Map<String, dynamic> pagamento) async {
     final resultado = await showDialog<Map<String, dynamic>>(
       context: context,
@@ -471,6 +554,7 @@ class _TelaPedidosState extends State<TelaPedidos> {
                     onTapCliente: () =>
                         _abrirDetalhesCliente(_pedidoSelecionado!),
                     onEditarData: _editarDataPedido,
+                    onEditarTemporada: _editarTemporadaPedido,
                     onEditarPagamento: _editarPagamento,
                     onExcluirPagamento: _excluirPagamento,
                     onNotaFiscalPagamento: _editarNotaFiscal,

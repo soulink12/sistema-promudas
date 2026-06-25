@@ -48,32 +48,75 @@ const PEDIDO_INCLUDE = {
     }
 };
 
-const criarPedido = async (dados) => {
-    return await prisma.pedidos.create({
-        data: {
-            clientes: {
-                connect: { id: parseInt(dados.cliente_id) }
-            },
-            valor_total: dados.valor_total,
-            ajuste: dados.ajuste ?? null,
-            observacoes: dados.observacoes,
-            // Na criação, a data do pedido é o momento atual (= criado_em).
-            // Pode ser alterada depois na consulta (PUT /pedidos/:id).
-            data_pedido: parseData(dados.data_pedido, 'data_pedido') ?? new Date(),
-            status_geral: 'Ativa',
-            ativo: true,
+// Próximo número sequencial dentro de uma temporada (MAX + 1). Robusto para a
+// importação de dados (continua a partir do maior número já usado) e para
+// reativar uma temporada anterior (não duplica). `client` pode ser o prisma ou
+// um cliente de transação (tx).
+const proximoNumeroTemporada = async (client, ano) => {
+    const agg = await client.pedidos.aggregate({
+        _max: { numero_temporada: true },
+        where: { temporada_ano: ano },
+    });
+    return (agg._max.numero_temporada ?? 0) + 1;
+};
 
-            itens_pedido: {
-                create: dados.itens.map(item => ({
-                    produto_id: parseInt(item.produto_id),
-                    quantidade: parseInt(item.quantidade),
-                    valor_unitario: item.valor_unitario
-                }))
+// Quando um update troca a temporada do pedido, recomputa o numero_temporada
+// (próximo da nova temporada). Muta `campos` ajustando temporada_ano/numero_temporada.
+const aplicarTrocaTemporada = async (client, id, campos) => {
+    if (campos.temporada_ano === undefined) return;
+
+    const atual = await client.pedidos.findUnique({
+        where: { id: parseInt(id) },
+        select: { temporada_ano: true },
+    });
+
+    const novoAno = campos.temporada_ano === null ? null : parseInt(campos.temporada_ano);
+    campos.temporada_ano = novoAno;
+
+    if (novoAno === atual?.temporada_ano) return; // sem mudança de temporada
+    campos.numero_temporada = novoAno === null
+        ? null
+        : await proximoNumeroTemporada(client, novoAno);
+};
+
+const criarPedido = async (dados) => {
+    return await prisma.$transaction(async (tx) => {
+        // O número de temporada vem da temporada ativa (configurada no Admin).
+        // Sem temporada ativa, o pedido fica sem número (exibe '#id' como fallback).
+        const temporada = await tx.temporadas.findFirst({ where: { ativo: true } });
+        const temporada_ano = temporada?.ano ?? null;
+        const numero_temporada = temporada
+            ? await proximoNumeroTemporada(tx, temporada.ano)
+            : null;
+
+        return await tx.pedidos.create({
+            data: {
+                clientes: {
+                    connect: { id: parseInt(dados.cliente_id) }
+                },
+                valor_total: dados.valor_total,
+                ajuste: dados.ajuste ?? null,
+                observacoes: dados.observacoes,
+                // Na criação, a data do pedido é o momento atual (= criado_em).
+                // Pode ser alterada depois na consulta (PUT /pedidos/:id).
+                data_pedido: parseData(dados.data_pedido, 'data_pedido') ?? new Date(),
+                status_geral: 'Ativa',
+                ativo: true,
+                temporada_ano,
+                numero_temporada,
+
+                itens_pedido: {
+                    create: dados.itens.map(item => ({
+                        produto_id: parseInt(item.produto_id),
+                        quantidade: parseInt(item.quantidade),
+                        valor_unitario: item.valor_unitario
+                    }))
+                }
+            },
+            include: {
+                itens_pedido: true
             }
-        },
-        include: {
-            itens_pedido: true
-        }
+        });
     });
 };
 
@@ -150,11 +193,17 @@ const atualizarPedido = async (id, dados) => {
     const camposPedido = normalizarDatas(camposBrutos, ['data_pedido']);
 
     if (!itens) {
-        return await prisma.pedidos.update({
-            where: { id: parseInt(id) },
-            data: camposPedido,
+        return await prisma.$transaction(async (tx) => {
+            await aplicarTrocaTemporada(tx, id, camposPedido);
+            return await tx.pedidos.update({
+                where: { id: parseInt(id) },
+                data: camposPedido,
+            });
         });
     }
+
+    // Caso o update também troque a temporada (raro nesta ramificação), recomputa o número.
+    await aplicarTrocaTemporada(prisma, id, camposPedido);
 
     const [pedidoAtual, formasPosteriores] = await Promise.all([
         prisma.pedidos.findUnique({

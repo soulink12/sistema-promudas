@@ -62,7 +62,7 @@ class ListaPedidos extends StatelessWidget {
                             ),
                             const SizedBox(height: 4),
                             Text(
-                              'Pedido #${p['id']} · $data',
+                              'Pedido ${formatarNumeroPedido(p)} · $data',
                               style: TextStyle(
                                 color: cs.onSurfaceVariant,
                                 fontSize: 12,

@@ -18,6 +18,8 @@ class DetalhesPedido extends StatelessWidget {
   final VoidCallback onTapCliente;
   // Recebe a nova data/hora escolhida para o pedido (data_pedido)
   final void Function(DateTime novaData) onEditarData;
+  // Abre o fluxo de troca da temporada do pedido (numeração 26-1, 27-1…)
+  final VoidCallback onEditarTemporada;
   final void Function(Map<String, dynamic> pagamento) onEditarPagamento;
   final void Function(Map<String, dynamic> pagamento) onExcluirPagamento;
   final void Function(Map<String, dynamic> pagamento) onNotaFiscalPagamento;
@@ -32,6 +34,7 @@ class DetalhesPedido extends StatelessWidget {
     required this.onEditar,
     required this.onTapCliente,
     required this.onEditarData,
+    required this.onEditarTemporada,
     required this.onEditarPagamento,
     required this.onExcluirPagamento,
     required this.onNotaFiscalPagamento,
@@ -89,10 +92,29 @@ class DetalhesPedido extends StatelessWidget {
                 onPressed: onVoltar,
               ),
               const SizedBox(width: 4),
-              Text(
-                'Pedido #${pedido['id']}',
-                style:
-                    const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+              // Número do pedido (temporada) — clicável para trocar a temporada
+              InkWell(
+                onTap: onEditarTemporada,
+                borderRadius: BorderRadius.circular(6),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 4, vertical: 2),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        'Pedido ${formatarNumeroPedido(pedido)}',
+                        style: const TextStyle(
+                            fontSize: 20, fontWeight: FontWeight.bold),
+                      ),
+                      const SizedBox(width: 4),
+                      Icon(Icons.edit_outlined,
+                          size: 16,
+                          color:
+                              Theme.of(context).colorScheme.onSurfaceVariant),
+                    ],
+                  ),
+                ),
               ),
               const Spacer(),
               IconButton(
