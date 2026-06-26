@@ -1,6 +1,7 @@
 import 'package:desktop_updater/desktop_updater.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'core/services/app_config.dart';
 import 'core/services/atualizador_service.dart';
 import 'core/services/theme_service.dart';
@@ -51,6 +52,14 @@ class _MeuViveiroAppState extends State<MeuViveiroApp> {
           debugShowCheckedModeBanner: false,
           navigatorKey: _navigatorKey,
           navigatorObservers: [observadorRotas],
+          // Localização em português do Brasil (datas, seletores, textos do Material).
+          locale: const Locale('pt', 'BR'),
+          localizationsDelegates: const [
+            GlobalMaterialLocalizations.delegate,
+            GlobalWidgetsLocalizations.delegate,
+            GlobalCupertinoLocalizations.delegate,
+          ],
+          supportedLocales: const [Locale('pt', 'BR')],
           // Envolve toda a aplicação: trata o Backspace como "voltar" e aplica
           // o tamanho de fonte global escolhido nas configurações.
           builder: (context, child) {
