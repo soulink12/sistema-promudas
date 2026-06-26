@@ -125,9 +125,9 @@ class _TelaInicial extends StatelessWidget {
   }
 }
 
-/// Faz com que a tecla Backspace funcione como o botão "voltar" em qualquer
-/// tela, exceto quando o foco está num campo de texto (para não atrapalhar a
-/// edição). Funciona também para fechar diálogos abertos.
+/// Faz com que as teclas Backspace e Esc funcionem como o botão "voltar" em
+/// qualquer tela, exceto quando o foco está num campo de texto (para não
+/// atrapalhar a edição). Funciona também para fechar diálogos abertos.
 class _AtalhoVoltarTeclado extends StatelessWidget {
   final Widget child;
 
@@ -156,7 +156,8 @@ class _AtalhoVoltarTeclado extends StatelessWidget {
       skipTraversal: true,
       onKeyEvent: (node, event) {
         if (event is KeyDownEvent &&
-            event.logicalKey == LogicalKeyboardKey.backspace &&
+            (event.logicalKey == LogicalKeyboardKey.backspace ||
+                event.logicalKey == LogicalKeyboardKey.escape) &&
             !_focoEmCampoDeTexto()) {
           final nav = _navigatorKey.currentState;
           if (nav != null && nav.canPop()) {

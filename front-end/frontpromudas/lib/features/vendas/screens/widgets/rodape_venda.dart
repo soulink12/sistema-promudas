@@ -8,8 +8,8 @@ import '../../../../core/utils/observador_rotas.dart';
 ///
 /// Fluxo de uso:
 ///   1. Operador digita nome ou código → sugestões aparecem
-///   2. Operador seleciona uma sugestão → campo mostra só o id (ex: "1")
-///   3. Operador pode editar para "QTDxID" (ex: "10x1" = 10 unidades do produto 1)
+///   2. Operador seleciona uma sugestão → campo mostra o nome do produto
+///   3. Operador prefixa "QTD*" ou "QTDx" (ex: "100*mudas de pimenta" = 100 unidades)
 ///   4. Operador pressiona Enter → item adicionado ao carrinho
 class RodapeVenda extends StatefulWidget {
   // Callback chamado com o produto encontrado e a quantidade informada
@@ -32,6 +32,13 @@ class _RodapeVendaState extends State<RodapeVenda> with RouteAware {
   List<Map<String, dynamic>> _produtos = [];
   bool _carregando = true;
   String? _erroCarregamento;
+
+  // Suprime o "Enter" que apenas confirma a seleção de um produto na lista — a
+  // quantidade é digitada depois. Limpado no frame seguinte à seleção.
+  bool _selecionandoOpcao = false;
+  // Nome do produto recém-selecionado: enquanto o campo mostrar exatamente esse
+  // nome, o dropdown fica fechado, para o Enter adicionar (qtd 1) sem reselecionar.
+  String? _nomeSelecionado;
 
   @override
   void initState() {
@@ -91,36 +98,54 @@ class _RodapeVendaState extends State<RodapeVenda> with RouteAware {
     }
   }
 
-  /// Interpreta o texto digitado no formato "QTDxID" ou apenas "ID".
-  /// Busca o produto pelo id na lista carregada da API.
+  /// Interpreta o texto digitado no formato "QTD*PRODUTO" ou "QTDxPRODUTO"
+  /// (separador `*` ou `x` após o número), ou apenas o produto (quantidade 1).
+  /// A parte do produto pode ser o nome (ex.: "mudas de pimenta") ou o código.
   void _processarEntrada(String texto) {
+    // Ignora o Enter que só confirmou a seleção na lista; a quantidade vem depois.
+    if (_selecionandoOpcao) return;
+
     final trimmed = texto.trim();
     if (trimmed.isEmpty) return;
 
     int quantidade = 1;
-    int id;
+    String parteProduto = trimmed;
 
-    if (trimmed.contains('x')) {
-      final partes = trimmed.split('x');
-      // Formato inválido se não houver exatamente dois segmentos
-      if (partes.length != 2) return;
-      quantidade = int.tryParse(partes[0]) ?? 1;
-      id = int.tryParse(partes[1]) ?? -1;
-    } else {
-      id = int.tryParse(trimmed) ?? -1;
+    // Número inicial + separador (* ou x) + produto. O produto é o resto da
+    // string, então nomes com 'x' no meio não atrapalham (só o 1º separador conta).
+    final match = RegExp(r'^(\d+)\s*[x*]\s*(.+)$').firstMatch(trimmed);
+    if (match != null) {
+      quantidade = int.tryParse(match.group(1)!) ?? 1;
+      parteProduto = match.group(2)!.trim();
     }
 
-    if (id == -1 || quantidade <= 0) return;
+    if (quantidade <= 0 || parteProduto.isEmpty) return;
 
-    final produto = _produtos.firstWhere(
-      (p) => p['id'] == id,
-      orElse: () => <String, dynamic>{},
-    );
-
+    final produto = _encontrarProduto(parteProduto);
     if (produto.isEmpty) return;
 
     widget.onProdutoSelecionado(produto, quantidade);
     _pesquisaProdutoController.clear();
+    _nomeSelecionado = null;
+  }
+
+  /// Resolve o produto pela parte digitada: por código (quando numérico) ou
+  /// pelo nome (correspondência exata, sem diferenciar maiúsculas/minúsculas).
+  Map<String, dynamic> _encontrarProduto(String termo) {
+    final idNumerico = int.tryParse(termo);
+    if (idNumerico != null) {
+      final porId = _produtos.firstWhere(
+        (p) => p['id'] == idNumerico,
+        orElse: () => <String, dynamic>{},
+      );
+      if (porId.isNotEmpty) return porId;
+    }
+
+    final alvo = termo.toLowerCase();
+    return _produtos.firstWhere(
+      (p) => p['nome'].toString().toLowerCase() == alvo,
+      orElse: () => <String, dynamic>{},
+    );
   }
 
   @override
@@ -166,6 +191,12 @@ class _RodapeVendaState extends State<RodapeVenda> with RouteAware {
                     if (valorDigitado.text.isEmpty || _produtos.isEmpty) {
                       return const Iterable<Map<String, dynamic>>.empty();
                     }
+                    // Logo após selecionar, o campo mostra o nome exato — não
+                    // reabrir a lista, senão o Enter para confirmar a quantidade
+                    // reselecionaria o produto em vez de adicioná-lo.
+                    if (valorDigitado.text == _nomeSelecionado) {
+                      return const Iterable<Map<String, dynamic>>.empty();
+                    }
                     final busca = valorDigitado.text.toLowerCase();
                     return _produtos.where((produto) {
                       final nome = produto['nome'].toString().toLowerCase();
@@ -176,15 +207,19 @@ class _RodapeVendaState extends State<RodapeVenda> with RouteAware {
                   displayStringForOption: (Map<String, dynamic> p) => p['nome'],
 
                   onSelected: (Map<String, dynamic> produtoEscolhido) {
-                    // Após o Autocomplete preencher o campo com o nome,
-                    // sobrescrevemos com apenas o id para o operador informar a quantidade
+                    // Marca que este Enter foi só para selecionar (não adicionar).
+                    _selecionandoOpcao = true;
+                    // Campo mostra o nome do produto; cursor no início para o
+                    // operador prefixar a quantidade (ex.: "100*mudas de pimenta").
                     WidgetsBinding.instance.addPostFrameCallback((_) {
-                      _pesquisaProdutoController.text =
-                          produtoEscolhido['id'].toString();
+                      final nome = produtoEscolhido['nome'].toString();
+                      _nomeSelecionado = nome;
+                      _pesquisaProdutoController.text = nome;
                       _pesquisaProdutoController.selection =
                           TextSelection.fromPosition(
                         const TextPosition(offset: 0),
                       );
+                      _selecionandoOpcao = false;
                     });
                   },
 
@@ -202,7 +237,7 @@ class _RodapeVendaState extends State<RodapeVenda> with RouteAware {
                               vertical: 8,
                               horizontal: 8,
                             ),
-                            hintText: 'Nome, Cód. ou QTDxID (ex: 10x1)',
+                            hintText: 'Nome, Cód. ou QTD*Produto (ex: 100*mudas de pimenta)',
                             border: const OutlineInputBorder(),
                             prefixIcon: const Icon(Icons.search),
                             filled: true,
