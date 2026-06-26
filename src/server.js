@@ -34,7 +34,9 @@ app.use('/api/auth', authRoutes);
 // versão acontece antes do login, então não pode exigir JWT). A pasta `updates/`
 // fica na raiz do projeto e recebe o manifesto (app-archive.json), os descritores
 // de release e os zips gerados por `dart run desktop_updater:release publish`.
-app.use('/updates', express.static(path.join(__dirname, '..', 'updates')));
+// `fallthrough: false` faz arquivo inexistente retornar 404 em vez de "cair"
+// no `verificarToken` abaixo (que responderia 403, mascarando o arquivo que falta).
+app.use('/updates', express.static(path.join(__dirname, '..', 'updates'), { fallthrough: false }));
 
 // Todas as rotas abaixo exigem token JWT válido
 app.use(verificarToken);
