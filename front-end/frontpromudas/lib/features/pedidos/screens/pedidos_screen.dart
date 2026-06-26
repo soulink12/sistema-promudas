@@ -3,6 +3,7 @@ import '../../../core/services/api_service.dart';
 import '../../../core/services/temporada_service.dart';
 import '../../../core/theme/cores_semanticas.dart';
 import '../../../core/utils/api_feedback.dart';
+import '../../../core/utils/formatadores.dart';
 import '../../../core/widgets/pesquisa_cliente_lista.dart';
 import '../../../core/widgets/dialog_confirmacao.dart';
 import '../../../core/widgets/filtro_multi_status.dart';
@@ -428,6 +429,44 @@ class _TelaPedidosState extends State<TelaPedidos> {
     }
   }
 
+  // Exclui o pedido (soft-delete no backend) após confirmação. Volta para a
+  // lista e recarrega, já que o pedido aberto deixa de existir.
+  Future<void> _excluirPedido() async {
+    final pedidoId = _pedidoSelecionado!['id'] as int;
+    final confirmado = await mostrarDialogConfirmacao(
+      context: context,
+      titulo: 'Excluir pedido',
+      mensagem:
+          'Tem certeza que deseja excluir o Pedido ${formatarNumeroPedido(_pedidoSelecionado!)}? Esta ação não pode ser desfeita.',
+      textoConfirmar: 'Excluir',
+    );
+    if (!confirmado) return;
+
+    setState(() => _salvando = true);
+    try {
+      await ApiService.dio.delete('/pedidos/$pedidoId');
+      if (!mounted) return;
+      setState(() {
+        _salvando = false;
+        _pedidoSelecionado = null;
+      });
+      await _carregarPedidos();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Pedido excluído com sucesso!'),
+            backgroundColor: CoresSemanticas.sucesso,
+          ),
+        );
+      }
+    } catch (e) {
+      setState(() => _salvando = false);
+      if (mounted) {
+        mostrarErro(context, extrairErroApi(e, 'Erro ao excluir o pedido.'));
+      }
+    }
+  }
+
   Future<void> _editarPagamento(Map<String, dynamic> pagamento) async {
     final resultado = await showDialog<Map<String, dynamic>>(
       context: context,
@@ -553,6 +592,7 @@ class _TelaPedidosState extends State<TelaPedidos> {
                       _pedidoSelecionado!['id'] as int,
                     ),
                     onEditar: () => _abrirEdicaoPedido(_pedidoSelecionado!),
+                    onExcluir: _excluirPedido,
                     onTapCliente: () =>
                         _abrirDetalhesCliente(_pedidoSelecionado!),
                     onEditarData: _editarDataPedido,

@@ -15,6 +15,8 @@ class DetalhesPedido extends StatelessWidget {
   final VoidCallback onRegistrarPagamento;
   final VoidCallback onEmitirPdf;
   final VoidCallback onEditar;
+  // Exclui o pedido (soft-delete) após confirmação
+  final VoidCallback onExcluir;
   final VoidCallback onTapCliente;
   // Recebe a nova data/hora escolhida para o pedido (data_pedido)
   final void Function(DateTime novaData) onEditarData;
@@ -32,6 +34,7 @@ class DetalhesPedido extends StatelessWidget {
     required this.onRegistrarPagamento,
     required this.onEmitirPdf,
     required this.onEditar,
+    required this.onExcluir,
     required this.onTapCliente,
     required this.onEditarData,
     required this.onEditarTemporada,
@@ -117,10 +120,51 @@ class DetalhesPedido extends StatelessWidget {
                 ),
               ),
               const Spacer(),
-              IconButton(
-                icon: const Icon(Icons.edit_outlined),
-                tooltip: 'Editar pedido',
-                onPressed: onEditar,
+              PopupMenuButton<String>(
+                icon: const Icon(Icons.more_vert),
+                tooltip: 'Opções do pedido',
+                onSelected: (valor) {
+                  switch (valor) {
+                    case 'editar':
+                      onEditar();
+                      break;
+                    case 'temporada':
+                      onEditarTemporada();
+                      break;
+                    case 'excluir':
+                      onExcluir();
+                      break;
+                  }
+                },
+                itemBuilder: (context) => [
+                  const PopupMenuItem(
+                    value: 'editar',
+                    child: ListTile(
+                      leading: Icon(Icons.edit_outlined),
+                      title: Text('Editar pedido'),
+                      contentPadding: EdgeInsets.zero,
+                    ),
+                  ),
+                  const PopupMenuItem(
+                    value: 'temporada',
+                    child: ListTile(
+                      leading: Icon(Icons.event_outlined),
+                      title: Text('Editar temporada do pedido'),
+                      contentPadding: EdgeInsets.zero,
+                    ),
+                  ),
+                  PopupMenuItem(
+                    value: 'excluir',
+                    child: ListTile(
+                      leading: Icon(Icons.delete_outline,
+                          color: Theme.of(context).colorScheme.error),
+                      title: Text('Excluir pedido',
+                          style: TextStyle(
+                              color: Theme.of(context).colorScheme.error)),
+                      contentPadding: EdgeInsets.zero,
+                    ),
+                  ),
+                ],
               ),
             ],
           ),
