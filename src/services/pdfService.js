@@ -7,6 +7,10 @@ const { formatarMoeda } = require('../utils/moeda');
 
 const moeda = formatarMoeda;
 
+// Escala global das fontes do recibo. Aumentar/diminuir aqui afeta o documento todo.
+const ESCALA_FONTE = 1.15;
+const fs = (n) => n * ESCALA_FONTE;
+
 const formatarData = (d) => {
     if (!d) return '—';
     const dt = new Date(d);
@@ -15,6 +19,15 @@ const formatarData = (d) => {
     const hora = String(dt.getHours()).padStart(2, '0');
     const min = String(dt.getMinutes()).padStart(2, '0');
     return `${dia}/${mes}/${dt.getFullYear()}  ${hora}:${min}`;
+};
+
+// Formata só a data (sem hora) — usado em campos @db.Date, como a emissão da nota.
+const formatarSoData = (d) => {
+    if (!d) return '—';
+    const dt = new Date(d);
+    const dia = String(dt.getDate()).padStart(2, '0');
+    const mes = String(dt.getMonth() + 1).padStart(2, '0');
+    return `${dia}/${mes}/${dt.getFullYear()}`;
 };
 
 // Pontos por milímetro (PDFKit trabalha em pontos: 72 pt = 1 polegada = 25,4 mm)
@@ -60,7 +73,8 @@ const gerarPedidoPDF = async (pedidoId) => {
                     include: { produtos: { select: { nome: true } } }
                 },
                 pagamentos: {
-                    orderBy: { criado_em: 'asc' }
+                    orderBy: { criado_em: 'asc' },
+                    include: { cheques: { orderBy: { bom_para: 'asc' } } }
                 },
                 entregas: {
                     orderBy: { criado_em: 'asc' },
@@ -99,9 +113,9 @@ const gerarPedidoPDF = async (pedidoId) => {
 
         // ── CABEÇALHO ──────────────────────────────────────────────────────────
 
-        doc.font('Helvetica-Bold').fontSize(20).fillColor('#1b5e20')
+        doc.font('Helvetica-Bold').fontSize(fs(20)).fillColor('#1b5e20')
             .text('Viveiro Promudas', { align: 'center' });
-        doc.font('Helvetica').fontSize(10).fillColor('#555555')
+        doc.font('Helvetica').fontSize(fs(10)).fillColor('#555555')
             .text('Recibo de Pedido', { align: 'center' });
         doc.fillColor('black');
         doc.moveDown(0.8);
@@ -111,20 +125,33 @@ const gerarPedidoPDF = async (pedidoId) => {
 
         // Número e data
         const dataPedido = formatarData(pedido.data_pedido || pedido.criado_em);
-        doc.font('Helvetica-Bold').fontSize(14).text(`PEDIDO ${formatarNumeroPedido(pedido)}`, 50, doc.y, { continued: true });
-        doc.font('Helvetica').fontSize(10).fillColor('#555555')
+        doc.font('Helvetica-Bold').fontSize(fs(14)).text(`PEDIDO ${formatarNumeroPedido(pedido)}`, 50, doc.y, { continued: true });
+        doc.font('Helvetica').fontSize(fs(10)).fillColor('#555555')
             .text(dataPedido, { align: 'right' });
         doc.fillColor('black');
         doc.moveDown(0.4);
 
-        // Status
-        const statusCor = pedido.status_pagamento === 'Pago'
+        // Status — pagamento e entrega, em linhas rotuladas separadas
+        const corPagamento = pedido.status_pagamento === 'Pago'
             ? '#1b5e20'
             : pedido.status_pagamento === 'Parcial'
                 ? '#e65100'
                 : '#555555';
-        doc.font('Helvetica').fontSize(10).text('Status: ', { continued: true });
-        doc.font('Helvetica-Bold').fillColor(statusCor).text(pedido.status_pagamento);
+        const corEntrega = (pedido.status_entrega === 'Realizada' || pedido.status_entrega === 'Entregue')
+            ? '#1b5e20'
+            : pedido.status_entrega === 'Parcial'
+                ? '#e65100'
+                : '#555555';
+
+        doc.font('Helvetica').fontSize(fs(10)).fillColor('black')
+            .text('Status de Pagamento: ', 50, doc.y, { continued: true });
+        doc.font('Helvetica-Bold').fillColor(corPagamento).text(pedido.status_pagamento || 'Pendente');
+        doc.fillColor('black');
+        doc.moveDown(0.2);
+
+        doc.font('Helvetica').fontSize(fs(10)).fillColor('black')
+            .text('Status de Entrega: ', 50, doc.y, { continued: true });
+        doc.font('Helvetica-Bold').fillColor(corEntrega).text(pedido.status_entrega || 'Pendente');
         doc.fillColor('black');
         doc.moveDown(0.8);
 
@@ -132,13 +159,13 @@ const gerarPedidoPDF = async (pedidoId) => {
 
         linha(doc);
         doc.moveDown(0.5);
-        doc.font('Helvetica-Bold').fontSize(10).fillColor('#1b5e20').text('CLIENTE');
+        doc.font('Helvetica-Bold').fontSize(fs(10)).fillColor('#1b5e20').text('CLIENTE', 50, doc.y);
         doc.fillColor('black');
         doc.moveDown(0.2);
-        doc.font('Helvetica-Bold').fontSize(11).text(pedido.clientes.nome);
+        doc.font('Helvetica-Bold').fontSize(fs(11)).text(pedido.clientes.nome);
 
         const c = pedido.clientes;
-        doc.font('Helvetica').fontSize(9).fillColor('#555555');
+        doc.font('Helvetica').fontSize(fs(9)).fillColor('#555555');
 
         if (c.cpf_cnpj) doc.text(`CPF/CNPJ: ${c.cpf_cnpj}`);
         if (c.telefone_1) doc.text(`Telefone: ${c.telefone_1}`);
@@ -158,7 +185,7 @@ const gerarPedidoPDF = async (pedidoId) => {
 
         linha(doc);
         doc.moveDown(0.5);
-        doc.font('Helvetica-Bold').fontSize(10).fillColor('#1b5e20').text('ITENS DO PEDIDO');
+        doc.font('Helvetica-Bold').fontSize(fs(10)).fillColor('#1b5e20').text('ITENS DO PEDIDO', 50, doc.y);
         doc.fillColor('black');
         doc.moveDown(0.4);
 
@@ -170,7 +197,7 @@ const gerarPedidoPDF = async (pedidoId) => {
             { x: 460, largura: 85, texto: 'Total', alinhamento: 'right' },
         ];
 
-        doc.font('Helvetica-Bold').fontSize(9).fillColor('#555555');
+        doc.font('Helvetica-Bold').fontSize(fs(9)).fillColor('#555555');
         linhaTabela(doc, doc.y, colItens);
         doc.fillColor('black');
         doc.moveDown(0.3);
@@ -194,7 +221,7 @@ const gerarPedidoPDF = async (pedidoId) => {
                 doc.rect(50, y - 2, 495, 16).fill('#f9f9f9');
             }
 
-            doc.font('Helvetica').fontSize(9).fillColor('black');
+            doc.font('Helvetica').fontSize(fs(9)).fillColor('black');
             linhaTabela(doc, y, [
                 { x: 50, largura: 250, texto: nome },
                 { x: 310, largura: 45, texto: String(qtd), alinhamento: 'center' },
@@ -216,7 +243,7 @@ const gerarPedidoPDF = async (pedidoId) => {
 
         const linhaValor = (label, valor, bold = false, cor = 'black') => {
             const y = doc.y;
-            doc.font(bold ? 'Helvetica-Bold' : 'Helvetica').fontSize(10)
+            doc.font(bold ? 'Helvetica-Bold' : 'Helvetica').fontSize(fs(10))
                 .fillColor('#555555').text(label, 320, y, { lineBreak: false });
             doc.font(bold ? 'Helvetica-Bold' : 'Helvetica')
                 .fillColor(cor).text(moeda(valor), 460, y, { width: 85, align: 'right' });
@@ -240,10 +267,10 @@ const gerarPedidoPDF = async (pedidoId) => {
         if (pedido.observacoes && pedido.observacoes.trim()) {
             linha(doc);
             doc.moveDown(0.5);
-            doc.font('Helvetica-Bold').fontSize(10).fillColor('#1b5e20').text('OBSERVAÇÕES', { align: 'right' });
+            doc.font('Helvetica-Bold').fontSize(fs(10)).fillColor('#1b5e20').text('OBSERVAÇÕES', { align: 'right' });
             doc.fillColor('black');
             doc.moveDown(0.3);
-            doc.font('Helvetica').fontSize(9).fillColor('#333333')
+            doc.font('Helvetica').fontSize(fs(9)).fillColor('#333333')
                 .text(pedido.observacoes.trim(), 50, doc.y, { width: 495, align: 'right' });
             doc.fillColor('black');
             doc.moveDown(0.5);
@@ -253,18 +280,32 @@ const gerarPedidoPDF = async (pedidoId) => {
 
         linha(doc);
         doc.moveDown(0.5);
-        doc.font('Helvetica-Bold').fontSize(10).fillColor('#1b5e20').text('PAGAMENTOS RECEBIDOS');
+        doc.font('Helvetica-Bold').fontSize(fs(10)).fillColor('#1b5e20').text('PAGAMENTOS', 50, doc.y);
         doc.fillColor('black');
         doc.moveDown(0.4);
 
         if (pagamentosReais.length === 0) {
-            doc.font('Helvetica').fontSize(9).fillColor('#888888')
-                .text('Nenhum pagamento recebido até o momento.');
+            doc.font('Helvetica').fontSize(fs(9)).fillColor('#888888')
+                .text('Nenhum pagamento recebido até o momento.', 50, doc.y);
             doc.fillColor('black');
         } else {
+            // Cabeçalho de colunas: Forma de pagamento | Dia | Valor
+            const colPagamentos = [
+                { x: 50, largura: 220, texto: 'Forma de pagamento' },
+                { x: 280, largura: 170, texto: 'Dia', alinhamento: 'left' },
+                { x: 460, largura: 85, texto: 'Valor', alinhamento: 'right' },
+            ];
+            doc.font('Helvetica-Bold').fontSize(fs(9)).fillColor('#555555');
+            linhaTabela(doc, doc.y, colPagamentos);
+            doc.fillColor('black');
+            doc.moveDown(0.3);
+            doc.moveTo(50, doc.y).lineTo(545, doc.y).strokeColor('#dddddd').lineWidth(0.5).stroke();
+            doc.strokeColor('black').lineWidth(1);
+            doc.moveDown(0.3);
+
             pagamentosReais.forEach(pag => {
                 const y = doc.y;
-                doc.font('Helvetica').fontSize(9).fillColor('black');
+                doc.font('Helvetica').fontSize(fs(9)).fillColor('black');
                 const formaTexto = pag.parcelas > 1
                     ? `${pag.forma_pagamento} (${pag.parcelas}x)`
                     : pag.forma_pagamento;
@@ -277,7 +318,7 @@ const gerarPedidoPDF = async (pedidoId) => {
 
                 // Conta para a qual o pagamento entrou
                 if (pag.conta) {
-                    doc.font('Helvetica-Oblique').fontSize(8).fillColor('#666666')
+                    doc.font('Helvetica-Oblique').fontSize(fs(8)).fillColor('#666666')
                         .text(`Conta: ${pag.conta}`, 60, doc.y, { width: 470 });
                     doc.fillColor('black');
                     doc.moveDown(0.4);
@@ -285,7 +326,7 @@ const gerarPedidoPDF = async (pedidoId) => {
 
                 // Escambo (troca): quantidade de produção recebida em kg
                 if (pag.escambo_quantidade != null) {
-                    doc.font('Helvetica-Oblique').fontSize(8).fillColor('#666666')
+                    doc.font('Helvetica-Oblique').fontSize(fs(8)).fillColor('#666666')
                         .text(`Pimenta: ${parseFloat(pag.escambo_quantidade)} kg`, 60, doc.y, { width: 470 });
                     doc.fillColor('black');
                     doc.moveDown(0.4);
@@ -296,8 +337,34 @@ const gerarPedidoPDF = async (pedidoId) => {
                     const detalhePagador = pag.cpf_cnpj_pagador
                         ? `Pago por: ${pag.nome_pagador} (${pag.cpf_cnpj_pagador})`
                         : `Pago por: ${pag.nome_pagador}`;
-                    doc.font('Helvetica-Oblique').fontSize(8).fillColor('#666666')
+                    doc.font('Helvetica-Oblique').fontSize(fs(8)).fillColor('#666666')
                         .text(detalhePagador, 60, doc.y, { width: 470 });
+                    doc.fillColor('black');
+                    doc.moveDown(0.4);
+                }
+
+                // Detalhes dos cheques (pré-datados): número, banco e "bom para"
+                (pag.cheques || []).forEach(cheque => {
+                    const partes = [
+                        cheque.numero ? `Cheque nº ${cheque.numero}` : 'Cheque',
+                        cheque.banco,
+                        cheque.bom_para ? `bom para ${formatarData(cheque.bom_para)}` : null,
+                    ].filter(Boolean);
+                    doc.font('Helvetica-Oblique').fontSize(fs(8)).fillColor('#666666')
+                        .text(partes.join(' · '), 60, doc.y, { width: 470 });
+                    doc.fillColor('black');
+                    doc.moveDown(0.4);
+                });
+
+                // Nota fiscal, quando informada
+                if (pag.numero_nota || pag.status_nota) {
+                    const partesNota = [];
+                    if (pag.numero_nota) partesNota.push(`Nota fiscal: ${pag.numero_nota}`);
+                    else partesNota.push('Nota fiscal');
+                    if (pag.status_nota) partesNota.push(`(${pag.status_nota})`);
+                    if (pag.data_emissao_nota) partesNota.push(`emitida em ${formatarSoData(pag.data_emissao_nota)}`);
+                    doc.font('Helvetica-Oblique').fontSize(fs(8)).fillColor('#666666')
+                        .text(partesNota.join(' '), 60, doc.y, { width: 470 });
                     doc.fillColor('black');
                     doc.moveDown(0.4);
                 }
@@ -308,7 +375,7 @@ const gerarPedidoPDF = async (pedidoId) => {
         if (saldoCredito > 0.005) {
             doc.moveDown(0.3);
             const y = doc.y;
-            doc.font('Helvetica-Bold').fontSize(10).fillColor('#e65100')
+            doc.font('Helvetica-Bold').fontSize(fs(10)).fillColor('#e65100')
                 .text('A receber (crediário):', 50, y, { lineBreak: false });
             doc.text(moeda(saldoCredito), 460, y, { width: 85, align: 'right' });
             doc.fillColor('black');
@@ -320,40 +387,53 @@ const gerarPedidoPDF = async (pedidoId) => {
             doc.moveDown(0.8);
             linha(doc);
             doc.moveDown(0.5);
-            doc.font('Helvetica-Bold').fontSize(10).fillColor('#1b5e20').text('ENTREGAS');
+            doc.font('Helvetica-Bold').fontSize(fs(10)).fillColor('#1b5e20').text('ENTREGAS', 50, doc.y);
             doc.fillColor('black');
             doc.moveDown(0.4);
 
+            // Cabeçalho de colunas: Produto | Local | Dia | Quantidade
+            const colEntregas = [
+                { x: 50, largura: 200, texto: 'Produto' },
+                { x: 255, largura: 105, texto: 'Local' },
+                { x: 365, largura: 120, texto: 'Dia' },
+                { x: 490, largura: 55, texto: 'Qtd', alinhamento: 'right' },
+            ];
+            doc.font('Helvetica-Bold').fontSize(fs(9)).fillColor('#555555');
+            linhaTabela(doc, doc.y, colEntregas);
+            doc.fillColor('black');
+            doc.moveDown(0.3);
+            doc.moveTo(50, doc.y).lineTo(545, doc.y).strokeColor('#dddddd').lineWidth(0.5).stroke();
+            doc.strokeColor('black').lineWidth(1);
+            doc.moveDown(0.3);
+
             pedido.entregas.forEach((entrega, idx) => {
                 // Espaçamento entre entregas múltiplas
-                if (idx > 0) doc.moveDown(0.4);
+                if (idx > 0) doc.moveDown(0.3);
 
-                // Cabeçalho: local de saída (esquerda) + data (direita)
-                const y = doc.y;
-                doc.font('Helvetica-Bold').fontSize(9).fillColor('black')
-                    .text(entrega.local_entrega || '—', 50, y, { width: 300, lineBreak: false });
-                doc.font('Helvetica').fontSize(9).fillColor('#555555')
-                    .text(formatarData(entrega.data_entrega), 360, y, { width: 185, align: 'right' });
-                doc.fillColor('black');
-                doc.moveDown(0.4);
+                const local = entrega.local_entrega || '—';
+                const dia = formatarData(entrega.data_entrega);
 
-                // Itens entregues: nome + quantidade
+                // Uma linha por item: Produto | Local | Dia | Quantidade
                 entrega.itens_entrega.forEach(item => {
                     const nome = item.produtos?.nome || '—';
-                    const yItem = doc.y;
-                    doc.font('Helvetica').fontSize(9).fillColor('#333333')
-                        .text(nome, 60, yItem, { width: 400, lineBreak: false });
-                    doc.text(`${item.quantidade}x`, 460, yItem, { width: 85, align: 'right' });
+                    doc.font('Helvetica').fontSize(fs(9)).fillColor('black');
+                    linhaTabela(doc, doc.y, [
+                        { x: 50, largura: 200, texto: nome },
+                        { x: 255, largura: 105, texto: local },
+                        { x: 365, largura: 120, texto: dia },
+                        { x: 490, largura: 55, texto: `${item.quantidade}x`, alinhamento: 'right' },
+                    ]);
                     doc.fillColor('black');
-                    doc.moveDown(0.4);
+                    doc.moveDown(0.45);
                 });
 
-                // Veículo (motorista / placa), quando informado
-                const veiculo = [entrega.motorista, entrega.placa_veiculo]
-                    .filter(v => v && v.trim()).join(' · ');
-                if (veiculo) {
-                    doc.font('Helvetica-Oblique').fontSize(8).fillColor('#666666')
-                        .text(veiculo, 60, doc.y, { width: 470 });
+                // Abaixo dos itens: quem pegou (motorista) e placa do veículo
+                const detalhes = [];
+                if (entrega.motorista && entrega.motorista.trim()) detalhes.push(`Recebido por: ${entrega.motorista.trim()}`);
+                if (entrega.placa_veiculo && entrega.placa_veiculo.trim()) detalhes.push(`Placa: ${entrega.placa_veiculo.trim()}`);
+                if (detalhes.length > 0) {
+                    doc.font('Helvetica-Oblique').fontSize(fs(8)).fillColor('#666666')
+                        .text(detalhes.join(' · '), 60, doc.y, { width: 470 });
                     doc.fillColor('black');
                     doc.moveDown(0.4);
                 }
@@ -365,7 +445,7 @@ const gerarPedidoPDF = async (pedidoId) => {
         doc.moveDown(3);
         linha(doc);
         doc.moveDown(0.4);
-        doc.font('Helvetica').fontSize(8).fillColor('#aaaaaa')
+        doc.font('Helvetica').fontSize(fs(8)).fillColor('#aaaaaa')
             .text(`Viveiro Promudas — documento gerado em ${formatarData(new Date())}`, { align: 'center' });
 
         doc.end();
