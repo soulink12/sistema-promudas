@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'core/services/app_config.dart';
 import 'core/services/atualizador_service.dart';
+import 'core/services/pdf_config_service.dart';
 import 'core/services/theme_service.dart';
 import 'core/utils/observador_rotas.dart';
 import 'features/auth/screens/login_screen.dart';
@@ -15,6 +16,7 @@ void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await AppConfig.carregar();
   await ThemeService.carregar();
+  await PdfConfigService.carregar();
   runApp(const MeuViveiroApp());
 }
 

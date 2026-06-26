@@ -69,9 +69,9 @@ const eliminarPedido = async (req, res, next) => {
 
 const gerarPDF = async (req, res, next) => {
     try {
-        const buffer = await pdfService.gerarPedidoPDF(req.params.id);
+        const { buffer, nomeArquivo } = await pdfService.gerarPedidoPDF(req.params.id);
         res.setHeader('Content-Type', 'application/pdf');
-        res.setHeader('Content-Disposition', `attachment; filename="pedido_${req.params.id}.pdf"`);
+        res.setHeader('Content-Disposition', `attachment; filename="${nomeArquivo}"`);
         res.setHeader('Content-Length', buffer.length);
         res.send(buffer);
     } catch (erro) {

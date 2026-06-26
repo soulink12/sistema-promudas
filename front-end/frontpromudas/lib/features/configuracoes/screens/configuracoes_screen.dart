@@ -1,4 +1,6 @@
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
+import '../../../core/services/pdf_config_service.dart';
 import '../../../core/services/theme_service.dart';
 
 /// Configurações do Aplicativo — preferências de aparência (tema + tamanho da
@@ -51,6 +53,28 @@ class TelaConfiguracoes extends StatelessWidget {
                         ThemeService.definirTamanhoFonte(selecao.first),
                   ),
                 ),
+              );
+            },
+          ),
+          const Divider(height: 1),
+          ValueListenableBuilder<String?>(
+            valueListenable: PdfConfigService.pasta,
+            builder: (context, pasta, _) {
+              return ListTile(
+                leading: const Icon(Icons.folder_outlined),
+                title: const Text('Pasta para salvar os PDFs'),
+                subtitle: Text(
+                  pasta ?? 'Não definida — toque para escolher uma pasta',
+                ),
+                trailing: const Icon(Icons.edit_outlined),
+                onTap: () async {
+                  final pasta = await FilePicker.platform.getDirectoryPath(
+                    dialogTitle: 'Escolha a pasta para salvar os PDFs',
+                  );
+                  if (pasta != null) {
+                    await PdfConfigService.definirPasta(pasta);
+                  }
+                },
               );
             },
           ),

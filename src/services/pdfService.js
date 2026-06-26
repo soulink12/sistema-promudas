@@ -99,11 +99,15 @@ const gerarPedidoPDF = async (pedidoId) => {
         .filter(p => nomesPosteriores.has(p.forma_pagamento))
         .reduce((s, p) => s + parseFloat(p.valor_pago), 0);
 
+    // Nome do arquivo final: "Pedido AA-N.pdf" (AA-N = número por temporada),
+    // ou "Pedido #id.pdf" para pedidos sem temporada. Enviado no Content-Disposition.
+    const nomeArquivo = `Pedido ${formatarNumeroPedido(pedido)}.pdf`;
+
     return new Promise((resolve, reject) => {
         const doc = new PDFDocument({ size: 'A4', margin: 50 });
         const chunks = [];
         doc.on('data', c => chunks.push(c));
-        doc.on('end', () => resolve(Buffer.concat(chunks)));
+        doc.on('end', () => resolve({ buffer: Buffer.concat(chunks), nomeArquivo }));
         doc.on('error', reject);
 
         // Guias de furação: na primeira página (já criada pelo construtor) e em cada
@@ -356,8 +360,8 @@ const gerarPedidoPDF = async (pedidoId) => {
                     doc.moveDown(0.4);
                 });
 
-                // Nota fiscal, quando informada
-                if (pag.numero_nota || pag.status_nota) {
+                // Nota fiscal — só quando já emitida; pendente não aparece no recibo
+                if (pag.status_nota && pag.status_nota !== 'Pendente') {
                     const partesNota = [];
                     if (pag.numero_nota) partesNota.push(`Nota fiscal: ${pag.numero_nota}`);
                     else partesNota.push('Nota fiscal');
@@ -446,7 +450,8 @@ const gerarPedidoPDF = async (pedidoId) => {
         linha(doc);
         doc.moveDown(0.4);
         doc.font('Helvetica').fontSize(fs(8)).fillColor('#aaaaaa')
-            .text(`Viveiro Promudas — documento gerado em ${formatarData(new Date())}`, { align: 'center' });
+            .text(`Viveiro Promudas — documento gerado em ${formatarData(new Date())}`,
+                50, doc.y, { width: 495, align: 'right' });
 
         doc.end();
     });
