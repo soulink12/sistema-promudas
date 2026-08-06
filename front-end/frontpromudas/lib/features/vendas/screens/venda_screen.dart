@@ -50,6 +50,10 @@ class _TelaVendaState extends State<TelaVenda> {
   // Total pago em pagamentos reais antes da edição (somente modo edição)
   double _totalPagoReal = 0.0;
 
+  // Valor total do pedido antes da edição (somente modo edição) — usado para
+  // saber quanto o valor aumentou e exigir cobertura desse aumento ao salvar.
+  double _valorTotalOriginal = 0.0;
+
   @override
   void initState() {
     super.initState();
@@ -100,6 +104,8 @@ class _TelaVendaState extends State<TelaVenda> {
     _totalPagoReal = pagamentos
         .where((p) => (p as Map)['pagamento_posterior'] != true)
         .fold(0.0, (s, p) => s + _toDouble((p as Map)['valor_pago']));
+
+    _valorTotalOriginal = _toDouble(pedido['valor_total']);
   }
 
   @override
@@ -363,6 +369,26 @@ class _TelaVendaState extends State<TelaVenda> {
 
   Future<void> _confirmarEdicao() async {
     final pedidoId = widget.pedidoParaEditar!['id'] as int;
+    final novoTotal = _carrinhoService.totalComAjuste;
+    final aumento = novoTotal - _valorTotalOriginal;
+
+    // Valor do pedido aumentou: exige cobertura do aumento (pagamento real
+    // e/ou crediário) antes de salvar, igual ao fechamento de um pedido novo.
+    if (aumento > 0.01) {
+      showDialog<void>(
+        context: context,
+        builder: (_) => ModalPagamento(
+          totalPedido: aumento,
+          onConfirmar: (pagamentos) => _salvarEdicao(
+            pedidoId,
+            pagamentosAdicionais: pagamentos,
+            valorACobrir: aumento,
+          ),
+        ),
+      );
+      return;
+    }
+
     final confirmado = await mostrarDialogConfirmacao(
       context: context,
       titulo: 'Confirmar edição',
@@ -374,7 +400,11 @@ class _TelaVendaState extends State<TelaVenda> {
     _salvarEdicao(pedidoId);
   }
 
-  Future<void> _salvarEdicao(int pedidoId) async {
+  Future<void> _salvarEdicao(
+    int pedidoId, {
+    List<Map<String, dynamic>>? pagamentosAdicionais,
+    double? valorACobrir,
+  }) async {
     setState(() => _salvando = true);
 
     final itens = _carrinhoService.itens;
@@ -393,13 +423,42 @@ class _TelaVendaState extends State<TelaVenda> {
         'observacoes': _observacoes.isNotEmpty ? _observacoes : null,
       });
 
+      // Registra os pagamentos do aumento (pagamento real e/ou crediário),
+      // capando pelo valor do aumento — mesmo padrão de _registrarPedido.
+      if (pagamentosAdicionais != null && pagamentosAdicionais.isNotEmpty) {
+        double restante = valorACobrir ?? 0.0;
+        for (final p in pagamentosAdicionais) {
+          if (restante <= 0.005) break;
+          final valorPago = (p['valor'] as double).clamp(0.0, restante);
+          await ApiService.dio.post('/pagamentos', data: {
+            'pedido_id': pedidoId,
+            'valor_pago': valorPago,
+            'forma_pagamento': p['forma'],
+            // Cheque (depósito posterior): data fica nula até o depósito.
+            if (p['depositoPosterior'] != true)
+              'data_pagamento': DateTime.now().toUtc().toIso8601String(),
+            if (p['parcelas'] != null) 'parcelas': p['parcelas'],
+            if (p['escamboQuantidade'] != null)
+              'escambo_quantidade': p['escamboQuantidade'],
+            if (p['conta'] != null) 'conta': p['conta'],
+            if (p['nomePagador'] != null) 'nome_pagador': p['nomePagador'],
+            if (p['cpfPagador'] != null) 'cpf_cnpj_pagador': p['cpfPagador'],
+            if (p['cheques'] != null) 'cheques': p['cheques'],
+          });
+          restante -= valorPago;
+        }
+      }
+
       final creditoGerado = _toDouble(response.data['creditoGerado']);
       setState(() => _salvando = false);
 
       if (mounted) {
-        final mensagem = creditoGerado > 0.01
-            ? 'Pedido atualizado. Crédito de ${formatarMoeda(creditoGerado)} adicionado ao cliente.'
-            : 'Pedido atualizado com sucesso!';
+        final mensagem = pagamentosAdicionais != null &&
+                pagamentosAdicionais.isNotEmpty
+            ? 'Pedido atualizado e pagamento do aumento registrado com sucesso!'
+            : creditoGerado > 0.01
+                ? 'Pedido atualizado. Crédito de ${formatarMoeda(creditoGerado)} adicionado ao cliente.'
+                : 'Pedido atualizado com sucesso!';
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(mensagem),
