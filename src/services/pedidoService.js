@@ -160,6 +160,34 @@ const listarPedidos = async (filtros = {}) => {
             ...(filtros.ate && { lte: new Date(filtros.ate) }),
         };
     }
+    if (filtros.temporadaAno) {
+        where.temporada_ano = { in: filtros.temporadaAno.split(',').map(Number) };
+    }
+    if (filtros.formaPagamento) {
+        where.pagamentos = { some: { forma_pagamento: { in: filtros.formaPagamento.split(',') } } };
+    }
+    if (filtros.numero) {
+        // Aceita os formatos exibidos por formatarNumeroPedido: "AA-N" (ex. "26-1",
+        // temporada+número) ou só "N" (número da temporada, sem precisar informar a
+        // safra — busca em qualquer uma). "#id" busca pelo id bruto, só usado no
+        // fallback de pedidos sem temporada (exibidos como "#id").
+        const bruto = filtros.numero.trim();
+        if (bruto.startsWith('#')) {
+            const idStr = bruto.slice(1);
+            where.id = /^\d+$/.test(idStr) ? parseInt(idStr) : -1;
+        } else {
+            const match = bruto.match(/^(\d{1,2})-(\d+)$/);
+            if (match) {
+                where.temporada_ano = 2000 + parseInt(match[1]);
+                where.numero_temporada = parseInt(match[2]);
+            } else if (/^\d+$/.test(bruto)) {
+                where.numero_temporada = parseInt(bruto);
+            } else {
+                // Formato incompleto/inválido (usuário ainda digitando) — nenhum resultado.
+                where.id = -1;
+            }
+        }
+    }
 
     const [pedidos, formasPosteriores] = await Promise.all([
         prisma.pedidos.findMany({

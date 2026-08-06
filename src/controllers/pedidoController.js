@@ -34,7 +34,10 @@ const buscarPedido = async (req, res, next) => {
 
 const listarPedidos = async (req, res, next) => {
     try {
-        const { cliente, statusEntrega, statusPagamento, statusNota, de, ate } = req.query;
+        const {
+            cliente, statusEntrega, statusPagamento, statusNota, de, ate,
+            numero, temporadaAno, formaPagamento,
+        } = req.query;
         const filtros = {};
         if (cliente) filtros.cliente = cliente;
         if (statusEntrega) filtros.statusEntrega = statusEntrega;
@@ -42,6 +45,9 @@ const listarPedidos = async (req, res, next) => {
         if (statusNota) filtros.statusNota = statusNota;
         if (de) filtros.de = de;
         if (ate) filtros.ate = ate;
+        if (numero) filtros.numero = numero;
+        if (temporadaAno) filtros.temporadaAno = temporadaAno;
+        if (formaPagamento) filtros.formaPagamento = formaPagamento;
         const pedidos = await pedidoService.listarPedidos(filtros);
         return res.status(200).json(pedidos);
     } catch (erro) {

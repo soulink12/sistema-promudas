@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../../core/services/api_service.dart';
 import '../../../core/services/temporada_service.dart';
+import '../../../core/services/forma_pagamento_service.dart';
 import '../../../core/theme/cores_semanticas.dart';
 import '../../../core/utils/api_feedback.dart';
 import '../../../core/utils/formatadores.dart';
@@ -47,10 +48,20 @@ class _TelaPedidosState extends State<TelaPedidos> {
   Map<String, dynamic>? _clienteFiltro;
   Map<String, dynamic>? _pedidoSelecionado;
 
+  // Busca por número do pedido (ex.: "26-1" ou "#12") — alternativa à busca por
+  // cliente no mesmo campo "Pesquisar". Vazio = sem filtro.
+  String _numeroFiltro = '';
+
   // Filtros de status (seleção múltipla). Vazio = sem filtro. Todos filtrados no backend.
   final Set<String> _statusPagamento = {};
   final Set<String> _statusEntrega = {};
   final Set<String> _statusNota = {};
+
+  // Opções (carregadas da API) e seleção dos filtros de temporada/forma de pagamento.
+  List<Map<String, dynamic>> _temporadas = [];
+  List<Map<String, dynamic>> _formasPagamento = [];
+  final Set<String> _temporadasFiltro = {};
+  final Set<String> _formaPagamentoFiltro = {};
 
   // Intervalo de datas — obrigatório. Padrão: última semana (hoje − 7 dias … hoje).
   late DateTime _de;
@@ -69,8 +80,27 @@ class _TelaPedidosState extends State<TelaPedidos> {
       _statusPagamento.addAll(widget.statusPagamentoFiltro!.split(','));
     }
     _carregarPedidos();
+    _carregarOpcoesFiltro();
     if (widget.pedidoInicial != null) {
       _pedidoSelecionado = widget.pedidoInicial;
+    }
+  }
+
+  // Carrega as opções dos filtros de temporada e forma de pagamento. Falha
+  // silenciosa — nesse caso os filtros extras simplesmente não aparecem.
+  Future<void> _carregarOpcoesFiltro() async {
+    try {
+      final resultados = await Future.wait([
+        TemporadaService().listar(),
+        FormaPagamentoService().listar(),
+      ]);
+      if (!mounted) return;
+      setState(() {
+        _temporadas = resultados[0];
+        _formasPagamento = resultados[1];
+      });
+    } catch (_) {
+      // Ignorado — resto da tela funciona normalmente.
     }
   }
 
@@ -90,6 +120,9 @@ class _TelaPedidosState extends State<TelaPedidos> {
       if (clienteNome != null && clienteNome.isNotEmpty) {
         params['cliente'] = clienteNome;
       }
+      if (_numeroFiltro.isNotEmpty) {
+        params['numero'] = _numeroFiltro;
+      }
       if (_statusPagamento.isNotEmpty) {
         params['statusPagamento'] = _statusPagamento.join(',');
       }
@@ -98,6 +131,12 @@ class _TelaPedidosState extends State<TelaPedidos> {
       }
       if (_statusNota.isNotEmpty) {
         params['statusNota'] = _statusNota.join(',');
+      }
+      if (_temporadasFiltro.isNotEmpty) {
+        params['temporadaAno'] = _temporadasFiltro.join(',');
+      }
+      if (_formaPagamentoFiltro.isNotEmpty) {
+        params['formaPagamento'] = _formaPagamentoFiltro.join(',');
       }
       final response = await ApiService.dio.get(
         '/pedidos',
@@ -137,6 +176,7 @@ class _TelaPedidosState extends State<TelaPedidos> {
   void _selecionarClienteFiltro(Map<String, dynamic> cliente) {
     setState(() {
       _clienteFiltro = cliente;
+      _numeroFiltro = '';
       _pedidoSelecionado = null;
     });
     _carregarPedidos();
@@ -145,8 +185,16 @@ class _TelaPedidosState extends State<TelaPedidos> {
   void _limparFiltro() {
     setState(() {
       _clienteFiltro = null;
+      _numeroFiltro = '';
       _pedidoSelecionado = null;
     });
+    _carregarPedidos();
+  }
+
+  // Busca por número do pedido, digitado no mesmo campo "Pesquisar".
+  void _filtrarPorNumero(String texto) {
+    if (texto == _numeroFiltro) return;
+    setState(() => _numeroFiltro = texto);
     _carregarPedidos();
   }
 
@@ -615,11 +663,14 @@ class _TelaPedidosState extends State<TelaPedidos> {
   Widget _buildListagem() {
     return Column(
       children: [
-        // Barra de busca/filtro por cliente — sempre visível no topo da lista
+        // Barra de busca — cliente ou número do pedido — sempre visível no topo da lista
         PesquisaClienteLista(
           clienteSelecionado: _clienteFiltro,
           onSelecionado: _selecionarClienteFiltro,
           onLimpar: _limparFiltro,
+          labelText: 'Pesquisar',
+          hintText: 'Nome do cliente ou número do pedido',
+          onTextoNumerico: _filtrarPorNumero,
         ),
         // Filtros (datas obrigatórias + status) — logo abaixo da pesquisa
         Padding(
@@ -677,6 +728,26 @@ class _TelaPedidosState extends State<TelaPedidos> {
                     selecionados: _statusNota,
                     onChanged: (sel) => _aplicarFiltroStatus(_statusNota, sel),
                   ),
+                  if (_temporadas.isNotEmpty)
+                    FiltroMultiStatus(
+                      rotulo: 'Temporada',
+                      opcoes: _temporadas
+                          .map((t) => (t['ano'] as int).toString())
+                          .toList(),
+                      selecionados: _temporadasFiltro,
+                      onChanged: (sel) =>
+                          _aplicarFiltroStatus(_temporadasFiltro, sel),
+                    ),
+                  if (_formasPagamento.isNotEmpty)
+                    FiltroMultiStatus(
+                      rotulo: 'Forma de pagamento',
+                      opcoes: _formasPagamento
+                          .map((f) => f['nome'] as String)
+                          .toList(),
+                      selecionados: _formaPagamentoFiltro,
+                      onChanged: (sel) =>
+                          _aplicarFiltroStatus(_formaPagamentoFiltro, sel),
+                    ),
                 ],
               ),
             ],

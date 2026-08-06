@@ -170,3 +170,57 @@ test('pedido pago e entregue bloqueia edição de itens, mas não de data', asyn
     });
     assert.equal(updData.status, 200, JSON.stringify(updData.body));
 });
+
+test('busca por número do pedido (AA-N, só o número da temporada, e #id)', async () => {
+    const pedidoId = await amb.criarPedido({
+        cliente_id: 1,
+        itens: [{ produto_id: produtoId, quantidade: 1, valor_unitario: 50 }],
+    });
+
+    // Ano improvável de colidir com temporadas reais — dá numeração previsível (1º pedido da "safra").
+    const setTemporada = await amb.api('PUT', `/api/pedidos/${pedidoId}`, {
+        body: { temporada_ano: 2099 },
+    });
+    assert.equal(setTemporada.status, 200, JSON.stringify(setTemporada.body));
+
+    const resAaN = await amb.api('GET', '/api/pedidos?numero=99-1');
+    assert.ok(resAaN.body.some((p) => p.id === pedidoId), 'não achou pelo formato AA-N');
+    assert.ok(!resAaN.body.some((p) => p.id !== pedidoId && p.temporada_ano === 2099),
+        'formato AA-N trouxe pedido de outra numeração');
+
+    // Só o número da temporada, sem precisar informar a safra.
+    const resSoNumero = await amb.api('GET', '/api/pedidos?numero=1');
+    assert.ok(resSoNumero.body.some((p) => p.id === pedidoId),
+        'não achou só pelo número da temporada, sem a safra');
+
+    const resHash = await amb.api('GET', `/api/pedidos?numero=%23${pedidoId}`);
+    assert.ok(resHash.body.some((p) => p.id === pedidoId), 'não achou pelo formato #id');
+});
+
+test('filtros de temporada e forma de pagamento', async () => {
+    const pedidoId = await amb.criarPedido({
+        cliente_id: 1,
+        itens: [{ produto_id: produtoId, quantidade: 3, valor_unitario: 50 }], // total 150
+    });
+    await amb.api('PUT', `/api/pedidos/${pedidoId}`, { body: { temporada_ano: 2098 } });
+    await amb.api('POST', '/api/pagamentos', {
+        body: {
+            pedido_id: pedidoId,
+            valor_pago: 50,
+            forma_pagamento: 'PIX',
+            data_pagamento: new Date().toISOString(),
+        },
+    });
+
+    const porTemporada = await amb.api('GET', '/api/pedidos?temporadaAno=2098');
+    assert.ok(porTemporada.body.some((p) => p.id === pedidoId), 'filtro de temporada não achou o pedido');
+
+    const outraTemporada = await amb.api('GET', '/api/pedidos?temporadaAno=2097');
+    assert.ok(!outraTemporada.body.some((p) => p.id === pedidoId), 'temporada errada não deveria trazer o pedido');
+
+    const porForma = await amb.api('GET', '/api/pedidos?formaPagamento=PIX');
+    assert.ok(porForma.body.some((p) => p.id === pedidoId), 'filtro de forma de pagamento não achou o pedido');
+
+    const outraForma = await amb.api('GET', '/api/pedidos?formaPagamento=Dinheiro');
+    assert.ok(!outraForma.body.some((p) => p.id === pedidoId), 'forma errada não deveria trazer o pedido');
+});

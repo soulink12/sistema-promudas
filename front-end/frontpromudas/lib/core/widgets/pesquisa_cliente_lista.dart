@@ -13,6 +13,7 @@ class PesquisaClienteLista extends StatelessWidget {
   final VoidCallback onLimpar;
   final String labelText;
   final String hintText;
+  final ValueChanged<String>? onTextoNumerico;
 
   const PesquisaClienteLista({
     super.key,
@@ -21,6 +22,7 @@ class PesquisaClienteLista extends StatelessWidget {
     required this.onLimpar,
     this.labelText = 'Filtrar por cliente',
     this.hintText = 'Buscar por nome, CPF ou telefone',
+    this.onTextoNumerico,
   });
 
   @override
@@ -37,6 +39,7 @@ class PesquisaClienteLista extends StatelessWidget {
                   labelText: labelText,
                   hintText: hintText,
                   onSelecionado: onSelecionado,
+                  onTextoNumerico: onTextoNumerico,
                 )
               : Card(
                   child: ListTile(
