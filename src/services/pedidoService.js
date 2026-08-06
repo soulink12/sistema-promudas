@@ -2,6 +2,7 @@ const prisma = require('../config/database');
 const { recalcularStatusPedido } = require('./pagamentoService');
 const { parseData, normalizarDatas } = require('../utils/parseData');
 const formaPagamentoService = require('./formaPagamentoService');
+const BusinessError = require('../utils/BusinessError');
 
 // Campos de pagamento retornados ao montar um pedido completo (listar/buscar).
 const PAGAMENTO_SELECT = {
@@ -203,20 +204,28 @@ const atualizarPedido = async (id, dados) => {
         });
     }
 
-    // Caso o update também troque a temporada (raro nesta ramificação), recomputa o número.
-    await aplicarTrocaTemporada(prisma, id, camposPedido);
-
     const [pedidoAtual, formasPosteriores] = await Promise.all([
         prisma.pedidos.findUnique({
             where: { id: parseInt(id) },
             select: {
                 ajuste: true,
                 cliente_id: true,
+                status_pagamento: true,
+                status_entrega: true,
                 pagamentos: { select: { valor_pago: true, forma_pagamento: true } },
             },
         }),
         formaPagamentoService.listarPosteriores(),
     ]);
+
+    const pagamentoFechado = pedidoAtual?.status_pagamento === 'Pago' || pedidoAtual?.status_pagamento === 'Crédito';
+    const entregaFechada = pedidoAtual?.status_entrega === 'Entregue';
+    if (pagamentoFechado && entregaFechada) {
+        throw new BusinessError('Este pedido já foi pago e entregue integralmente e não pode mais ser alterado.');
+    }
+
+    // Caso o update também troque a temporada (raro nesta ramificação), recomputa o número.
+    await aplicarTrocaTemporada(prisma, id, camposPedido);
 
     const ajuste = camposPedido.ajuste !== undefined
         ? Number(camposPedido.ajuste ?? 0)

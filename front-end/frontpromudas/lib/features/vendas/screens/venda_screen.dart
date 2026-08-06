@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import '../../../core/services/api_service.dart';
 import '../../../core/services/carrinho_service.dart';
 import '../../../core/theme/cores_semanticas.dart';
+import '../../../core/utils/api_feedback.dart';
 import '../../../core/utils/formatadores.dart';
 import '../../clientes/screens/widgets/dialog_cadastro_cliente.dart';
 import 'widgets/detalhes_app_bar.dart';
@@ -470,15 +471,12 @@ class _TelaVendaState extends State<TelaVenda> {
         );
         Navigator.pop(context);
       }
-    } catch (_) {
+    } catch (e) {
       setState(() => _salvando = false);
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Erro ao atualizar pedido. Tente novamente.'),
-            backgroundColor: CoresSemanticas.erro,
-            duration: Duration(seconds: 4),
-          ),
+        mostrarErro(
+          context,
+          extrairErroApi(e, 'Erro ao atualizar pedido. Tente novamente.'),
         );
       }
     }

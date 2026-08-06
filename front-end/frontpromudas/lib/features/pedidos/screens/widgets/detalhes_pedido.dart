@@ -52,6 +52,8 @@ class DetalhesPedido extends StatelessWidget {
     final data = formatarDataHora(dataPedidoRaw);
     final statusPag = pedido['status_pagamento'] as String? ?? 'Pendente';
     final statusRet = pedido['status_entrega'] as String? ?? 'Pendente';
+    final pedidoFechado =
+        (statusPag == 'Pago' || statusPag == 'Crédito') && statusRet == 'Entregue';
     final obs = pedido['observacoes'] as String?;
 
     final itens = (pedido['itens_pedido'] as List? ?? [])
@@ -95,29 +97,11 @@ class DetalhesPedido extends StatelessWidget {
                 onPressed: onVoltar,
               ),
               const SizedBox(width: 4),
-              // Número do pedido (temporada) — clicável para trocar a temporada
-              InkWell(
-                onTap: onEditarTemporada,
-                borderRadius: BorderRadius.circular(6),
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: 4, vertical: 2),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(
-                        'Pedido ${formatarNumeroPedido(pedido)}',
-                        style: const TextStyle(
-                            fontSize: 20, fontWeight: FontWeight.bold),
-                      ),
-                      const SizedBox(width: 4),
-                      Icon(Icons.edit_outlined,
-                          size: 16,
-                          color:
-                              Theme.of(context).colorScheme.onSurfaceVariant),
-                    ],
-                  ),
-                ),
+              // Número do pedido (temporada) — a troca de temporada fica só no menu ⋮.
+              Text(
+                'Pedido ${formatarNumeroPedido(pedido)}',
+                style: const TextStyle(
+                    fontSize: 20, fontWeight: FontWeight.bold),
               ),
               const Spacer(),
               PopupMenuButton<String>(
@@ -137,11 +121,18 @@ class DetalhesPedido extends StatelessWidget {
                   }
                 },
                 itemBuilder: (context) => [
-                  const PopupMenuItem(
+                  PopupMenuItem(
                     value: 'editar',
+                    enabled: !pedidoFechado,
                     child: ListTile(
-                      leading: Icon(Icons.edit_outlined),
-                      title: Text('Editar pedido'),
+                      leading: Icon(Icons.edit_outlined,
+                          color: pedidoFechado
+                              ? Theme.of(context).disabledColor
+                              : null),
+                      title: const Text('Editar pedido'),
+                      subtitle: pedidoFechado
+                          ? const Text('Pago e entregue')
+                          : null,
                       contentPadding: EdgeInsets.zero,
                     ),
                   ),

@@ -131,3 +131,42 @@ test('soft-delete some da consulta e bloqueia novo pagamento', async () => {
     });
     assert.equal(pg.status, 400);
 });
+
+test('pedido pago e entregue bloqueia edição de itens, mas não de data', async () => {
+    const pedidoId = await amb.criarPedido({
+        cliente_id: 1,
+        itens: [{ produto_id: produtoId, quantidade: 2, valor_unitario: 50 }], // total 100
+    });
+
+    await amb.api('POST', '/api/pagamentos', {
+        body: {
+            pedido_id: pedidoId,
+            valor_pago: 100,
+            forma_pagamento: 'PIX',
+            data_pagamento: new Date().toISOString(),
+        },
+    });
+    await amb.api('POST', '/api/entregas', {
+        body: {
+            pedido_id: pedidoId,
+            local_entrega: 'Paraíso',
+            itens: [{ produto_id: produtoId, quantidade: 2 }],
+        },
+    });
+
+    const ped = await amb.api('GET', `/api/pedidos/${pedidoId}`);
+    assert.equal(ped.body.status_pagamento, 'Pago');
+    assert.equal(ped.body.status_entrega, 'Entregue');
+
+    const updItens = await amb.api('PUT', `/api/pedidos/${pedidoId}`, {
+        body: { itens: [{ produto_id: produtoId, quantidade: 3, valor_unitario: 50 }] },
+    });
+    assert.equal(updItens.status, 400);
+    assert.ok(updItens.body.erro, 'esperava mensagem de erro de negócio');
+
+    // Edição de metadados (sem `itens`) continua liberada mesmo com o pedido fechado.
+    const updData = await amb.api('PUT', `/api/pedidos/${pedidoId}`, {
+        body: { data_pedido: new Date().toISOString() },
+    });
+    assert.equal(updData.status, 200, JSON.stringify(updData.body));
+});
