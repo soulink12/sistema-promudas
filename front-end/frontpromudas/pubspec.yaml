@@ -24,8 +24,24 @@ dev_dependencies:
   # usado só nos testes para fingir o FilePicker (MockPlatformInterfaceMixin)
   plugin_platform_interface: ^2.1.8
   flutter_lints: ^6.0.0
+  flutter_launcher_icons: ^0.14.4
 
 flutter:
   uses-material-design: true
   assets:
     - assets/images/
+    - assets/icon/
+
+# Ícone do app, gerado a partir de assets/icon/app_icon.png via:
+#   dart run flutter_launcher_icons
+flutter_launcher_icons:
+  image_path: "assets/icon/app_icon.png"
+  android: true
+  ios: true
+  web:
+    generate: true
+  windows:
+    generate: true
+    icon_size: 256
+  macos:
+    generate: true
