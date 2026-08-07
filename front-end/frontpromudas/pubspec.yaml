@@ -14,6 +14,7 @@ dependencies:
     sdk: flutter
   flutter_localizations:
     sdk: flutter
+  printing: ^5.15.0
   shared_preferences: ^2.5.3
 
 dev_dependencies:

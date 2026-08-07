@@ -5,11 +5,12 @@ import 'package:flutter/material.dart';
 import 'api_service.dart';
 import 'pdf_config_service.dart';
 import '../theme/cores_semanticas.dart';
+import '../widgets/pdf_preview_screen.dart';
 
 class PdfDownloadService {
   /// Baixa o PDF do pedido, salva na pasta configurada em Configurações e abre
-  /// o arquivo no programa padrão do Windows. O nome do arquivo ("Pedido AA-N.pdf")
-  /// vem do backend, no cabeçalho `Content-Disposition`.
+  /// o preview embutido do app (com opção de impressão). O nome do arquivo
+  /// ("Pedido AA-N.pdf") vem do backend, no cabeçalho `Content-Disposition`.
   static Future<void> baixarESalvar(BuildContext context, int pedidoId) async {
     // Sem pasta configurada não há onde salvar — orienta o usuário e sai.
     final pasta = PdfConfigService.pasta.value;
@@ -47,7 +48,13 @@ class PdfDownloadService {
       final caminho = '$destino${Platform.pathSeparator}$nomeArquivo';
       await File(caminho).writeAsBytes(bytes);
 
-      await _abrirNoProgramaPadrao(caminho);
+      if (context.mounted) {
+        await Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (_) => PdfPreviewScreen(bytes: bytes, nomeArquivo: nomeArquivo),
+          ),
+        );
+      }
     } catch (_) {
       if (context.mounted) {
         _avisar(
@@ -79,18 +86,6 @@ class PdfDownloadService {
   static String? _pastaTemporada(String nomeArquivo) {
     final match = RegExp(r'Pedido\s+(\d+)-').firstMatch(nomeArquivo);
     return match?.group(1);
-  }
-
-  /// Abre o arquivo no aplicativo padrão do sistema operacional.
-  static Future<void> _abrirNoProgramaPadrao(String caminho) async {
-    if (Platform.isWindows) {
-      // `start` é um comando interno do cmd; o "" é o título da janela.
-      await Process.start('cmd', ['/c', 'start', '', caminho]);
-    } else if (Platform.isMacOS) {
-      await Process.start('open', [caminho]);
-    } else if (Platform.isLinux) {
-      await Process.start('xdg-open', [caminho]);
-    }
   }
 
   static void _avisar(BuildContext context, String texto, Color cor) {
