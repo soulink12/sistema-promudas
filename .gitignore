@@ -61,6 +61,13 @@ app.*.symbols
 # Obfuscation related
 app.*.map.json
 
+# Registro de plugins gerado pelo Flutter (desktop) — regenerado por máquina, não deve ser versionado
+**/linux/flutter/generated_plugin_registrant.*
+**/linux/flutter/generated_plugins.cmake
+**/windows/flutter/generated_plugin_registrant.*
+**/windows/flutter/generated_plugins.cmake
+**/macos/Flutter/GeneratedPluginRegistrant.swift
+
 # Android Studio will place build artifacts here
 android/app/debug
 android/app/profile
