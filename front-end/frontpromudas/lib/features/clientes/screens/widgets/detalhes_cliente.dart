@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../../../core/widgets/chip_status.dart';
 import '../../../../core/theme/cores_semanticas.dart';
+import '../../../../core/utils/cpf_cnpj.dart';
 import '../../../../core/utils/formatadores.dart';
 
 class DetalhesCliente extends StatelessWidget {
@@ -26,13 +27,12 @@ class DetalhesCliente extends StatelessWidget {
     final cs = Theme.of(context).colorScheme;
     final c = cliente;
     final nome = c['nome'] as String? ?? '';
+    final cpfCnpj = c['cpf_cnpj'] as String?;
     final saldoCredito = _toDouble(c['saldo_credito']);
-    final pendentes = pedidosCliente
-        .where((p) {
-          final s = p['status_pagamento'] as String? ?? '';
-          return s == 'Pendente' || s == 'Parcial';
-        })
-        .toList();
+    final pendentes = pedidosCliente.where((p) {
+      final s = p['status_pagamento'] as String? ?? '';
+      return s == 'Pendente' || s == 'Parcial';
+    }).toList();
 
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16),
@@ -55,9 +55,10 @@ class DetalhesCliente extends StatelessWidget {
                         child: Text(
                           _iniciais(nome),
                           style: TextStyle(
-                              fontSize: 20,
-                              fontWeight: FontWeight.bold,
-                              color: cs.onPrimaryContainer),
+                            fontSize: 20,
+                            fontWeight: FontWeight.bold,
+                            color: cs.onPrimaryContainer,
+                          ),
                         ),
                       ),
                       const SizedBox(width: 16),
@@ -65,13 +66,20 @@ class DetalhesCliente extends StatelessWidget {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text(nome,
-                                style: const TextStyle(
-                                    fontSize: 20,
-                                    fontWeight: FontWeight.bold)),
-                            Text('ID: ${c['id']}',
-                                style: TextStyle(
-                                    color: cs.onSurfaceVariant, fontSize: 13)),
+                            Text(
+                              nome,
+                              style: const TextStyle(
+                                fontSize: 20,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            Text(
+                              'ID: ${c['id']}',
+                              style: TextStyle(
+                                color: cs.onSurfaceVariant,
+                                fontSize: 13,
+                              ),
+                            ),
                           ],
                         ),
                       ),
@@ -85,7 +93,12 @@ class DetalhesCliente extends StatelessWidget {
                   const Divider(height: 32),
                   ...[
                     _secao(context, 'Identificação', [
-                      ('CPF / CNPJ', c['cpf_cnpj']),
+                      (
+                        'CPF / CNPJ',
+                        cpfCnpj != null && cpfCnpj.isNotEmpty
+                            ? formatarCpfCnpj(cpfCnpj)
+                            : null,
+                      ),
                       ('Inscrição Estadual', c['inscricao_estadual']),
                     ]),
                     _secao(context, 'Contato', [
@@ -116,7 +129,9 @@ class DetalhesCliente extends StatelessWidget {
               color: cs.primaryContainer,
               child: Padding(
                 padding: const EdgeInsets.symmetric(
-                    horizontal: 20, vertical: 16),
+                  horizontal: 20,
+                  vertical: 16,
+                ),
                 child: Row(
                   children: [
                     Container(
@@ -126,8 +141,10 @@ class DetalhesCliente extends StatelessWidget {
                         color: cs.onPrimaryContainer.withValues(alpha: 0.15),
                         borderRadius: BorderRadius.circular(10),
                       ),
-                      child: Icon(Icons.savings_outlined,
-                          color: cs.onPrimaryContainer),
+                      child: Icon(
+                        Icons.savings_outlined,
+                        color: cs.onPrimaryContainer,
+                      ),
                     ),
                     const SizedBox(width: 16),
                     Expanded(
@@ -177,12 +194,16 @@ class DetalhesCliente extends StatelessWidget {
               if (!carregandoPedidos && pendentes.isNotEmpty) ...[
                 const SizedBox(width: 8),
                 Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 7,
+                    vertical: 2,
+                  ),
                   decoration: BoxDecoration(
                     color: CoresSemanticas.aviso.withAlpha(40),
                     borderRadius: BorderRadius.circular(10),
-                    border: Border.all(color: CoresSemanticas.aviso.withAlpha(120)),
+                    border: Border.all(
+                      color: CoresSemanticas.aviso.withAlpha(120),
+                    ),
                   ),
                   child: Text(
                     '${pendentes.length}',
@@ -217,20 +238,23 @@ class DetalhesCliente extends StatelessWidget {
                 children: pendentes.map((p) {
                   final numero = formatarNumeroPedido(p);
                   final total = _toDouble(p['valor_total']);
-                  final status =
-                      p['status_pagamento'] as String? ?? 'Pendente';
+                  final status = p['status_pagamento'] as String? ?? 'Pendente';
                   final data = _formatarData(p['criado_em']) ?? '—';
                   final pagamentos = (p['pagamentos'] as List? ?? []);
-                  final totalPagoReal =
-                      pagamentos.fold<double>(0.0, (soma, pag) {
+                  final totalPagoReal = pagamentos.fold<double>(0.0, (
+                    soma,
+                    pag,
+                  ) {
                     final isPosterior =
                         (pag as Map)['pagamento_posterior'] == true;
                     return isPosterior
                         ? soma
                         : soma + _toDouble(pag['valor_pago']);
                   });
-                  final valorPendente =
-                      (total - totalPagoReal).clamp(0.0, total);
+                  final valorPendente = (total - totalPagoReal).clamp(
+                    0.0,
+                    total,
+                  );
 
                   return Column(
                     children: [
@@ -241,14 +265,19 @@ class DetalhesCliente extends StatelessWidget {
                           // número (ex.: "#1234"), com um mínimo para manter
                           // o formato de badge nos números curtos.
                           constraints: const BoxConstraints(
-                              minWidth: 40, minHeight: 40),
+                            minWidth: 40,
+                            minHeight: 40,
+                          ),
                           padding: const EdgeInsets.symmetric(
-                              horizontal: 8, vertical: 4),
+                            horizontal: 8,
+                            vertical: 4,
+                          ),
                           decoration: BoxDecoration(
                             color: cs.primaryContainer,
                             borderRadius: BorderRadius.circular(8),
                             border: Border.all(
-                                color: cs.primary.withValues(alpha: 0.3)),
+                              color: cs.primary.withValues(alpha: 0.3),
+                            ),
                           ),
                           child: Center(
                             widthFactor: 1,
@@ -264,11 +293,12 @@ class DetalhesCliente extends StatelessWidget {
                         ),
                         title: Text(
                           'Valor pendente do pedido $numero é ${formatarMoeda(valorPendente)}',
-                          style:
-                              const TextStyle(fontWeight: FontWeight.w600),
+                          style: const TextStyle(fontWeight: FontWeight.w600),
                         ),
-                        subtitle: Text(data,
-                            style: const TextStyle(fontSize: 12)),
+                        subtitle: Text(
+                          data,
+                          style: const TextStyle(fontSize: 12),
+                        ),
                         trailing: ChipStatus(status: status),
                         onTap: () => onTapPedido(p),
                       ),
@@ -299,9 +329,13 @@ class DetalhesCliente extends StatelessWidget {
 // ── Widgets auxiliares ──────────────────────────────────────────────────────
 
 Widget? _secao(
-    BuildContext context, String titulo, List<(String, dynamic)> campos) {
-  final preenchidos =
-      campos.where((f) => f.$2 != null && f.$2.toString().isNotEmpty).toList();
+  BuildContext context,
+  String titulo,
+  List<(String, dynamic)> campos,
+) {
+  final preenchidos = campos
+      .where((f) => f.$2 != null && f.$2.toString().isNotEmpty)
+      .toList();
   if (preenchidos.isEmpty) return null;
   return Column(
     crossAxisAlignment: CrossAxisAlignment.start,
@@ -309,10 +343,11 @@ Widget? _secao(
       Text(
         titulo.toUpperCase(),
         style: TextStyle(
-            fontSize: 11,
-            fontWeight: FontWeight.bold,
-            color: Theme.of(context).colorScheme.onSurfaceVariant,
-            letterSpacing: 0.8),
+          fontSize: 11,
+          fontWeight: FontWeight.bold,
+          color: Theme.of(context).colorScheme.onSurfaceVariant,
+          letterSpacing: 0.8,
+        ),
       ),
       const SizedBox(height: 10),
       ...preenchidos.map((f) => _linha(context, f.$1, f.$2)),
@@ -329,10 +364,13 @@ Widget _linha(BuildContext context, String label, dynamic valor) {
       children: [
         SizedBox(
           width: 150,
-          child: Text(label,
-              style: TextStyle(
-                  color: Theme.of(context).colorScheme.onSurfaceVariant,
-                  fontSize: 14)),
+          child: Text(
+            label,
+            style: TextStyle(
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
+              fontSize: 14,
+            ),
+          ),
         ),
         Expanded(
           child: Text(valor.toString(), style: const TextStyle(fontSize: 14)),

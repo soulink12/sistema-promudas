@@ -1,6 +1,9 @@
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import '../../../../core/services/api_service.dart';
 import '../../../../core/theme/cores_semanticas.dart';
+import '../../../../core/utils/cpf_cnpj.dart';
 import '../../../../core/widgets/campo_obrigatorio.dart';
 
 class DialogCadastroCliente extends StatefulWidget {
@@ -15,6 +18,7 @@ class _DialogCadastroClienteState extends State<DialogCadastroCliente> {
   String? _erro;
   // Vira true ao tentar salvar — força a exibição do erro nos campos obrigatórios.
   bool _tentouSalvar = false;
+  bool _cpfInvalido = false;
 
   final _nome = TextEditingController();
   final _cpf = TextEditingController();
@@ -31,8 +35,17 @@ class _DialogCadastroClienteState extends State<DialogCadastroCliente> {
   @override
   void dispose() {
     for (final c in [
-      _nome, _cpf, _inscricao, _tel1, _tel2, _cep,
-      _logradouro, _numero, _bairro, _cidade, _estado,
+      _nome,
+      _cpf,
+      _inscricao,
+      _tel1,
+      _tel2,
+      _cep,
+      _logradouro,
+      _numero,
+      _bairro,
+      _cidade,
+      _estado,
     ]) {
       c.dispose();
     }
@@ -40,21 +53,30 @@ class _DialogCadastroClienteState extends State<DialogCadastroCliente> {
   }
 
   Future<void> _salvar() async {
-    // Nome é o único campo obrigatório do cadastro.
-    if (_nome.text.trim().isEmpty) {
-      setState(() => _tentouSalvar = true);
+    // Nome é o único campo obrigatório do cadastro; CPF/CNPJ é opcional, mas
+    // se preenchido precisa ter dígito verificador válido.
+    final cpfLimpo = limparCpfCnpj(_cpf.text);
+    final cpfInvalido = cpfLimpo.isNotEmpty && !validarCpfCnpj(cpfLimpo);
+
+    if (_nome.text.trim().isEmpty || cpfInvalido) {
+      setState(() {
+        _tentouSalvar = true;
+        _cpfInvalido = cpfInvalido;
+      });
       return;
     }
     setState(() {
       _salvando = true;
       _erro = null;
+      _cpfInvalido = false;
     });
     try {
       final body = <String, dynamic>{'nome': _nome.text.trim()};
       void add(String key, TextEditingController c) {
         if (c.text.trim().isNotEmpty) body[key] = c.text.trim();
       }
-      add('cpf_cnpj', _cpf);
+
+      if (cpfLimpo.isNotEmpty) body['cpf_cnpj'] = cpfLimpo;
       add('inscricao_estadual', _inscricao);
       add('telefone_1', _tel1);
       add('telefone_2', _tel2);
@@ -67,6 +89,12 @@ class _DialogCadastroClienteState extends State<DialogCadastroCliente> {
 
       await ApiService.dio.post('/clientes', data: body);
       if (mounted) Navigator.pop(context, true);
+    } on DioException catch (e) {
+      final mensagem = e.response?.data?['erro'] as String?;
+      setState(() {
+        _erro = mensagem ?? 'Erro ao cadastrar cliente. Tente novamente.';
+        _salvando = false;
+      });
     } catch (_) {
       setState(() {
         _erro = 'Erro ao cadastrar cliente. Tente novamente.';
@@ -78,8 +106,7 @@ class _DialogCadastroClienteState extends State<DialogCadastroCliente> {
   @override
   Widget build(BuildContext context) {
     return Dialog(
-      insetPadding:
-          const EdgeInsets.symmetric(horizontal: 32, vertical: 24),
+      insetPadding: const EdgeInsets.symmetric(horizontal: 32, vertical: 24),
       child: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 520),
         child: Column(
@@ -91,10 +118,13 @@ class _DialogCadastroClienteState extends State<DialogCadastroCliente> {
               child: Row(
                 children: [
                   const Expanded(
-                    child: Text('Novo Cliente',
-                        style: TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold)),
+                    child: Text(
+                      'Novo Cliente',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
                   ),
                   IconButton(
                     icon: const Icon(Icons.close),
@@ -108,49 +138,57 @@ class _DialogCadastroClienteState extends State<DialogCadastroCliente> {
               child: SingleChildScrollView(
                 padding: const EdgeInsets.fromLTRB(24, 0, 24, 8),
                 child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Padding(
-                        padding: const EdgeInsets.only(bottom: 12),
-                        child: CampoObrigatorio(
-                          controller: _nome,
-                          label: 'Nome',
-                          mostrarErroForcado: _tentouSalvar,
-                        ),
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 12),
+                      child: CampoObrigatorio(
+                        controller: _nome,
+                        label: 'Nome',
+                        mostrarErroForcado: _tentouSalvar,
                       ),
-                      _subtitulo(context, 'Identificação'),
-                      _campo(_cpf, 'CPF / CNPJ'),
-                      _campo(_inscricao, 'Inscrição Estadual'),
-                      _subtitulo(context, 'Contato'),
-                      _campo(_tel1, 'Telefone'),
-                      _campo(_tel2, 'Telefone 2'),
-                      _subtitulo(context, 'Endereço'),
-                      Row(children: [
+                    ),
+                    _subtitulo(context, 'Identificação'),
+                    _campo(
+                      _cpf,
+                      'CPF / CNPJ',
+                      keyboardType: TextInputType.number,
+                      inputFormatters: [CpfCnpjInputFormatter()],
+                      errorText: _cpfInvalido ? 'CPF/CNPJ inválido.' : null,
+                    ),
+                    _campo(_inscricao, 'Inscrição Estadual'),
+                    _subtitulo(context, 'Contato'),
+                    _campo(_tel1, 'Telefone'),
+                    _campo(_tel2, 'Telefone 2'),
+                    _subtitulo(context, 'Endereço'),
+                    Row(
+                      children: [
                         Expanded(flex: 2, child: _campo(_cep, 'CEP')),
                         const SizedBox(width: 12),
-                        Expanded(
-                            flex: 3, child: _campo(_estado, 'Estado')),
-                      ]),
-                      _campo(_logradouro, 'Logradouro'),
-                      Row(children: [
-                        Expanded(
-                            flex: 3, child: _campo(_bairro, 'Bairro')),
+                        Expanded(flex: 3, child: _campo(_estado, 'Estado')),
+                      ],
+                    ),
+                    _campo(_logradouro, 'Logradouro'),
+                    Row(
+                      children: [
+                        Expanded(flex: 3, child: _campo(_bairro, 'Bairro')),
                         const SizedBox(width: 12),
-                        Expanded(
-                            flex: 1, child: _campo(_numero, 'Número')),
-                      ]),
-                      _campo(_cidade, 'Cidade'),
-                      if (_erro != null)
-                        Padding(
-                          padding: const EdgeInsets.only(top: 8),
-                          child: Text(_erro!,
-                              style: const TextStyle(
-                                  color: CoresSemanticas.erro)),
+                        Expanded(flex: 1, child: _campo(_numero, 'Número')),
+                      ],
+                    ),
+                    _campo(_cidade, 'Cidade'),
+                    if (_erro != null)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 8),
+                        child: Text(
+                          _erro!,
+                          style: const TextStyle(color: CoresSemanticas.erro),
                         ),
-                    ],
-                  ),
+                      ),
+                  ],
                 ),
               ),
+            ),
             const Divider(height: 16),
             Padding(
               padding: const EdgeInsets.fromLTRB(24, 0, 24, 16),
@@ -171,8 +209,9 @@ class _DialogCadastroClienteState extends State<DialogCadastroCliente> {
                             width: 18,
                             height: 18,
                             child: CircularProgressIndicator(
-                                strokeWidth: 2,
-                                color: Colors.white),
+                              strokeWidth: 2,
+                              color: Colors.white,
+                            ),
                           )
                         : const Text('Salvar'),
                   ),
@@ -194,23 +233,33 @@ Widget _subtitulo(BuildContext context, String texto) {
     child: Text(
       texto.toUpperCase(),
       style: TextStyle(
-          fontSize: 11,
-          fontWeight: FontWeight.bold,
-          color: Theme.of(context).colorScheme.onSurfaceVariant,
-          letterSpacing: 0.8),
+        fontSize: 11,
+        fontWeight: FontWeight.bold,
+        color: Theme.of(context).colorScheme.onSurfaceVariant,
+        letterSpacing: 0.8,
+      ),
     ),
   );
 }
 
-Widget _campo(TextEditingController controller, String label) {
+Widget _campo(
+  TextEditingController controller,
+  String label, {
+  TextInputType? keyboardType,
+  List<TextInputFormatter>? inputFormatters,
+  String? errorText,
+}) {
   return Padding(
     padding: const EdgeInsets.only(bottom: 12),
     child: TextField(
       controller: controller,
+      keyboardType: keyboardType,
+      inputFormatters: inputFormatters,
       decoration: InputDecoration(
         labelText: label,
         border: const OutlineInputBorder(),
         isDense: true,
+        errorText: errorText,
       ),
     ),
   );

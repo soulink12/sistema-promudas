@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import '../../../core/services/api_service.dart';
 import '../../../core/theme/cores_semanticas.dart';
@@ -178,6 +179,19 @@ class _TelaListaClientesState extends State<TelaListaClientes> {
           ),
         );
       }
+    } on DioException catch (e) {
+      setState(() => _salvandoEdicao = false);
+      if (mounted) {
+        final mensagem = e.response?.data?['erro'] as String?;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              mensagem ?? 'Erro ao atualizar cliente. Tente novamente.',
+            ),
+            backgroundColor: CoresSemanticas.erro,
+          ),
+        );
+      }
     } catch (_) {
       setState(() => _salvandoEdicao = false);
       if (mounted) {
@@ -333,7 +347,11 @@ class _TelaListaClientesState extends State<TelaListaClientes> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(Icons.error_outline, color: CoresSemanticas.erro, size: 40),
+            const Icon(
+              Icons.error_outline,
+              color: CoresSemanticas.erro,
+              size: 40,
+            ),
             const SizedBox(height: 8),
             Text(_erroCarregamento!),
             const SizedBox(height: 16),

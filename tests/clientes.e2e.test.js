@@ -2,7 +2,7 @@
 
 const { test, before, after } = require('node:test');
 const assert = require('node:assert/strict');
-const { criarAmbiente, marcador } = require('./helpers');
+const { criarAmbiente, marcador, gerarCpfValido } = require('./helpers');
 
 let amb;
 
@@ -17,7 +17,7 @@ after(async () => {
 
 test('cria, busca por id e lista com filtro de busca', async () => {
     const nome = marcador('cli');
-    const cpf = `999${Date.now()}`.slice(0, 14);
+    const cpf = gerarCpfValido();
 
     const criar = await amb.api('POST', '/api/clientes', {
         body: { nome, cpf_cnpj: cpf, telefone_1: '11999990000' },
@@ -62,4 +62,41 @@ test('atualiza e faz soft-delete (some da listagem com ativo)', async () => {
         !busca.body.some((x) => x.id === c.id),
         'cliente inativo não deveria aparecer na listagem',
     );
+});
+
+test('rejeita cpf/cnpj duplicado ao criar cliente', async () => {
+    const cpf = gerarCpfValido();
+    const c1 = await amb.criarCliente({ cpf_cnpj: cpf });
+    amb.registrar.cliente(c1.id);
+
+    const resp = await amb.api('POST', '/api/clientes', {
+        body: { nome: marcador('cli'), cpf_cnpj: cpf },
+    });
+    assert.equal(resp.status, 400, JSON.stringify(resp.body));
+    assert.match(resp.body.erro, /cpf.*cnpj/i);
+});
+
+test('rejeita cpf com dígito verificador inválido', async () => {
+    const valido = gerarCpfValido();
+    // Mesma base, último dígito verificador propositalmente errado.
+    const invalido = valido.slice(0, -1) + (valido.at(-1) === '0' ? '1' : '0');
+
+    const resp = await amb.api('POST', '/api/clientes', {
+        body: { nome: marcador('cli'), cpf_cnpj: invalido },
+    });
+    assert.equal(resp.status, 400, JSON.stringify(resp.body));
+});
+
+test('armazena cpf/cnpj só com dígitos mesmo recebendo valor formatado', async () => {
+    const nome = marcador('cli');
+    const base = gerarCpfValido();
+    const formatado = `${base.slice(0, 3)}.${base.slice(3, 6)}.${base.slice(6, 9)}-${base.slice(9)}`;
+
+    const criar = await amb.api('POST', '/api/clientes', { body: { nome, cpf_cnpj: formatado } });
+    assert.equal(criar.status, 201, JSON.stringify(criar.body));
+    const id = criar.body.id;
+    amb.registrar.cliente(id);
+
+    const busca = await amb.api('GET', `/api/clientes/${id}`);
+    assert.equal(busca.body.cpf_cnpj, base);
 });

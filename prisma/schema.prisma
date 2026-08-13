@@ -8,7 +8,7 @@ datasource db {
 
 model clientes {
   id                 Int       @id @default(autoincrement())
-  cpf_cnpj           String?   @db.VarChar(20)
+  cpf_cnpj           String?   @unique @db.VarChar(20)
   inscricao_estadual String?   @db.VarChar(30)
   nome               String    @db.VarChar(100)
   telefone_1         String?   @db.VarChar(20)

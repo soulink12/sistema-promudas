@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import '../../../../core/utils/cpf_cnpj.dart';
 import '../../../../core/widgets/dialog_confirmacao.dart';
 
 class FormEdicaoCliente extends StatefulWidget {
@@ -39,26 +41,36 @@ class _FormEdicaoClienteState extends State<FormEdicaoCliente> {
     super.initState();
     final c = widget.cliente;
     _nome = TextEditingController(text: c['nome'] as String? ?? '');
-    _cpf = TextEditingController(text: c['cpf_cnpj'] as String? ?? '');
-    _inscricao =
-        TextEditingController(text: c['inscricao_estadual'] as String? ?? '');
+    _cpf = TextEditingController(
+      text: formatarCpfCnpj(c['cpf_cnpj'] as String? ?? ''),
+    );
+    _inscricao = TextEditingController(
+      text: c['inscricao_estadual'] as String? ?? '',
+    );
     _tel1 = TextEditingController(text: c['telefone_1'] as String? ?? '');
     _tel2 = TextEditingController(text: c['telefone_2'] as String? ?? '');
     _cep = TextEditingController(text: c['cep'] as String? ?? '');
-    _logradouro =
-        TextEditingController(text: c['logradouro'] as String? ?? '');
+    _logradouro = TextEditingController(text: c['logradouro'] as String? ?? '');
     _numero = TextEditingController(text: c['numero'] as String? ?? '');
     _bairro = TextEditingController(text: c['bairro'] as String? ?? '');
     _cidade = TextEditingController(text: c['cidade'] as String? ?? '');
-    _estado =
-        TextEditingController(text: c['estado'] as String? ?? 'PA');
+    _estado = TextEditingController(text: c['estado'] as String? ?? 'PA');
   }
 
   @override
   void dispose() {
     for (final c in [
-      _nome, _cpf, _inscricao, _tel1, _tel2,
-      _cep, _logradouro, _numero, _bairro, _cidade, _estado,
+      _nome,
+      _cpf,
+      _inscricao,
+      _tel1,
+      _tel2,
+      _cep,
+      _logradouro,
+      _numero,
+      _bairro,
+      _cidade,
+      _estado,
     ]) {
       c.dispose();
     }
@@ -71,7 +83,8 @@ class _FormEdicaoClienteState extends State<FormEdicaoCliente> {
     final confirmado = await mostrarDialogConfirmacao(
       context: context,
       titulo: 'Confirmar edição',
-      mensagem: 'Deseja salvar as alterações do cliente "${_nome.text.trim()}"?',
+      mensagem:
+          'Deseja salvar as alterações do cliente "${_nome.text.trim()}"?',
     );
     if (!confirmado) return;
 
@@ -79,7 +92,9 @@ class _FormEdicaoClienteState extends State<FormEdicaoCliente> {
     void add(String key, TextEditingController ctrl) {
       body[key] = ctrl.text.trim().isNotEmpty ? ctrl.text.trim() : null;
     }
-    add('cpf_cnpj', _cpf);
+
+    final cpfLimpo = limparCpfCnpj(_cpf.text);
+    body['cpf_cnpj'] = cpfLimpo.isNotEmpty ? cpfLimpo : null;
     add('inscricao_estadual', _inscricao);
     add('telefone_1', _tel1);
     add('telefone_2', _tel2);
@@ -108,26 +123,29 @@ class _FormEdicaoClienteState extends State<FormEdicaoCliente> {
                 Row(
                   children: [
                     const Expanded(
-                      child: Text('Editar Cliente',
-                          style: TextStyle(
-                              fontSize: 18, fontWeight: FontWeight.bold)),
+                      child: Text(
+                        'Editar Cliente',
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
                     ),
                     TextButton(
-                      onPressed:
-                          widget.salvando ? null : widget.onCancelar,
+                      onPressed: widget.salvando ? null : widget.onCancelar,
                       child: const Text('Cancelar'),
                     ),
                     const SizedBox(width: 8),
                     FilledButton(
-                      onPressed:
-                          widget.salvando ? null : _tentarSalvar,
+                      onPressed: widget.salvando ? null : _tentarSalvar,
                       child: widget.salvando
                           ? const SizedBox(
                               width: 18,
                               height: 18,
                               child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                  color: Colors.white),
+                                strokeWidth: 2,
+                                color: Colors.white,
+                              ),
                             )
                           : const Text('Salvar'),
                     ),
@@ -136,23 +154,33 @@ class _FormEdicaoClienteState extends State<FormEdicaoCliente> {
                 const Divider(height: 24),
                 _campo(_nome, 'Nome *', obrigatorio: true),
                 _subtitulo(context, 'Identificação'),
-                _campo(_cpf, 'CPF / CNPJ'),
+                _campo(
+                  _cpf,
+                  'CPF / CNPJ',
+                  keyboardType: TextInputType.number,
+                  inputFormatters: [CpfCnpjInputFormatter()],
+                  validator: validarCampoCpfCnpj,
+                ),
                 _campo(_inscricao, 'Inscrição Estadual'),
                 _subtitulo(context, 'Contato'),
                 _campo(_tel1, 'Telefone'),
                 _campo(_tel2, 'Telefone 2'),
                 _subtitulo(context, 'Endereço'),
-                Row(children: [
-                  Expanded(flex: 2, child: _campo(_cep, 'CEP')),
-                  const SizedBox(width: 12),
-                  Expanded(flex: 3, child: _campo(_estado, 'Estado')),
-                ]),
+                Row(
+                  children: [
+                    Expanded(flex: 2, child: _campo(_cep, 'CEP')),
+                    const SizedBox(width: 12),
+                    Expanded(flex: 3, child: _campo(_estado, 'Estado')),
+                  ],
+                ),
                 _campo(_logradouro, 'Logradouro'),
-                Row(children: [
-                  Expanded(flex: 3, child: _campo(_bairro, 'Bairro')),
-                  const SizedBox(width: 12),
-                  Expanded(flex: 1, child: _campo(_numero, 'Número')),
-                ]),
+                Row(
+                  children: [
+                    Expanded(flex: 3, child: _campo(_bairro, 'Bairro')),
+                    const SizedBox(width: 12),
+                    Expanded(flex: 1, child: _campo(_numero, 'Número')),
+                  ],
+                ),
                 _campo(_cidade, 'Cidade'),
               ],
             ),
@@ -171,28 +199,40 @@ Widget _subtitulo(BuildContext context, String texto) {
     child: Text(
       texto.toUpperCase(),
       style: TextStyle(
-          fontSize: 11,
-          fontWeight: FontWeight.bold,
-          color: Theme.of(context).colorScheme.onSurfaceVariant,
-          letterSpacing: 0.8),
+        fontSize: 11,
+        fontWeight: FontWeight.bold,
+        color: Theme.of(context).colorScheme.onSurfaceVariant,
+        letterSpacing: 0.8,
+      ),
     ),
   );
 }
 
-Widget _campo(TextEditingController controller, String label,
-    {bool obrigatorio = false}) {
+Widget _campo(
+  TextEditingController controller,
+  String label, {
+  bool obrigatorio = false,
+  TextInputType? keyboardType,
+  List<TextInputFormatter>? inputFormatters,
+  String? Function(String?)? validator,
+}) {
   return Padding(
     padding: const EdgeInsets.only(bottom: 12),
     child: TextFormField(
       controller: controller,
+      keyboardType: keyboardType,
+      inputFormatters: inputFormatters,
       decoration: InputDecoration(
         labelText: label,
         border: const OutlineInputBorder(),
         isDense: true,
       ),
-      validator: obrigatorio
-          ? (v) => (v == null || v.trim().isEmpty) ? 'Campo obrigatório' : null
-          : null,
+      validator:
+          validator ??
+          (obrigatorio
+              ? (v) =>
+                    (v == null || v.trim().isEmpty) ? 'Campo obrigatório' : null
+              : null),
     ),
   );
 }

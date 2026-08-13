@@ -16,6 +16,23 @@ function marcador(prefixo) {
     return `__e2e_${prefixo}_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
 }
 
+function digitoVerificador(digitos, pesos) {
+    const soma = digitos.reduce((acc, d, i) => acc + d * pesos[i], 0);
+    const resto = soma % 11;
+    return resto < 2 ? 0 : 11 - resto;
+}
+
+let contadorDoc = 0;
+
+// CPF com dígito verificador válido, único por chamada (timestamp + contador).
+function gerarCpfValido() {
+    contadorDoc += 1;
+    const base = `${Date.now()}${contadorDoc}`.slice(-9).padStart(9, '1').split('').map(Number);
+    const d1 = digitoVerificador(base, [10, 9, 8, 7, 6, 5, 4, 3, 2]);
+    const d2 = digitoVerificador([...base, d1], [11, 10, 9, 8, 7, 6, 5, 4, 3, 2]);
+    return [...base, d1, d2].join('');
+}
+
 async function criarAmbiente() {
     const server = app.listen(0);
     await new Promise((resolve) => server.once('listening', resolve));
@@ -134,4 +151,4 @@ async function criarAmbiente() {
     };
 }
 
-module.exports = { criarAmbiente, prisma, marcador, EMAIL, SENHA };
+module.exports = { criarAmbiente, prisma, marcador, gerarCpfValido, EMAIL, SENHA };

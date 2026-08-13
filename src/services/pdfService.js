@@ -4,6 +4,7 @@ const BusinessError = require('../utils/BusinessError');
 const formaPagamentoService = require('./formaPagamentoService');
 const { formatarNumeroPedido } = require('../utils/numeroPedido');
 const { formatarMoeda } = require('../utils/moeda');
+const { formatar: formatarCpfCnpj } = require('../utils/cpfCnpj');
 
 const moeda = formatarMoeda;
 
@@ -171,7 +172,7 @@ const gerarPedidoPDF = async (pedidoId) => {
         const c = pedido.clientes;
         doc.font('Helvetica').fontSize(fs(9)).fillColor('#555555');
 
-        if (c.cpf_cnpj) doc.text(`CPF/CNPJ: ${c.cpf_cnpj}`);
+        if (c.cpf_cnpj) doc.text(`CPF/CNPJ: ${formatarCpfCnpj(c.cpf_cnpj)}`);
         if (c.telefone_1) doc.text(`Telefone: ${c.telefone_1}`);
 
         // Endereço — monta apenas com os campos preenchidos

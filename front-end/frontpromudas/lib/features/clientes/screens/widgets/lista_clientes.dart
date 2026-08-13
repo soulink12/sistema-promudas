@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../../core/utils/cpf_cnpj.dart';
 
 class ListaClientes extends StatelessWidget {
   final List<Map<String, dynamic>> clientes;
@@ -20,7 +21,9 @@ class ListaClientes extends StatelessWidget {
           textoBusca.isEmpty
               ? 'Nenhum cliente cadastrado.'
               : 'Nenhum cliente encontrado.',
-          style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant),
+          style: TextStyle(
+            color: Theme.of(context).colorScheme.onSurfaceVariant,
+          ),
         ),
       );
     }
@@ -33,7 +36,7 @@ class ListaClientes extends StatelessWidget {
         final cpf = c['cpf_cnpj'] as String?;
         final tel = c['telefone_1'] as String?;
         final subtitulo = [
-          if (cpf != null && cpf.isNotEmpty) cpf,
+          if (cpf != null && cpf.isNotEmpty) formatarCpfCnpj(cpf),
           if (tel != null && tel.isNotEmpty) tel,
         ].join(' • ');
         final cs = Theme.of(context).colorScheme;
@@ -43,7 +46,9 @@ class ListaClientes extends StatelessWidget {
             child: Text(
               _iniciais(nome),
               style: TextStyle(
-                  color: cs.onPrimaryContainer, fontWeight: FontWeight.bold),
+                color: cs.onPrimaryContainer,
+                fontWeight: FontWeight.bold,
+              ),
             ),
           ),
           title: Text(nome),
