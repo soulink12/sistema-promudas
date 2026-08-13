@@ -1,6 +1,7 @@
 #Claude
 *.MD
 *.xlsx
+*.pdf
 
 # ==========================================
 # BACKEND (Node.js & Prisma)
