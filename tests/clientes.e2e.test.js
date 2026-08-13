@@ -100,3 +100,63 @@ test('armazena cpf/cnpj só com dígitos mesmo recebendo valor formatado', async
     const busca = await amb.api('GET', `/api/clientes/${id}`);
     assert.equal(busca.body.cpf_cnpj, base);
 });
+
+test('rejeita cpf/cnpj duplicado ao editar cliente', async () => {
+    const cpfA = gerarCpfValido();
+    const a = await amb.criarCliente({ cpf_cnpj: cpfA });
+    amb.registrar.cliente(a.id);
+    const b = await amb.criarCliente({ cpf_cnpj: gerarCpfValido() });
+    amb.registrar.cliente(b.id);
+
+    const resp = await amb.api('PUT', `/api/clientes/${b.id}`, {
+        body: { cpf_cnpj: cpfA },
+    });
+    assert.equal(resp.status, 400, JSON.stringify(resp.body));
+    assert.match(resp.body.erro, /cpf.*cnpj/i);
+});
+
+test('rejeita cpf com dígito verificador inválido ao editar', async () => {
+    const c = await amb.criarCliente({});
+    amb.registrar.cliente(c.id);
+
+    const valido = gerarCpfValido();
+    const invalido = valido.slice(0, -1) + (valido.at(-1) === '0' ? '1' : '0');
+
+    const resp = await amb.api('PUT', `/api/clientes/${c.id}`, {
+        body: { cpf_cnpj: invalido },
+    });
+    assert.equal(resp.status, 400, JSON.stringify(resp.body));
+});
+
+test('armazena cpf/cnpj só com dígitos mesmo recebendo valor formatado ao editar', async () => {
+    const base = gerarCpfValido();
+    const formatado = `${base.slice(0, 3)}.${base.slice(3, 6)}.${base.slice(6, 9)}-${base.slice(9)}`;
+    const c = await amb.criarCliente({});
+    amb.registrar.cliente(c.id);
+
+    const upd = await amb.api('PUT', `/api/clientes/${c.id}`, {
+        body: { cpf_cnpj: formatado },
+    });
+    assert.equal(upd.status, 200, JSON.stringify(upd.body));
+
+    const busca = await amb.api('GET', `/api/clientes/${c.id}`);
+    assert.equal(busca.body.cpf_cnpj, base);
+});
+
+test('editar cliente mantendo o próprio cpf/cnpj não gera falso positivo de duplicidade', async () => {
+    const cpf = gerarCpfValido();
+    const c = await amb.criarCliente({ cpf_cnpj: cpf });
+    amb.registrar.cliente(c.id);
+
+    // Reenvia o mesmo CPF (formatado) junto com outra alteração — não pode
+    // ser barrado como "duplicado" por colidir consigo mesmo.
+    const formatado = `${cpf.slice(0, 3)}.${cpf.slice(3, 6)}.${cpf.slice(6, 9)}-${cpf.slice(9)}`;
+    const resp = await amb.api('PUT', `/api/clientes/${c.id}`, {
+        body: { nome: `${c.nome}_editado`, cpf_cnpj: formatado },
+    });
+    assert.equal(resp.status, 200, JSON.stringify(resp.body));
+
+    const busca = await amb.api('GET', `/api/clientes/${c.id}`);
+    assert.equal(busca.body.cpf_cnpj, cpf);
+    assert.match(busca.body.nome, /_editado$/);
+});
