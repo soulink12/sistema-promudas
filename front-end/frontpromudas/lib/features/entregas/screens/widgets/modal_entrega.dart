@@ -202,7 +202,7 @@ class _ModalEntregaState extends State<ModalEntrega> {
   Widget build(BuildContext context) {
     final numero = formatarNumeroPedido(widget.pedido);
     final clienteMap = widget.pedido['clientes'] as Map<String, dynamic>?;
-    final cliente = clienteMap?['nome'] as String? ?? '—';
+    final cliente = capitalizarNome(clienteMap?['nome'] as String? ?? '—');
 
     return AlertDialog(
       title: Column(

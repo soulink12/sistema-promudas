@@ -3,6 +3,7 @@ import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import '../../../core/services/api_service.dart';
 import '../../../core/theme/cores_semanticas.dart';
+import '../../../core/utils/formatadores.dart';
 import '../../pedidos/screens/pedidos_screen.dart';
 import 'widgets/lista_clientes.dart';
 import 'widgets/detalhes_cliente.dart';
@@ -119,7 +120,7 @@ class _TelaListaClientesState extends State<TelaListaClientes> {
       _clienteSelecionado = cliente;
       _editando = false;
       _pedidosCliente = [];
-      _buscaController.text = cliente['nome'] as String? ?? '';
+      _buscaController.text = capitalizarNome(cliente['nome'] as String? ?? '');
       _textoBusca = '';
     });
     _atualizandoProgramaticamente = false;
@@ -278,7 +279,7 @@ class _TelaListaClientesState extends State<TelaListaClientes> {
       child: TextField(
         controller: _buscaController,
         decoration: InputDecoration(
-          hintText: 'Buscar por nome, CPF ou telefone...',
+          hintText: 'Buscar por nome, CPF, telefone ou #id...',
           prefixIcon: const Icon(Icons.search),
           border: const OutlineInputBorder(),
           suffixIcon: _buscaController.text.isNotEmpty
@@ -309,7 +310,7 @@ class _TelaListaClientesState extends State<TelaListaClientes> {
   /// destaque, no mesmo padrão dos detalhes do pedido.
   Widget _buildCabecalhoCliente() {
     final cs = Theme.of(context).colorScheme;
-    final nome = _clienteSelecionado!['nome'] as String? ?? '';
+    final nome = capitalizarNome(_clienteSelecionado!['nome'] as String? ?? '');
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(8, 8, 16, 8),

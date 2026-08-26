@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../../../core/utils/cpf_cnpj.dart';
+import '../../../../core/utils/formatadores.dart';
 
 class ListaClientes extends StatelessWidget {
   final List<Map<String, dynamic>> clientes;
@@ -32,7 +33,7 @@ class ListaClientes extends StatelessWidget {
       separatorBuilder: (context, i) => const Divider(height: 1),
       itemBuilder: (context, index) {
         final c = clientes[index];
-        final nome = c['nome'] as String? ?? '';
+        final nome = capitalizarNome(c['nome'] as String? ?? '');
         final cpf = c['cpf_cnpj'] as String?;
         final tel = c['telefone_1'] as String?;
         final subtitulo = [

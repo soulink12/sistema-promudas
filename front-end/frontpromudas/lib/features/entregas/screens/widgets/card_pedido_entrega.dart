@@ -24,7 +24,7 @@ class CardPedidoEntrega extends StatelessWidget {
   Widget build(BuildContext context) {
     final numero = formatarNumeroPedido(pedido);
     final clienteMap = pedido['clientes'] as Map<String, dynamic>?;
-    final cliente = clienteMap?['nome'] as String? ?? '—';
+    final cliente = capitalizarNome(clienteMap?['nome'] as String? ?? '—');
     final statusRet = pedido['status_entrega'] as String? ?? '—';
     final data = _formatarData(pedido['criado_em'] as String?);
     final itens = pedido['itens_pedido'] as List?;

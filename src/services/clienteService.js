@@ -40,17 +40,23 @@ const criarCliente = async (dadosCliente) => {
 const listarClientes = async (filtros = {}) => {
     const where = { ativo: true };
 
-    // Pesquisa por nome, CPF/CNPJ ou telefone
+    // Pesquisa por nome, CPF/CNPJ, telefone ou "#id" (busca direta pelo id).
     if (filtros.busca) {
-        const clausulas = [
-            { nome: { contains: filtros.busca } },
-            { telefone_1: { contains: filtros.busca } },
-        ];
-        // cpf_cnpj é armazenado só com dígitos — normaliza o termo de busca
-        // antes de comparar, senão um CPF pontuado digitado na busca nunca bate.
-        const buscaCpf = limpar(filtros.busca);
-        if (buscaCpf) clausulas.push({ cpf_cnpj: { contains: buscaCpf } });
-        where.OR = clausulas;
+        const bruto = filtros.busca.trim();
+        if (bruto.startsWith('#')) {
+            const idStr = bruto.slice(1);
+            where.id = /^\d+$/.test(idStr) ? parseInt(idStr) : -1;
+        } else {
+            const clausulas = [
+                { nome: { contains: bruto } },
+                { telefone_1: { contains: bruto } },
+            ];
+            // cpf_cnpj é armazenado só com dígitos — normaliza o termo de busca
+            // antes de comparar, senão um CPF pontuado digitado na busca nunca bate.
+            const buscaCpf = limpar(bruto);
+            if (buscaCpf) clausulas.push({ cpf_cnpj: { contains: buscaCpf } });
+            where.OR = clausulas;
+        }
     }
 
     // Sem busca: retorna só os 20 últimos cadastrados.

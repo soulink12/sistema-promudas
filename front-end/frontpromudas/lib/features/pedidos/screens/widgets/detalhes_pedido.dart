@@ -45,7 +45,7 @@ class DetalhesPedido extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final nomeCliente = pedido['clientes']?['nome'] as String? ?? '—';
+    final nomeCliente = capitalizarNome(pedido['clientes']?['nome'] as String? ?? '—');
     final total = _toDouble(pedido['valor_total']);
     final ajuste = _toDouble(pedido['ajuste']);
     final dataPedidoRaw = pedido['data_pedido'] ?? pedido['criado_em'];

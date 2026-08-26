@@ -21,9 +21,10 @@ class CardEntrega extends StatelessWidget {
 
     final pedido = entrega['pedidos'] as Map<String, dynamic>?;
     final numeroPedido = pedido != null ? formatarNumeroPedido(pedido) : '—';
-    final cliente =
-        (pedido?['clientes'] as Map<String, dynamic>?)?['nome'] as String? ??
-            '—';
+    final cliente = capitalizarNome(
+      (pedido?['clientes'] as Map<String, dynamic>?)?['nome'] as String? ??
+          '—',
+    );
 
     final data = formatarDataHora(entrega['data_entrega']);
     final local = entrega['local_entrega'] as String? ?? '—';

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../../core/utils/formatadores.dart';
 
 /// Widget que exibe as informações do cliente selecionado na AppBar da tela de venda.
 /// Ao ser tocado, dispara o callback [onTap] para abrir o modal de busca de clientes.
@@ -45,7 +46,7 @@ class DetalhesAppBar extends StatelessWidget {
               children: [
                 // Nome do cliente em destaque
                 Text(
-                  clienteSelecionado!['nome'] ?? '',
+                  capitalizarNome(clienteSelecionado!['nome'] as String? ?? ''),
                   style: const TextStyle(
                     fontSize: 18,
                     fontWeight: FontWeight.bold,

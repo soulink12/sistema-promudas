@@ -41,6 +41,20 @@ String formatarNumeroPedido(Map pedido) {
   return '#${pedido['id']}';
 }
 
+/// Padroniza a exibição de um nome próprio: primeira letra de cada palavra
+/// maiúscula, resto minúsculo (ex.: "MARIA DA SILVA" ou "maria da silva" →
+/// "Maria Da Silva"). Só afeta a exibição — o valor salvo no banco não muda.
+String capitalizarNome(String nome) {
+  return nome
+      .trim()
+      .split(RegExp(r'\s+'))
+      .map((palavra) {
+        if (palavra.isEmpty) return palavra;
+        return palavra[0].toUpperCase() + palavra.substring(1).toLowerCase();
+      })
+      .join(' ');
+}
+
 /// Formata um `DateTime` (ou ISO string) como `dd/MM/yyyy  HH:mm` no fuso local.
 /// Retorna '—' quando o valor é nulo/inválido.
 String formatarDataHora(dynamic valor) {

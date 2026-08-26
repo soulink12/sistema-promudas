@@ -41,6 +41,27 @@ test('cria, busca por id e lista com filtro de busca', async () => {
     );
 });
 
+test('busca "#id" filtra só pelo id, ignorando nome/cpf/telefone', async () => {
+    const nome = marcador('cli-hash');
+
+    const criar = await amb.api('POST', '/api/clientes', { body: { nome } });
+    assert.equal(criar.status, 201, JSON.stringify(criar.body));
+    const id = criar.body.id;
+    amb.registrar.cliente(id);
+
+    // Outro cliente cujo nome contém o id do primeiro como substring (ex.: id 42 -> "Cliente 42x"),
+    // só para garantir que a busca "#id" não vaza pro filtro por nome/cpf/telefone.
+    const outroNome = marcador(`cli-hash-${id}`);
+    const criarOutro = await amb.api('POST', '/api/clientes', { body: { nome: outroNome } });
+    assert.equal(criarOutro.status, 201, JSON.stringify(criarOutro.body));
+    amb.registrar.cliente(criarOutro.body.id);
+
+    const resHash = await amb.api('GET', `/api/clientes?busca=${encodeURIComponent(`#${id}`)}`);
+    assert.equal(resHash.status, 200);
+    assert.equal(resHash.body.length, 1, `esperava só o cliente #${id}, veio: ${JSON.stringify(resHash.body)}`);
+    assert.equal(resHash.body[0].id, id);
+});
+
 test('atualiza e faz soft-delete (some da listagem com ativo)', async () => {
     const c = await amb.criarCliente({ telefone_1: '11888887777' });
 

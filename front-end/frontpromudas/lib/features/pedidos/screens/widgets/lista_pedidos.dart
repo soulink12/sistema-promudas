@@ -29,8 +29,9 @@ class ListaPedidos extends StatelessWidget {
       itemBuilder: (context, index) {
         final p = pedidos[index];
         final cs = Theme.of(context).colorScheme;
-        final nomeCliente =
-            p['clientes']?['nome'] as String? ?? 'Cliente desconhecido';
+        final nomeCliente = capitalizarNome(
+          p['clientes']?['nome'] as String? ?? 'Cliente desconhecido',
+        );
         final total = _toDouble(p['valor_total']);
         final data = formatarDataHora(p['data_pedido'] ?? p['criado_em']);
         final statusPag = p['status_pagamento'] as String? ?? 'Pendente';

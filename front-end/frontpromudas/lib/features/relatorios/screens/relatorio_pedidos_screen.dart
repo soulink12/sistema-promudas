@@ -237,7 +237,7 @@ class _TelaRelatorioPedidosState extends State<TelaRelatorioPedidos> {
                         const SizedBox(width: 8),
                         Expanded(
                           child: Text(
-                            _clienteSelecionado!['nome'] as String,
+                            capitalizarNome(_clienteSelecionado!['nome'] as String),
                             style: const TextStyle(fontWeight: FontWeight.w600),
                           ),
                         ),

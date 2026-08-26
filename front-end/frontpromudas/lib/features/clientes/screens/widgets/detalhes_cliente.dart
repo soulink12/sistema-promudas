@@ -26,7 +26,7 @@ class DetalhesCliente extends StatelessWidget {
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final c = cliente;
-    final nome = c['nome'] as String? ?? '';
+    final nome = capitalizarNome(c['nome'] as String? ?? '');
     final cpfCnpj = c['cpf_cnpj'] as String?;
     final saldoCredito = _toDouble(c['saldo_credito']);
     final pendentes = pedidosCliente.where((p) {
