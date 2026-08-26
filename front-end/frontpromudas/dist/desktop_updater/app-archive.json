@@ -49,6 +49,14 @@
       "channel": "stable",
       "mandatory": true,
       "release": "http://172.28.114.71:6072/updates/releases/0.1.5/windows/release.json"
+    },
+    {
+      "version": "0.1.6",
+      "buildNumber": 7,
+      "platform": "windows",
+      "channel": "stable",
+      "mandatory": true,
+      "release": "http://172.28.114.71:6072/updates/releases/0.1.6/windows/release.json"
     }
   ]
 }
