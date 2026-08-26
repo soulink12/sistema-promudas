@@ -1,0 +1,23 @@
+{
+  "schemaVersion": 1,
+  "baseUrl": "http://172.28.114.71:6072/updates/",
+  "localRoot": "C:\\Dev\\sistema-promudas\\front-end\\frontpromudas\\dist\\desktop_updater",
+  "appArchive": {
+    "path": "app-archive.json",
+    "url": "http://172.28.114.71:6072/updates/app-archive.json"
+  },
+  "release": {
+    "version": "0.1.6",
+    "buildNumber": 7,
+    "platform": "windows",
+    "channel": "stable",
+    "path": "releases/0.1.6/windows/release.json",
+    "url": "http://172.28.114.71:6072/updates/releases/0.1.6/windows/release.json"
+  },
+  "artifact": {
+    "path": "releases/0.1.6/windows/Frontpromudas-0.1.6-windows.zip",
+    "url": "http://172.28.114.71:6072/updates/releases/0.1.6/windows/Frontpromudas-0.1.6-windows.zip",
+    "sha256": "ff9a735becdd91b59c7e7838f7bd5745f9ee9a3fc3a2841c58f9e95115a5325f",
+    "length": 17980544
+  }
+}

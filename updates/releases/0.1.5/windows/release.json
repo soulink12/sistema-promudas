@@ -1,0 +1,20 @@
+{
+  "schemaVersion": 3,
+  "packageId": "frontpromudas",
+  "appName": "Frontpromudas",
+  "version": "0.1.5",
+  "buildNumber": 6,
+  "platform": "windows",
+  "channel": "stable",
+  "artifact": {
+    "kind": "zip",
+    "url": "http://172.28.114.71:6072/updates/releases/0.1.5/windows/Frontpromudas-0.1.5-windows.zip",
+    "sha256": "d3d4fcd82670540dd5a302832dfd8b473b2cc7f1614400532af13e749e47f332",
+    "length": 18035449
+  },
+  "install": {
+    "strategy": "wholeDirectoryReplace"
+  },
+  "minimumUpdaterVersion": "2.0.0",
+  "generatedAt": "2026-08-07T18:10:36.794062Z"
+}
