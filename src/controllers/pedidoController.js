@@ -75,7 +75,11 @@ const eliminarPedido = async (req, res, next) => {
 
 const gerarPDF = async (req, res, next) => {
     try {
-        const { buffer, nomeArquivo } = await pdfService.gerarPedidoPDF(req.params.id);
+        const copiasSolicitadas = parseInt(req.query.copias, 10);
+        const copias = Number.isInteger(copiasSolicitadas) && copiasSolicitadas >= 1 && copiasSolicitadas <= 5
+            ? copiasSolicitadas
+            : 1;
+        const { buffer, nomeArquivo } = await pdfService.gerarPedidoPDF(req.params.id, copias);
         res.setHeader('Content-Type', 'application/pdf');
         res.setHeader('Content-Disposition', `attachment; filename="${nomeArquivo}"`);
         res.setHeader('Content-Length', buffer.length);

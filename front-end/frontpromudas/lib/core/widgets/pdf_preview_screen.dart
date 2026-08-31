@@ -1,8 +1,11 @@
 import 'dart:math' as math;
+import 'package:dio/dio.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:printing/printing.dart';
+import '../services/api_service.dart';
+import '../theme/cores_semanticas.dart';
 
 /// Tela cheia com o preview de um PDF já em memória. Usada depois de
 /// baixar/salvar o PDF de um pedido — evita abrir o visualizador externo do
@@ -15,10 +18,20 @@ import 'package:printing/printing.dart';
 /// [InteractiveViewer] do pacote faz roda-do-mouse = zoom por padrão, sem
 /// suporte a Ctrl, então não dá pra usar o gesto embutido dele aqui.
 class PdfPreviewScreen extends StatefulWidget {
-  const PdfPreviewScreen({super.key, required this.bytes, required this.nomeArquivo});
+  const PdfPreviewScreen({
+    super.key,
+    required this.bytes,
+    required this.nomeArquivo,
+    required this.pedidoId,
+  });
 
   final Uint8List bytes;
   final String nomeArquivo;
+
+  /// Usado para buscar sob demanda a versão de 3 vias do PDF (ver
+  /// [_imprimir3Vias]) — o arquivo salvo em disco continua vindo só de
+  /// [bytes], com 1 via.
+  final int pedidoId;
 
   @override
   State<PdfPreviewScreen> createState() => _PdfPreviewScreenState();
@@ -33,6 +46,11 @@ class _PdfPreviewScreenState extends State<PdfPreviewScreen> {
 
   double _zoom = 1.0;
   Offset _pan = Offset.zero;
+
+  // Cache da versão de 3 vias (buscada sob demanda no backend, só quando o
+  // usuário clica em "Imprimir 3 vias" pela primeira vez).
+  Uint8List? _bytes3Vias;
+  bool _carregando3Vias = false;
 
   // Preenchidos a cada build de _paginaAjustada, usados para limitar o pan
   // às bordas da página (ver _limitarPan).
@@ -85,6 +103,40 @@ class _PdfPreviewScreenState extends State<PdfPreviewScreen> {
     return Printing.layoutPdf(onLayout: (_) async => widget.bytes, name: widget.nomeArquivo);
   }
 
+  /// Imprime 3 vias do pedido de uma vez, num único PDF (mesmo diálogo de
+  /// impressão, 3 cópias). Busca a versão de 3 vias no backend na primeira
+  /// vez e reaproveita o resultado nos cliques seguintes — não mexe no
+  /// arquivo já salvo em disco, que continua com 1 via.
+  Future<void> _imprimir3Vias() async {
+    if (_bytes3Vias != null) {
+      await Printing.layoutPdf(onLayout: (_) async => _bytes3Vias!, name: widget.nomeArquivo);
+      return;
+    }
+
+    setState(() => _carregando3Vias = true);
+    try {
+      final response = await ApiService.dio.get(
+        '/pedidos/${widget.pedidoId}/pdf',
+        queryParameters: {'copias': 3},
+        options: Options(responseType: ResponseType.bytes),
+      );
+      _bytes3Vias = Uint8List.fromList(response.data as List<int>);
+      await Printing.layoutPdf(onLayout: (_) async => _bytes3Vias!, name: widget.nomeArquivo);
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Não foi possível gerar as 3 vias do pedido.'),
+            backgroundColor: CoresSemanticas.erro,
+            duration: Duration(seconds: 4),
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _carregando3Vias = false);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return CallbackShortcuts(
@@ -111,6 +163,17 @@ class _PdfPreviewScreenState extends State<PdfPreviewScreen> {
                 icon: const Icon(Icons.print),
                 tooltip: 'Imprimir (Ctrl+P)',
                 onPressed: _imprimir,
+              ),
+              IconButton(
+                icon: _carregando3Vias
+                    ? const SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Icon(Icons.filter_3),
+                tooltip: 'Imprimir 3 vias',
+                onPressed: _carregando3Vias ? null : _imprimir3Vias,
               ),
             ],
           ),
