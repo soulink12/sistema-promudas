@@ -51,7 +51,7 @@ class PdfDownloadService {
       if (context.mounted) {
         await Navigator.of(context).push(
           MaterialPageRoute(
-            builder: (_) => PdfPreviewScreen(bytes: bytes, nomeArquivo: nomeArquivo),
+            builder: (_) => PdfPreviewScreen(bytes: bytes, nomeArquivo: nomeArquivo, pedidoId: pedidoId),
           ),
         );
       }

@@ -64,7 +64,7 @@ const linhaTabela = (doc, y, colunas) => {
     });
 };
 
-const gerarPedidoPDF = async (pedidoId) => {
+const gerarPedidoPDF = async (pedidoId, copias = 1) => {
     const [pedido, formasPosteriores] = await Promise.all([
         prisma.pedidos.findUnique({
             where: { id: parseInt(pedidoId) },
@@ -116,6 +116,10 @@ const gerarPedidoPDF = async (pedidoId) => {
         desenharGuiasFuro(doc);
         doc.on('pageAdded', () => desenharGuiasFuro(doc));
 
+        // Desenha uma via completa do recibo a partir da posição atual do cursor.
+        // Chamada `copias` vezes (com `doc.addPage()` entre elas) para imprimir
+        // o pedido em várias vias dentro do mesmo PDF.
+        const desenharPedido = () => {
         // ── CABEÇALHO ──────────────────────────────────────────────────────────
 
         doc.font('Helvetica-Bold').fontSize(fs(20)).fillColor('#1b5e20')
@@ -453,6 +457,12 @@ const gerarPedidoPDF = async (pedidoId) => {
         doc.font('Helvetica').fontSize(fs(8)).fillColor('#aaaaaa')
             .text(`Viveiro Promudas — documento gerado em ${formatarData(new Date())}`,
                 50, doc.y, { width: 495, align: 'right' });
+        };
+
+        for (let i = 0; i < copias; i++) {
+            if (i > 0) doc.addPage();
+            desenharPedido();
+        }
 
         doc.end();
     });
