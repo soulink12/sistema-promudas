@@ -104,6 +104,7 @@ class DetalhesCliente extends StatelessWidget {
                     _secao(context, 'Contato', [
                       ('Telefone', c['telefone_1']),
                       ('Telefone 2', c['telefone_2']),
+                      ('E-mail', c['email']),
                     ]),
                     _secao(context, 'Endereço', [
                       ('CEP', c['cep']),

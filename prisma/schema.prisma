@@ -20,9 +20,11 @@ model clientes {
   cidade             String?   @db.VarChar(100)
   estado             String?   @default("PA") @db.VarChar(2)
   saldo_credito      Decimal?  @default(0) @db.Decimal(10, 2)
+  email              String?   @db.VarChar(150)
   ativo              Boolean?  @default(true)
   criado_em          DateTime? @default(now()) @db.Timestamp(0)
   pedidos            pedidos[]
+  orcamentos         orcamentos[]
 }
 
 model pedidos {
@@ -43,18 +45,42 @@ model pedidos {
   entregas         entregas[]
   itens_pedido     itens_pedido[]
   pagamentos       pagamentos[]
+  orcamentos       orcamentos[]
 
   @@index([cliente_id])
   @@index([temporada_ano])
 }
 
+// Documento prévio ligado a um cliente, criado na mesma tela de venda do
+// pedido (atalho F11). Não tem pagamentos/entregas — só vira isso quando
+// aprovado, gerando um pedido de verdade (ver campo pedido_id).
+model orcamentos {
+  id              Int               @id @default(autoincrement())
+  cliente_id      Int?
+  ativo           Boolean?          @default(true)
+  data_orcamento  DateTime?         @db.Timestamp(0)
+  valor_total     Decimal?          @db.Decimal(10, 2)
+  ajuste          Decimal?          @db.Decimal(10, 2)
+  status          String?           @default("Pendente") @db.VarChar(20)
+  observacoes     String?           @db.Text
+  // Preenchido só quando o orçamento é aprovado — aponta para o pedido gerado.
+  pedido_id       Int?
+  criado_em       DateTime?         @default(now()) @db.Timestamp(0)
+  clientes        clientes?         @relation(fields: [cliente_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  pedidos         pedidos?          @relation(fields: [pedido_id], references: [id], onDelete: SetNull, onUpdate: NoAction)
+  itens_orcamento itens_orcamento[]
+
+  @@index([cliente_id])
+}
+
 model produtos {
-  id             Int             @id @default(autoincrement())
-  nome           String          @db.VarChar(50)
-  preco          Decimal         @db.Decimal(10, 2)
-  ativo          Boolean?        @default(true)
-  itens_pedido   itens_pedido[]
-  itens_entrega  itens_entrega[]
+  id              Int               @id @default(autoincrement())
+  nome            String            @db.VarChar(50)
+  preco           Decimal           @db.Decimal(10, 2)
+  ativo           Boolean?          @default(true)
+  itens_pedido    itens_pedido[]
+  itens_entrega   itens_entrega[]
+  itens_orcamento itens_orcamento[]
 }
 
 model itens_pedido {
@@ -67,6 +93,19 @@ model itens_pedido {
   produtos       produtos? @relation(fields: [produto_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
 
   @@index([pedido_id])
+  @@index([produto_id])
+}
+
+model itens_orcamento {
+  id             Int         @id @default(autoincrement())
+  orcamento_id   Int?
+  produto_id     Int?
+  quantidade     Int
+  valor_unitario Decimal?    @db.Decimal(10, 2)
+  orcamentos     orcamentos? @relation(fields: [orcamento_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  produtos       produtos?   @relation(fields: [produto_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@index([orcamento_id])
   @@index([produto_id])
 }
 

@@ -89,11 +89,21 @@ const gerarPDF = async (req, res, next) => {
     }
 };
 
+const enviarEmail = async (req, res, next) => {
+    try {
+        await pedidoService.enviarPedidoPorEmail(req.params.id);
+        return res.status(200).json({ mensagem: 'E-mail enviado com sucesso!' });
+    } catch (erro) {
+        next(erro);
+    }
+};
+
 module.exports = {
     criarPedido,
     listarPedidos,
     buscarPedido,
     atualizarPedido,
     eliminarPedido,
-    gerarPDF
+    gerarPDF,
+    enviarEmail
 };

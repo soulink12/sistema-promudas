@@ -2,6 +2,9 @@ const prisma = require('../config/database');
 const { recalcularStatusPedido } = require('./pagamentoService');
 const { parseData, normalizarDatas } = require('../utils/parseData');
 const formaPagamentoService = require('./formaPagamentoService');
+const pdfService = require('./pdfService');
+const emailService = require('./emailService');
+const { formatarNumeroPedido } = require('../utils/numeroPedido');
 const BusinessError = require('../utils/BusinessError');
 
 // Campos de pagamento retornados ao montar um pedido completo (listar/buscar).
@@ -37,7 +40,7 @@ const PAGAMENTO_SELECT = {
 // Include padrão de um pedido completo: cliente, itens (com nome do produto),
 // pagamentos (PAGAMENTO_SELECT) e entregas com seus itens.
 const PEDIDO_INCLUDE = {
-    clientes: { select: { id: true, nome: true } },
+    clientes: { select: { id: true, nome: true, email: true } },
     itens_pedido: {
         include: { produtos: { select: { nome: true } } }
     },
@@ -334,10 +337,42 @@ const eliminarPedido = async (id) => {
     });
 };
 
+// Gera o PDF do pedido e envia por e-mail ao cliente. Exige que o cliente
+// tenha e-mail cadastrado — a mesma checagem existe no front (botão
+// desabilitado), mas aqui é validada de novo antes de tentar enviar.
+const enviarPedidoPorEmail = async (id) => {
+    const pedido = await prisma.pedidos.findUnique({
+        where: { id: parseInt(id) },
+        select: {
+            id: true,
+            temporada_ano: true,
+            numero_temporada: true,
+            clientes: { select: { nome: true, email: true } },
+        },
+    });
+    if (!pedido) {
+        throw new BusinessError('Pedido não encontrado.', 404);
+    }
+    if (!pedido.clientes?.email) {
+        throw new BusinessError('Este cliente não tem e-mail cadastrado.');
+    }
+
+    const { buffer, nomeArquivo } = await pdfService.gerarPedidoPDF(id);
+    await emailService.enviarPdfPorEmail({
+        destinatario: pedido.clientes.email,
+        assunto: `Pedido ${formatarNumeroPedido(pedido)} — Viveiro Promudas`,
+        corpo: `Olá, ${pedido.clientes.nome}!\n\nSegue em anexo o recibo do seu pedido na Viveiro Promudas.\n\nQualquer dúvida, estamos à disposição.`,
+        anexoBuffer: buffer,
+        nomeArquivo,
+    });
+};
+
 module.exports = {
     criarPedido,
     listarPedidos,
     buscarPedido,
     atualizarPedido,
-    eliminarPedido
+    eliminarPedido,
+    enviarPedidoPorEmail,
+    proximoNumeroTemporada
 };

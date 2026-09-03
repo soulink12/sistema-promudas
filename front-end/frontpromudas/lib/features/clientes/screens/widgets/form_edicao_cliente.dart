@@ -29,6 +29,7 @@ class _FormEdicaoClienteState extends State<FormEdicaoCliente> {
   late final TextEditingController _inscricao;
   late final TextEditingController _tel1;
   late final TextEditingController _tel2;
+  late final TextEditingController _email;
   late final TextEditingController _cep;
   late final TextEditingController _logradouro;
   late final TextEditingController _numero;
@@ -49,6 +50,7 @@ class _FormEdicaoClienteState extends State<FormEdicaoCliente> {
     );
     _tel1 = TextEditingController(text: c['telefone_1'] as String? ?? '');
     _tel2 = TextEditingController(text: c['telefone_2'] as String? ?? '');
+    _email = TextEditingController(text: c['email'] as String? ?? '');
     _cep = TextEditingController(text: c['cep'] as String? ?? '');
     _logradouro = TextEditingController(text: c['logradouro'] as String? ?? '');
     _numero = TextEditingController(text: c['numero'] as String? ?? '');
@@ -65,6 +67,7 @@ class _FormEdicaoClienteState extends State<FormEdicaoCliente> {
       _inscricao,
       _tel1,
       _tel2,
+      _email,
       _cep,
       _logradouro,
       _numero,
@@ -98,6 +101,7 @@ class _FormEdicaoClienteState extends State<FormEdicaoCliente> {
     add('inscricao_estadual', _inscricao);
     add('telefone_1', _tel1);
     add('telefone_2', _tel2);
+    add('email', _email);
     add('cep', _cep);
     add('logradouro', _logradouro);
     add('numero', _numero);
@@ -165,6 +169,12 @@ class _FormEdicaoClienteState extends State<FormEdicaoCliente> {
                 _subtitulo(context, 'Contato'),
                 _campo(_tel1, 'Telefone'),
                 _campo(_tel2, 'Telefone 2'),
+                _campo(
+                  _email,
+                  'E-mail',
+                  keyboardType: TextInputType.emailAddress,
+                  validator: _validarEmail,
+                ),
                 _subtitulo(context, 'Endereço'),
                 Row(
                   children: [
@@ -189,6 +199,15 @@ class _FormEdicaoClienteState extends State<FormEdicaoCliente> {
       ),
     );
   }
+}
+
+// E-mail é opcional, mas quando preenchido precisa ter um formato válido —
+// é a partir dele que o botão de "Enviar por e-mail" do PDF fica habilitado.
+String? _validarEmail(String? v) {
+  final texto = v?.trim() ?? '';
+  if (texto.isEmpty) return null;
+  final valido = RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$').hasMatch(texto);
+  return valido ? null : 'E-mail inválido.';
 }
 
 // ── Widgets auxiliares ──────────────────────────────────────────────────────
