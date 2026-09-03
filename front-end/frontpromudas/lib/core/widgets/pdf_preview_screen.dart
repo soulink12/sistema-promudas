@@ -6,6 +6,7 @@ import 'package:flutter/services.dart';
 import 'package:printing/printing.dart';
 import '../services/api_service.dart';
 import '../theme/cores_semanticas.dart';
+import '../utils/enviar_email_documento.dart';
 
 /// Tela cheia com o preview de um PDF já em memória. Usada depois de
 /// baixar/salvar o PDF de um pedido — evita abrir o visualizador externo do
@@ -23,6 +24,9 @@ class PdfPreviewScreen extends StatefulWidget {
     required this.bytes,
     required this.nomeArquivo,
     required this.pedidoId,
+    this.mostrarImprimir3Vias = true,
+    this.caminhoEnviarEmail,
+    this.clienteEmail,
   });
 
   final Uint8List bytes;
@@ -32,6 +36,18 @@ class PdfPreviewScreen extends StatefulWidget {
   /// [_imprimir3Vias]) — o arquivo salvo em disco continua vindo só de
   /// [bytes], com 1 via.
   final int pedidoId;
+
+  /// Orçamento não tem a opção de imprimir em 3 vias (sempre 1 via).
+  final bool mostrarImprimir3Vias;
+
+  /// Rota da API para enviar este documento por e-mail (ex.:
+  /// '/pedidos/12/enviar-email' ou '/orcamentos/7/enviar-email'). Null
+  /// esconde o botão de e-mail por completo.
+  final String? caminhoEnviarEmail;
+
+  /// E-mail cadastrado do cliente dono do documento. Sem e-mail, o botão de
+  /// enviar fica desabilitado (com tooltip explicando o motivo).
+  final String? clienteEmail;
 
   @override
   State<PdfPreviewScreen> createState() => _PdfPreviewScreenState();
@@ -51,6 +67,8 @@ class _PdfPreviewScreenState extends State<PdfPreviewScreen> {
   // usuário clica em "Imprimir 3 vias" pela primeira vez).
   Uint8List? _bytes3Vias;
   bool _carregando3Vias = false;
+
+  bool _enviandoEmail = false;
 
   // Preenchidos a cada build de _paginaAjustada, usados para limitar o pan
   // às bordas da página (ver _limitarPan).
@@ -137,6 +155,24 @@ class _PdfPreviewScreenState extends State<PdfPreviewScreen> {
     }
   }
 
+  /// Confirma com o usuário e envia o documento (pedido ou orçamento) por
+  /// e-mail para o cliente, via [widget.caminhoEnviarEmail]. Só é chamado
+  /// quando o cliente tem e-mail cadastrado (botão fica desabilitado sem ele).
+  Future<void> _enviarEmail() async {
+    final email = widget.clienteEmail;
+    final caminho = widget.caminhoEnviarEmail;
+    if (email == null || email.isEmpty || caminho == null) return;
+
+    setState(() => _enviandoEmail = true);
+    await enviarDocumentoPorEmail(
+      context: context,
+      caminho: caminho,
+      nomeDocumento: widget.nomeArquivo,
+      email: email,
+    );
+    if (mounted) setState(() => _enviandoEmail = false);
+  }
+
   @override
   Widget build(BuildContext context) {
     return CallbackShortcuts(
@@ -164,17 +200,36 @@ class _PdfPreviewScreenState extends State<PdfPreviewScreen> {
                 tooltip: 'Imprimir (Ctrl+P)',
                 onPressed: _imprimir,
               ),
-              IconButton(
-                icon: _carregando3Vias
-                    ? const SizedBox(
-                        width: 20,
-                        height: 20,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                    : const Icon(Icons.filter_3),
-                tooltip: 'Imprimir 3 vias',
-                onPressed: _carregando3Vias ? null : _imprimir3Vias,
-              ),
+              if (widget.mostrarImprimir3Vias)
+                IconButton(
+                  icon: _carregando3Vias
+                      ? const SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Icon(Icons.filter_3),
+                  tooltip: 'Imprimir 3 vias',
+                  onPressed: _carregando3Vias ? null : _imprimir3Vias,
+                ),
+              if (widget.caminhoEnviarEmail != null)
+                IconButton(
+                  icon: _enviandoEmail
+                      ? const SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Icon(Icons.mail_outlined),
+                  tooltip: (widget.clienteEmail == null || widget.clienteEmail!.isEmpty)
+                      ? 'Cadastre o e-mail do cliente para poder enviar'
+                      : 'Enviar por e-mail',
+                  onPressed: (widget.clienteEmail == null ||
+                          widget.clienteEmail!.isEmpty ||
+                          _enviandoEmail)
+                      ? null
+                      : _enviarEmail,
+                ),
             ],
           ),
           body: Listener(

@@ -356,7 +356,11 @@ class _TelaPedidosState extends State<TelaPedidos> {
             backgroundColor: CoresSemanticas.sucesso,
           ),
         );
-        await PdfDownloadService.baixarESalvar(context, pedidoId);
+        await PdfDownloadService.baixarESalvar(
+          context,
+          pedidoId,
+          clienteEmail: _pedidoSelecionado?['clientes']?['email'] as String?,
+        );
       }
     } catch (_) {
       setState(() => _salvando = false);
@@ -638,6 +642,7 @@ class _TelaPedidosState extends State<TelaPedidos> {
                     onEmitirPdf: () => PdfDownloadService.baixarESalvar(
                       context,
                       _pedidoSelecionado!['id'] as int,
+                      clienteEmail: _pedidoSelecionado!['clientes']?['email'] as String?,
                     ),
                     onEditar: () => _abrirEdicaoPedido(_pedidoSelecionado!),
                     onExcluir: _excluirPedido,

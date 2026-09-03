@@ -40,7 +40,7 @@ const PAGAMENTO_SELECT = {
 // Include padrão de um pedido completo: cliente, itens (com nome do produto),
 // pagamentos (PAGAMENTO_SELECT) e entregas com seus itens.
 const PEDIDO_INCLUDE = {
-    clientes: { select: { id: true, nome: true } },
+    clientes: { select: { id: true, nome: true, email: true } },
     itens_pedido: {
         include: { produtos: { select: { nome: true } } }
     },

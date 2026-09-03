@@ -11,7 +11,46 @@ class PdfDownloadService {
   /// Baixa o PDF do pedido, salva na pasta configurada em Configurações e abre
   /// o preview embutido do app (com opção de impressão). O nome do arquivo
   /// ("Pedido AA-N.pdf") vem do backend, no cabeçalho `Content-Disposition`.
-  static Future<void> baixarESalvar(BuildContext context, int pedidoId) async {
+  ///
+  /// [clienteEmail] habilita o botão de "Enviar por e-mail" no preview quando
+  /// o cliente do pedido tem e-mail cadastrado.
+  static Future<void> baixarESalvar(
+    BuildContext context,
+    int pedidoId, {
+    String? clienteEmail,
+  }) async {
+    await _baixarESalvar(
+      context,
+      id: pedidoId,
+      caminhoBase: '/pedidos',
+      mostrarImprimir3Vias: true,
+      clienteEmail: clienteEmail,
+    );
+  }
+
+  /// Mesma lógica de [baixarESalvar], mas para o PDF de um orçamento
+  /// ("Orçamento #N.pdf") — sem a opção de imprimir 3 vias.
+  static Future<void> baixarESalvarOrcamento(
+    BuildContext context,
+    int orcamentoId, {
+    String? clienteEmail,
+  }) async {
+    await _baixarESalvar(
+      context,
+      id: orcamentoId,
+      caminhoBase: '/orcamentos',
+      mostrarImprimir3Vias: false,
+      clienteEmail: clienteEmail,
+    );
+  }
+
+  static Future<void> _baixarESalvar(
+    BuildContext context, {
+    required int id,
+    required String caminhoBase,
+    required bool mostrarImprimir3Vias,
+    String? clienteEmail,
+  }) async {
     // Sem pasta configurada não há onde salvar — orienta o usuário e sai.
     final pasta = PdfConfigService.pasta.value;
     if (pasta == null) {
@@ -25,7 +64,7 @@ class PdfDownloadService {
 
     try {
       final response = await ApiService.dio.get(
-        '/pedidos/$pedidoId/pdf',
+        '$caminhoBase/$id/pdf',
         options: Options(responseType: ResponseType.bytes),
       );
 
@@ -33,12 +72,12 @@ class PdfDownloadService {
 
       final nomeArquivo = _nomeArquivo(
         response.headers.value('content-disposition'),
-        pedidoId,
+        id,
       );
 
       // Dentro da pasta do usuário, organiza por temporada: subpasta "26" para
       // pedidos da safra 2026 (ex.: "Pedido 26-1.pdf"). Cria a subpasta se ainda
-      // não existir. Pedidos sem temporada vão direto na pasta raiz.
+      // não existir. Pedidos sem temporada (e orçamentos) vão direto na raiz.
       final subpasta = _pastaTemporada(nomeArquivo);
       final destino = subpasta == null
           ? pasta
@@ -51,7 +90,14 @@ class PdfDownloadService {
       if (context.mounted) {
         await Navigator.of(context).push(
           MaterialPageRoute(
-            builder: (_) => PdfPreviewScreen(bytes: bytes, nomeArquivo: nomeArquivo, pedidoId: pedidoId),
+            builder: (_) => PdfPreviewScreen(
+              bytes: bytes,
+              nomeArquivo: nomeArquivo,
+              pedidoId: id,
+              mostrarImprimir3Vias: mostrarImprimir3Vias,
+              caminhoEnviarEmail: '$caminhoBase/$id/enviar-email',
+              clienteEmail: clienteEmail,
+            ),
           ),
         );
       }
@@ -59,7 +105,7 @@ class PdfDownloadService {
       if (context.mounted) {
         _avisar(
           context,
-          'Não foi possível gerar o PDF do pedido.',
+          'Não foi possível gerar o PDF.',
           CoresSemanticas.erro,
         );
       }

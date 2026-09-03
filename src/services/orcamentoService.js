@@ -7,7 +7,7 @@ const { formatarNumeroOrcamento } = require('../utils/numeroOrcamento');
 const BusinessError = require('../utils/BusinessError');
 
 const ORCAMENTO_INCLUDE = {
-    clientes: { select: { id: true, nome: true } },
+    clientes: { select: { id: true, nome: true, email: true } },
     itens_orcamento: {
         include: { produtos: { select: { nome: true } } }
     }

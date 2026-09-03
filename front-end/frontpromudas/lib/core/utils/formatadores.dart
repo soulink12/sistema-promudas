@@ -41,6 +41,10 @@ String formatarNumeroPedido(Map pedido) {
   return '#${pedido['id']}';
 }
 
+/// Número de exibição do orçamento: sempre `#id` — orçamento usa numeração
+/// própria simples, sem o esquema de temporada do pedido.
+String formatarNumeroOrcamento(Map orcamento) => '#${orcamento['id']}';
+
 /// Padroniza a exibição de um nome próprio: primeira letra de cada palavra
 /// maiúscula, resto minúsculo (ex.: "MARIA DA SILVA" ou "maria da silva" →
 /// "Maria Da Silva"). Só afeta a exibição — o valor salvo no banco não muda.
