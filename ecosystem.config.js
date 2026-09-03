@@ -26,8 +26,9 @@ module.exports = {
       // Não fica em watch — em produção o restart é manual/via deploy.
       watch: false,
 
-      // As variáveis reais (DATABASE_*, JWT_SECRET, PORT) vêm do .env via dotenv.
-      // Aqui só garantimos o ambiente de produção.
+      // As variáveis reais (DATABASE_*, JWT_SECRET, PORT, RESEND_API_KEY,
+      // EMAIL_REMETENTE) vêm do .env via dotenv. Aqui só garantimos o
+      // ambiente de produção.
       env: {
         NODE_ENV: 'production',
       },
