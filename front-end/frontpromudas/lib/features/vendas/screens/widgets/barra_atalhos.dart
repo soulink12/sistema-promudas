@@ -10,6 +10,7 @@ class BarraAtalhos extends StatelessWidget {
   static const List<(String, String)> _atalhos = [
     ('F5', 'Buscar cliente'),
     ('F12', 'Finalizar pagamento'),
+    ('F11', 'Salvar como orçamento'),
     ('Ctrl+C', 'Cadastrar cliente'),
     ('Ctrl+E', 'Pesquisar pedido'),
   ];

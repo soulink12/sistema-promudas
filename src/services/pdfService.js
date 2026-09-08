@@ -3,6 +3,7 @@ const prisma = require('../config/database');
 const BusinessError = require('../utils/BusinessError');
 const formaPagamentoService = require('./formaPagamentoService');
 const { formatarNumeroPedido } = require('../utils/numeroPedido');
+const { formatarNumeroOrcamento } = require('../utils/numeroOrcamento');
 const { formatarMoeda } = require('../utils/moeda');
 const { formatar: formatarCpfCnpj } = require('../utils/cpfCnpj');
 
@@ -468,4 +469,193 @@ const gerarPedidoPDF = async (pedidoId, copias = 1) => {
     });
 };
 
-module.exports = { gerarPedidoPDF };
+// Gera o PDF de um orçamento: mesmo estilo visual do recibo de pedido
+// (cabeçalho, guias de furação, cliente, itens, totais, observações), mas
+// sem as seções de Pagamentos/Entregas — orçamento ainda não tem nenhum dos
+// dois. Sempre 1 via (orçamento não tem a opção de imprimir 3 vias).
+const gerarOrcamentoPDF = async (orcamentoId) => {
+    const orcamento = await prisma.orcamentos.findUnique({
+        where: { id: parseInt(orcamentoId) },
+        include: {
+            clientes: true,
+            itens_orcamento: {
+                include: { produtos: { select: { nome: true } } }
+            }
+        }
+    });
+
+    if (!orcamento) {
+        throw new BusinessError('Orçamento não encontrado.', 404);
+    }
+
+    const nomeArquivo = `Orçamento ${formatarNumeroOrcamento(orcamento)}.pdf`;
+
+    return new Promise((resolve, reject) => {
+        const doc = new PDFDocument({ size: 'A4', margin: 50 });
+        const chunks = [];
+        doc.on('data', c => chunks.push(c));
+        doc.on('end', () => resolve({ buffer: Buffer.concat(chunks), nomeArquivo }));
+        doc.on('error', reject);
+
+        desenharGuiasFuro(doc);
+        doc.on('pageAdded', () => desenharGuiasFuro(doc));
+
+        // ── CABEÇALHO ──────────────────────────────────────────────────────────
+
+        doc.font('Helvetica-Bold').fontSize(fs(20)).fillColor('#1b5e20')
+            .text('Viveiro Promudas', { align: 'center' });
+        doc.font('Helvetica').fontSize(fs(10)).fillColor('#555555')
+            .text('Orçamento', { align: 'center' });
+        doc.fillColor('black');
+        doc.moveDown(0.8);
+
+        linha(doc);
+        doc.moveDown(0.5);
+
+        const dataOrcamento = formatarData(orcamento.data_orcamento || orcamento.criado_em);
+        doc.font('Helvetica-Bold').fontSize(fs(14)).text(`ORÇAMENTO ${formatarNumeroOrcamento(orcamento)}`, 50, doc.y, { continued: true });
+        doc.font('Helvetica').fontSize(fs(10)).fillColor('#555555')
+            .text(dataOrcamento, { align: 'right' });
+        doc.fillColor('black');
+        doc.moveDown(0.4);
+
+        const corStatus = orcamento.status === 'Aprovado'
+            ? '#1b5e20'
+            : orcamento.status === 'Rejeitado'
+                ? '#c62828'
+                : '#e65100';
+        doc.font('Helvetica').fontSize(fs(10)).fillColor('black')
+            .text('Status: ', 50, doc.y, { continued: true });
+        doc.font('Helvetica-Bold').fillColor(corStatus).text(orcamento.status || 'Pendente');
+        doc.fillColor('black');
+        doc.moveDown(0.8);
+
+        // ── CLIENTE ─────────────────────────────────────────────────────────────
+
+        linha(doc);
+        doc.moveDown(0.5);
+        doc.font('Helvetica-Bold').fontSize(fs(10)).fillColor('#1b5e20').text('CLIENTE', 50, doc.y);
+        doc.fillColor('black');
+        doc.moveDown(0.2);
+        doc.font('Helvetica-Bold').fontSize(fs(11)).text(orcamento.clientes?.nome || '—');
+
+        const c = orcamento.clientes;
+        doc.font('Helvetica').fontSize(fs(9)).fillColor('#555555');
+
+        if (c?.cpf_cnpj) doc.text(`CPF/CNPJ: ${formatarCpfCnpj(c.cpf_cnpj)}`);
+        if (c?.telefone_1) doc.text(`Telefone: ${c.telefone_1}`);
+
+        if (c?.logradouro) {
+            const linha1 = [c.logradouro, c.numero].filter(Boolean).join(', ');
+            const linha2Parts = [c.bairro, c.cidade && c.estado ? `${c.cidade}/${c.estado}` : (c.cidade || c.estado), c.cep].filter(Boolean);
+            doc.text(linha1);
+            if (linha2Parts.length > 0) doc.text(linha2Parts.join(' — '));
+        }
+
+        doc.fillColor('black');
+        doc.moveDown(0.8);
+
+        // ── ITENS ───────────────────────────────────────────────────────────────
+
+        linha(doc);
+        doc.moveDown(0.5);
+        doc.font('Helvetica-Bold').fontSize(fs(10)).fillColor('#1b5e20').text('ITENS DO ORÇAMENTO', 50, doc.y);
+        doc.fillColor('black');
+        doc.moveDown(0.4);
+
+        const colItens = [
+            { x: 50, largura: 250, texto: 'Produto' },
+            { x: 310, largura: 45, texto: 'Qtd', alinhamento: 'center' },
+            { x: 365, largura: 85, texto: 'Preço Unit.', alinhamento: 'right' },
+            { x: 460, largura: 85, texto: 'Total', alinhamento: 'right' },
+        ];
+
+        doc.font('Helvetica-Bold').fontSize(fs(9)).fillColor('#555555');
+        linhaTabela(doc, doc.y, colItens);
+        doc.fillColor('black');
+        doc.moveDown(0.3);
+        doc.moveTo(50, doc.y).lineTo(545, doc.y).strokeColor('#dddddd').lineWidth(0.5).stroke();
+        doc.strokeColor('black').lineWidth(1);
+        doc.moveDown(0.3);
+
+        let subtotal = 0;
+        orcamento.itens_orcamento.forEach((item, idx) => {
+            const nome = item.produtos?.nome || '—';
+            const qtd = item.quantidade;
+            const preco = parseFloat(item.valor_unitario);
+            const totalItem = preco * qtd;
+            subtotal += totalItem;
+
+            const y = doc.y;
+            if (idx % 2 === 0) {
+                doc.rect(50, y - 2, 495, 16).fill('#f9f9f9');
+            }
+
+            doc.font('Helvetica').fontSize(fs(9)).fillColor('black');
+            linhaTabela(doc, y, [
+                { x: 50, largura: 250, texto: nome },
+                { x: 310, largura: 45, texto: String(qtd), alinhamento: 'center' },
+                { x: 365, largura: 85, texto: moeda(preco), alinhamento: 'right' },
+                { x: 460, largura: 85, texto: moeda(totalItem), alinhamento: 'right' },
+            ]);
+            doc.moveDown(0.45);
+        });
+
+        doc.moveDown(0.5);
+
+        // ── TOTAIS ──────────────────────────────────────────────────────────────
+
+        linha(doc);
+        doc.moveDown(0.4);
+
+        const ajuste = parseFloat(orcamento.ajuste || 0);
+        const total = parseFloat(orcamento.valor_total);
+
+        const linhaValor = (label, valor, bold = false, cor = 'black') => {
+            const y = doc.y;
+            doc.font(bold ? 'Helvetica-Bold' : 'Helvetica').fontSize(fs(10))
+                .fillColor('#555555').text(label, 320, y, { lineBreak: false });
+            doc.font(bold ? 'Helvetica-Bold' : 'Helvetica')
+                .fillColor(cor).text(moeda(valor), 460, y, { width: 85, align: 'right' });
+            doc.fillColor('black');
+            doc.moveDown(0.4);
+        };
+
+        if (ajuste !== 0) linhaValor('Subtotal', subtotal);
+        if (ajuste < 0) linhaValor('Desconto', Math.abs(ajuste), false, '#1565c0');
+        if (ajuste > 0) linhaValor('Acréscimo', ajuste, false, '#e65100');
+
+        doc.moveTo(310, doc.y).lineTo(545, doc.y).strokeColor('#aaaaaa').lineWidth(0.5).stroke();
+        doc.strokeColor('black').lineWidth(1);
+        doc.moveDown(0.3);
+        linhaValor('TOTAL', total, true, '#1b5e20');
+        doc.moveDown(0.5);
+
+        // ── OBSERVAÇÕES ─────────────────────────────────────────────────────────
+
+        if (orcamento.observacoes && orcamento.observacoes.trim()) {
+            linha(doc);
+            doc.moveDown(0.5);
+            doc.font('Helvetica-Bold').fontSize(fs(10)).fillColor('#1b5e20').text('OBSERVAÇÕES', { align: 'right' });
+            doc.fillColor('black');
+            doc.moveDown(0.3);
+            doc.font('Helvetica').fontSize(fs(9)).fillColor('#333333')
+                .text(orcamento.observacoes.trim(), 50, doc.y, { width: 495, align: 'right' });
+            doc.fillColor('black');
+            doc.moveDown(0.5);
+        }
+
+        // ── RODAPÉ ──────────────────────────────────────────────────────────────
+
+        doc.moveDown(3);
+        linha(doc);
+        doc.moveDown(0.4);
+        doc.font('Helvetica').fontSize(fs(8)).fillColor('#aaaaaa')
+            .text(`Viveiro Promudas — documento gerado em ${formatarData(new Date())}`,
+                50, doc.y, { width: 495, align: 'right' });
+
+        doc.end();
+    });
+};
+
+module.exports = { gerarPedidoPDF, gerarOrcamentoPDF };

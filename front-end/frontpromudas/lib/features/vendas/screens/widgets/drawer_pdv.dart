@@ -4,6 +4,7 @@ import '../../../../core/theme/cores_semanticas.dart';
 import '../../../auth/screens/login_screen.dart';
 import '../../../clientes/screens/clientes_screen.dart';
 import '../../../pedidos/screens/pedidos_screen.dart';
+import '../../../orcamentos/screens/orcamentos_screen.dart';
 import '../../../configuracoes/screens/configuracoes_screen.dart';
 
 /// Drawer (menu sanduíche) do módulo PDV. Cabeçalho com o usuário logado e itens
@@ -85,6 +86,17 @@ class DrawerPdv extends StatelessWidget {
               Navigator.push(
                 context,
                 MaterialPageRoute(builder: (_) => const TelaPedidos()),
+              );
+            },
+          ),
+          ListTile(
+            leading: const Icon(Icons.request_quote_outlined),
+            title: const Text('Orçamentos'),
+            onTap: () {
+              Navigator.pop(context);
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const TelaOrcamentos()),
               );
             },
           ),

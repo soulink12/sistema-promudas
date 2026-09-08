@@ -19,12 +19,14 @@ class _DialogCadastroClienteState extends State<DialogCadastroCliente> {
   // Vira true ao tentar salvar — força a exibição do erro nos campos obrigatórios.
   bool _tentouSalvar = false;
   bool _cpfInvalido = false;
+  bool _emailInvalido = false;
 
   final _nome = TextEditingController();
   final _cpf = TextEditingController();
   final _inscricao = TextEditingController();
   final _tel1 = TextEditingController();
   final _tel2 = TextEditingController();
+  final _email = TextEditingController();
   final _cep = TextEditingController();
   final _logradouro = TextEditingController();
   final _numero = TextEditingController();
@@ -40,6 +42,7 @@ class _DialogCadastroClienteState extends State<DialogCadastroCliente> {
       _inscricao,
       _tel1,
       _tel2,
+      _email,
       _cep,
       _logradouro,
       _numero,
@@ -57,11 +60,15 @@ class _DialogCadastroClienteState extends State<DialogCadastroCliente> {
     // se preenchido precisa ter dígito verificador válido.
     final cpfLimpo = limparCpfCnpj(_cpf.text);
     final cpfInvalido = cpfLimpo.isNotEmpty && !validarCpfCnpj(cpfLimpo);
+    final emailTexto = _email.text.trim();
+    final emailInvalido = emailTexto.isNotEmpty &&
+        !RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$').hasMatch(emailTexto);
 
-    if (_nome.text.trim().isEmpty || cpfInvalido) {
+    if (_nome.text.trim().isEmpty || cpfInvalido || emailInvalido) {
       setState(() {
         _tentouSalvar = true;
         _cpfInvalido = cpfInvalido;
+        _emailInvalido = emailInvalido;
       });
       return;
     }
@@ -69,6 +76,7 @@ class _DialogCadastroClienteState extends State<DialogCadastroCliente> {
       _salvando = true;
       _erro = null;
       _cpfInvalido = false;
+      _emailInvalido = false;
     });
     try {
       final body = <String, dynamic>{'nome': _nome.text.trim()};
@@ -80,6 +88,7 @@ class _DialogCadastroClienteState extends State<DialogCadastroCliente> {
       add('inscricao_estadual', _inscricao);
       add('telefone_1', _tel1);
       add('telefone_2', _tel2);
+      add('email', _email);
       add('cep', _cep);
       add('logradouro', _logradouro);
       add('numero', _numero);
@@ -160,6 +169,12 @@ class _DialogCadastroClienteState extends State<DialogCadastroCliente> {
                     _subtitulo(context, 'Contato'),
                     _campo(_tel1, 'Telefone'),
                     _campo(_tel2, 'Telefone 2'),
+                    _campo(
+                      _email,
+                      'E-mail',
+                      keyboardType: TextInputType.emailAddress,
+                      errorText: _emailInvalido ? 'E-mail inválido.' : null,
+                    ),
                     _subtitulo(context, 'Endereço'),
                     Row(
                       children: [

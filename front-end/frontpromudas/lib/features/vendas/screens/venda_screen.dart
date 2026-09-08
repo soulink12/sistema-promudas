@@ -21,10 +21,16 @@ import '../../../core/widgets/dialog_confirmacao.dart';
 /// Tela principal de registro de venda (PDV).
 /// Quando [pedidoParaEditar] é fornecido, entra em modo de edição: o carrinho
 /// é pré-carregado com os itens do pedido e ao finalizar atualiza o pedido existente.
+///
+/// Quando [orcamentoParaEditar] é fornecido, entra em modo de edição de
+/// orçamento: F11 salva as alterações nele (F12/pagamento não se aplicam).
+/// Criando do zero (nenhum dos dois), F12 continua criando um Pedido; F11
+/// cria um Orçamento em vez disso (sem coletar pagamento).
 class TelaVenda extends StatefulWidget {
   final Map<String, dynamic>? pedidoParaEditar;
+  final Map<String, dynamic>? orcamentoParaEditar;
 
-  const TelaVenda({super.key, this.pedidoParaEditar});
+  const TelaVenda({super.key, this.pedidoParaEditar, this.orcamentoParaEditar});
 
   @override
   State<TelaVenda> createState() => _TelaVendaState();
@@ -62,6 +68,42 @@ class _TelaVendaState extends State<TelaVenda> {
     HardwareKeyboard.instance.addHandler(_onTecla);
     if (widget.pedidoParaEditar != null) {
       _preencherCarrinhoComPedido(widget.pedidoParaEditar!);
+    } else if (widget.orcamentoParaEditar != null) {
+      _preencherCarrinhoComOrcamento(widget.orcamentoParaEditar!);
+    }
+  }
+
+  void _preencherCarrinhoComOrcamento(Map<String, dynamic> orcamento) {
+    _observacoes = orcamento['observacoes'] as String? ?? '';
+    final cliente = orcamento['clientes'];
+    if (cliente != null) {
+      _clienteSelecionado = {
+        'id': cliente['id'],
+        'nome': cliente['nome'] as String? ?? '—',
+        'cpf': 'Não informado',
+        'telefone': 'Não informado',
+      };
+    }
+
+    final itens = (orcamento['itens_orcamento'] as List? ?? [])
+        .map((e) => Map<String, dynamic>.from(e as Map))
+        .toList();
+
+    for (final item in itens) {
+      final preco = _toDouble(item['valor_unitario']);
+      _carrinhoService.adicionarItem(
+        {
+          'id': item['produto_id'],
+          'nome': item['produtos']?['nome'] as String? ?? '—',
+          'preco': preco,
+        },
+        quantidade: item['quantidade'] as int? ?? 1,
+      );
+    }
+
+    final ajuste = _toDouble(orcamento['ajuste']);
+    if (ajuste.abs() > 0.001) {
+      _carrinhoService.aplicarAjuste(ajuste, ajuste < 0 ? 'Desconto' : 'Acréscimo');
     }
   }
 
@@ -129,7 +171,17 @@ class _TelaVendaState extends State<TelaVenda> {
       return true;
     }
     if (event.logicalKey == LogicalKeyboardKey.f12) {
+      // Editando um orçamento, F12 (finalizar pedido) não se aplica — só F11
+      // salva as alterações dele; virar pedido de verdade é a ação "Aprovar"
+      // na tela de detalhes do orçamento.
+      if (widget.orcamentoParaEditar != null) return true;
       _finalizarPedido();
+      return true;
+    }
+    if (event.logicalKey == LogicalKeyboardKey.f11) {
+      // Editando um pedido, F11 (salvar como orçamento) não se aplica.
+      if (widget.pedidoParaEditar != null) return true;
+      _finalizarOrcamento();
       return true;
     }
     if (HardwareKeyboard.instance.isControlPressed &&
@@ -177,21 +229,24 @@ class _TelaVendaState extends State<TelaVenda> {
   @override
   Widget build(BuildContext context) {
     final modoEdicao = widget.pedidoParaEditar != null;
+    final modoEdicaoOrcamento = widget.orcamentoParaEditar != null;
 
     return Scaffold(
       appBar: AppBar(
         titleSpacing: 8,
         title: DetalhesAppBar(
           clienteSelecionado: _clienteSelecionado,
-          onTap: modoEdicao || _salvando
+          onTap: modoEdicao || modoEdicaoOrcamento || _salvando
               ? null
               : () => _mostrarBuscaClienteModal(context),
           subtituloOverride: modoEdicao
               ? 'Editando Pedido ${formatarNumeroPedido(widget.pedidoParaEditar!)}'
-              : null,
+              : modoEdicaoOrcamento
+                  ? 'Editando Orçamento ${formatarNumeroOrcamento(widget.orcamentoParaEditar!)}'
+                  : null,
         ),
       ),
-      drawer: modoEdicao ? null : const DrawerPdv(),
+      drawer: (modoEdicao || modoEdicaoOrcamento) ? null : const DrawerPdv(),
       body: Stack(
         children: [
           Padding(
@@ -549,7 +604,11 @@ class _TelaVendaState extends State<TelaVenda> {
             backgroundColor: CoresSemanticas.sucesso,
           ),
         );
-        await PdfDownloadService.baixarESalvar(context, pedidoId);
+        await PdfDownloadService.baixarESalvar(
+          context,
+          pedidoId,
+          clienteEmail: cliente['email'] as String?,
+        );
       }
     } catch (_) {
       setState(() => _salvando = false);
@@ -560,6 +619,127 @@ class _TelaVendaState extends State<TelaVenda> {
             backgroundColor: CoresSemanticas.erro,
             duration: Duration(seconds: 4),
           ),
+        );
+      }
+    }
+  }
+
+  // ── Orçamento (atalho F11) ────────────────────────────────────────────────
+
+  void _finalizarOrcamento() {
+    if (_carrinhoService.itens.isEmpty || _salvando) return;
+
+    if (widget.orcamentoParaEditar != null) {
+      _confirmarEdicaoOrcamento();
+      return;
+    }
+    _registrarOrcamento();
+  }
+
+  Future<void> _confirmarEdicaoOrcamento() async {
+    final confirmado = await mostrarDialogConfirmacao(
+      context: context,
+      titulo: 'Confirmar edição',
+      mensagem:
+          'Deseja salvar as alterações no Orçamento ${formatarNumeroOrcamento(widget.orcamentoParaEditar!)}?',
+      textoConfirmar: 'Salvar',
+    );
+    if (!confirmado || !mounted) return;
+    _salvarEdicaoOrcamento(widget.orcamentoParaEditar!['id'] as int);
+  }
+
+  Future<void> _salvarEdicaoOrcamento(int orcamentoId) async {
+    setState(() => _salvando = true);
+
+    final itens = _carrinhoService.itens;
+    final ajuste = _carrinhoService.ajuste;
+
+    try {
+      await ApiService.dio.put('/orcamentos/$orcamentoId', data: {
+        'itens': itens
+            .map((item) => {
+                  'produto_id': item['id'],
+                  'quantidade': item['quantidade'],
+                  'valor_unitario': item['preco'],
+                })
+            .toList(),
+        'ajuste': ajuste != 0.0 ? ajuste : null,
+        'observacoes': _observacoes.isNotEmpty ? _observacoes : null,
+      });
+
+      setState(() => _salvando = false);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Orçamento atualizado com sucesso!'),
+            backgroundColor: CoresSemanticas.sucesso,
+          ),
+        );
+        Navigator.pop(context);
+      }
+    } catch (e) {
+      setState(() => _salvando = false);
+      if (mounted) {
+        mostrarErro(
+          context,
+          extrairErroApi(e, 'Erro ao atualizar orçamento. Tente novamente.'),
+        );
+      }
+    }
+  }
+
+  /// Cria um orçamento novo com os itens do carrinho — sem coletar pagamento,
+  /// já que orçamento ainda não é um pedido de verdade.
+  Future<void> _registrarOrcamento() async {
+    setState(() => _salvando = true);
+
+    final itens = _carrinhoService.itens;
+    final cliente = _clienteSelecionado!;
+    final ajuste = _carrinhoService.ajuste;
+
+    try {
+      final resposta = await ApiService.dio.post('/orcamentos', data: {
+        'cliente_id': cliente['id'],
+        'valor_total': _carrinhoService.totalComAjuste,
+        if (ajuste != 0.0) 'ajuste': ajuste,
+        if (_observacoes.isNotEmpty) 'observacoes': _observacoes,
+        'itens': itens
+            .map((item) => {
+                  'produto_id': item['id'],
+                  'quantidade': item['quantidade'],
+                  'valor_unitario': item['preco'],
+                })
+            .toList(),
+      });
+
+      final orcamentoId = resposta.data['data']['id'] as int;
+
+      setState(() {
+        _carrinhoService.limpar();
+        _clienteSelecionado = _consumidorPadrao;
+        _observacoes = '';
+        _salvando = false;
+      });
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Orçamento registrado com sucesso!'),
+            backgroundColor: CoresSemanticas.sucesso,
+          ),
+        );
+        await PdfDownloadService.baixarESalvarOrcamento(
+          context,
+          orcamentoId,
+          clienteEmail: cliente['email'] as String?,
+        );
+      }
+    } catch (e) {
+      setState(() => _salvando = false);
+      if (mounted) {
+        mostrarErro(
+          context,
+          extrairErroApi(e, 'Erro ao registrar orçamento. Tente novamente.'),
         );
       }
     }

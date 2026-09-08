@@ -5,6 +5,7 @@ import '../../../core/services/forma_pagamento_service.dart';
 import '../../../core/theme/cores_semanticas.dart';
 import '../../../core/utils/api_feedback.dart';
 import '../../../core/utils/formatadores.dart';
+import '../../../core/utils/enviar_email_documento.dart';
 import '../../../core/widgets/pesquisa_cliente_lista.dart';
 import '../../../core/widgets/dialog_confirmacao.dart';
 import '../../../core/widgets/filtro_multi_status.dart';
@@ -356,7 +357,11 @@ class _TelaPedidosState extends State<TelaPedidos> {
             backgroundColor: CoresSemanticas.sucesso,
           ),
         );
-        await PdfDownloadService.baixarESalvar(context, pedidoId);
+        await PdfDownloadService.baixarESalvar(
+          context,
+          pedidoId,
+          clienteEmail: _pedidoSelecionado?['clientes']?['email'] as String?,
+        );
       }
     } catch (_) {
       setState(() => _salvando = false);
@@ -479,6 +484,21 @@ class _TelaPedidosState extends State<TelaPedidos> {
 
   // Exclui o pedido (soft-delete no backend) após confirmação. Volta para a
   // lista e recarrega, já que o pedido aberto deixa de existir.
+  Future<void> _enviarEmailPedido() async {
+    final pedido = _pedidoSelecionado!;
+    final email = pedido['clientes']?['email'] as String?;
+    if (email == null || email.isEmpty) return;
+
+    setState(() => _salvando = true);
+    await enviarDocumentoPorEmail(
+      context: context,
+      caminho: '/pedidos/${pedido['id']}/enviar-email',
+      nomeDocumento: 'Pedido ${formatarNumeroPedido(pedido)}',
+      email: email,
+    );
+    if (mounted) setState(() => _salvando = false);
+  }
+
   Future<void> _excluirPedido() async {
     final pedidoId = _pedidoSelecionado!['id'] as int;
     final confirmado = await mostrarDialogConfirmacao(
@@ -638,7 +658,9 @@ class _TelaPedidosState extends State<TelaPedidos> {
                     onEmitirPdf: () => PdfDownloadService.baixarESalvar(
                       context,
                       _pedidoSelecionado!['id'] as int,
+                      clienteEmail: _pedidoSelecionado!['clientes']?['email'] as String?,
                     ),
+                    onEnviarEmail: _enviarEmailPedido,
                     onEditar: () => _abrirEdicaoPedido(_pedidoSelecionado!),
                     onExcluir: _excluirPedido,
                     onTapCliente: () =>

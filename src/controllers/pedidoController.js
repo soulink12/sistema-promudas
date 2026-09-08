@@ -1,5 +1,6 @@
 const pedidoService = require('../services/pedidoService');
 const pdfService = require('../services/pdfService');
+const { contentDisposition } = require('../utils/contentDisposition');
 
 const criarPedido = async (req, res, next) => {
     try {
@@ -12,6 +13,7 @@ const criarPedido = async (req, res, next) => {
         }
 
         const novoPedido = await pedidoService.criarPedido(dados);
+        pedidoService.notificarPedidoPorEmail(novoPedido.id, 'criado');
         return res.status(201).json({
             mensagem: 'Pedido registrado com sucesso!',
             data: novoPedido
@@ -58,6 +60,7 @@ const listarPedidos = async (req, res, next) => {
 const atualizarPedido = async (req, res, next) => {
     try {
         const pedido = await pedidoService.atualizarPedido(req.params.id, req.body);
+        pedidoService.notificarPedidoPorEmail(pedido.id, 'alterado');
         res.json({ ...pedido, creditoGerado: pedido.creditoGerado ?? 0 });
     } catch (erro) {
         next(erro);
@@ -81,9 +84,18 @@ const gerarPDF = async (req, res, next) => {
             : 1;
         const { buffer, nomeArquivo } = await pdfService.gerarPedidoPDF(req.params.id, copias);
         res.setHeader('Content-Type', 'application/pdf');
-        res.setHeader('Content-Disposition', `attachment; filename="${nomeArquivo}"`);
+        res.setHeader('Content-Disposition', contentDisposition(nomeArquivo));
         res.setHeader('Content-Length', buffer.length);
         res.send(buffer);
+    } catch (erro) {
+        next(erro);
+    }
+};
+
+const enviarEmail = async (req, res, next) => {
+    try {
+        await pedidoService.enviarPedidoPorEmail(req.params.id);
+        return res.status(200).json({ mensagem: 'E-mail enviado com sucesso!' });
     } catch (erro) {
         next(erro);
     }
@@ -95,5 +107,6 @@ module.exports = {
     buscarPedido,
     atualizarPedido,
     eliminarPedido,
-    gerarPDF
+    gerarPDF,
+    enviarEmail
 };
