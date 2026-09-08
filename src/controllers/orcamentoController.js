@@ -1,5 +1,7 @@
 const orcamentoService = require('../services/orcamentoService');
+const pedidoService = require('../services/pedidoService');
 const pdfService = require('../services/pdfService');
+const { contentDisposition } = require('../utils/contentDisposition');
 
 const criarOrcamento = async (req, res, next) => {
     try {
@@ -12,6 +14,7 @@ const criarOrcamento = async (req, res, next) => {
         }
 
         const novoOrcamento = await orcamentoService.criarOrcamento(dados);
+        orcamentoService.notificarOrcamentoPorEmail(novoOrcamento.id, 'criado');
         return res.status(201).json({
             mensagem: 'Orçamento registrado com sucesso!',
             data: novoOrcamento
@@ -50,6 +53,7 @@ const listarOrcamentos = async (req, res, next) => {
 const atualizarOrcamento = async (req, res, next) => {
     try {
         const orcamento = await orcamentoService.atualizarOrcamento(req.params.id, req.body);
+        orcamentoService.notificarOrcamentoPorEmail(orcamento.id, 'alterado');
         res.json(orcamento);
     } catch (erro) {
         next(erro);
@@ -69,7 +73,7 @@ const gerarPDF = async (req, res, next) => {
     try {
         const { buffer, nomeArquivo } = await pdfService.gerarOrcamentoPDF(req.params.id);
         res.setHeader('Content-Type', 'application/pdf');
-        res.setHeader('Content-Disposition', `attachment; filename="${nomeArquivo}"`);
+        res.setHeader('Content-Disposition', contentDisposition(nomeArquivo));
         res.setHeader('Content-Length', buffer.length);
         res.send(buffer);
     } catch (erro) {
@@ -89,6 +93,7 @@ const enviarEmail = async (req, res, next) => {
 const aprovarOrcamento = async (req, res, next) => {
     try {
         const orcamento = await orcamentoService.aprovarOrcamento(req.params.id);
+        pedidoService.notificarPedidoPorEmail(orcamento.pedido_id, 'criado a partir da aprovação do orçamento');
         res.json(orcamento);
     } catch (erro) {
         next(erro);
@@ -98,6 +103,7 @@ const aprovarOrcamento = async (req, res, next) => {
 const recusarOrcamento = async (req, res, next) => {
     try {
         const orcamento = await orcamentoService.recusarOrcamento(req.params.id);
+        orcamentoService.notificarOrcamentoPorEmail(orcamento.id, 'recusado');
         res.json(orcamento);
     } catch (erro) {
         next(erro);

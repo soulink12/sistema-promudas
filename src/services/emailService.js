@@ -33,4 +33,19 @@ const enviarPdfPorEmail = async ({ destinatario, assunto, corpo, anexoBuffer, no
     }
 };
 
-module.exports = { enviarPdfPorEmail };
+// Notifica o e-mail interno (EMAIL_NOTIFICACAO_PEDIDOS) de um pedido/orçamento
+// novo ou alterado, anexando o PDF. Não lança erro — é uma notificação
+// interna best-effort, uma falha nela não pode derrubar a criação/edição do
+// pedido/orçamento em si. No-op se a variável não estiver configurada.
+const notificarPedidoOuOrcamento = async ({ assunto, corpo, anexoBuffer, nomeArquivo }) => {
+    const destinatario = process.env.EMAIL_NOTIFICACAO_PEDIDOS;
+    if (!destinatario) return;
+
+    try {
+        await enviarPdfPorEmail({ destinatario, assunto, corpo, anexoBuffer, nomeArquivo });
+    } catch (erro) {
+        console.error('Falha ao enviar notificação interna de pedido/orçamento:', erro);
+    }
+};
+
+module.exports = { enviarPdfPorEmail, notificarPedidoOuOrcamento };

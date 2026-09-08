@@ -206,6 +206,29 @@ const recusarOrcamento = async (id) => {
     });
 };
 
+// Notificação interna (EMAIL_NOTIFICACAO_PEDIDOS) de orçamento criado/alterado —
+// best-effort, veja emailService.notificarPedidoOuOrcamento.
+const notificarOrcamentoPorEmail = async (id, tipo) => {
+    if (!process.env.EMAIL_NOTIFICACAO_PEDIDOS) return;
+
+    const orcamento = await prisma.orcamentos.findUnique({
+        where: { id: parseInt(id) },
+        select: {
+            id: true,
+            clientes: { select: { nome: true } },
+        },
+    });
+    if (!orcamento) return;
+
+    const { buffer, nomeArquivo } = await pdfService.gerarOrcamentoPDF(id);
+    await emailService.notificarPedidoOuOrcamento({
+        assunto: `Orçamento ${formatarNumeroOrcamento(orcamento)} ${tipo} — ${orcamento.clientes?.nome ?? 'cliente'}`,
+        corpo: `O orçamento ${formatarNumeroOrcamento(orcamento)} (${orcamento.clientes?.nome ?? 'cliente'}) foi ${tipo} no sistema.`,
+        anexoBuffer: buffer,
+        nomeArquivo,
+    });
+};
+
 const enviarOrcamentoPorEmail = async (id) => {
     const orcamento = await prisma.orcamentos.findUnique({
         where: { id: parseInt(id) },
@@ -239,5 +262,6 @@ module.exports = {
     eliminarOrcamento,
     aprovarOrcamento,
     recusarOrcamento,
-    enviarOrcamentoPorEmail
+    enviarOrcamentoPorEmail,
+    notificarOrcamentoPorEmail
 };

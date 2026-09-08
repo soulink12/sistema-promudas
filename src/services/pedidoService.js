@@ -340,6 +340,31 @@ const eliminarPedido = async (id) => {
 // Gera o PDF do pedido e envia por e-mail ao cliente. Exige que o cliente
 // tenha e-mail cadastrado — a mesma checagem existe no front (botão
 // desabilitado), mas aqui é validada de novo antes de tentar enviar.
+// Notificação interna (EMAIL_NOTIFICACAO_PEDIDOS) de pedido criado/alterado —
+// best-effort, veja emailService.notificarPedidoOuOrcamento.
+const notificarPedidoPorEmail = async (id, tipo) => {
+    if (!process.env.EMAIL_NOTIFICACAO_PEDIDOS) return;
+
+    const pedido = await prisma.pedidos.findUnique({
+        where: { id: parseInt(id) },
+        select: {
+            id: true,
+            temporada_ano: true,
+            numero_temporada: true,
+            clientes: { select: { nome: true } },
+        },
+    });
+    if (!pedido) return;
+
+    const { buffer, nomeArquivo } = await pdfService.gerarPedidoPDF(id);
+    await emailService.notificarPedidoOuOrcamento({
+        assunto: `Pedido ${formatarNumeroPedido(pedido)} ${tipo} — ${pedido.clientes?.nome ?? 'cliente'}`,
+        corpo: `O pedido ${formatarNumeroPedido(pedido)} (${pedido.clientes?.nome ?? 'cliente'}) foi ${tipo} no sistema.`,
+        anexoBuffer: buffer,
+        nomeArquivo,
+    });
+};
+
 const enviarPedidoPorEmail = async (id) => {
     const pedido = await prisma.pedidos.findUnique({
         where: { id: parseInt(id) },
@@ -374,5 +399,6 @@ module.exports = {
     atualizarPedido,
     eliminarPedido,
     enviarPedidoPorEmail,
+    notificarPedidoPorEmail,
     proximoNumeroTemporada
 };

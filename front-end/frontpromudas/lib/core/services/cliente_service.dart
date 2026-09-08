@@ -16,6 +16,7 @@ class ClienteService {
           'nome': item['nome'] as String,
           'cpf': item['cpf_cnpj'] as String? ?? 'Não informado',
           'telefone': item['telefone_1'] as String? ?? 'Não informado',
+          'email': item['email'] as String?,
         }).toList();
   }
 }

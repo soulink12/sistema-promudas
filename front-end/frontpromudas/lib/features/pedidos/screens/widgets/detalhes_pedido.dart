@@ -14,6 +14,7 @@ class DetalhesPedido extends StatelessWidget {
   final VoidCallback onVoltar;
   final VoidCallback onRegistrarPagamento;
   final VoidCallback onEmitirPdf;
+  final VoidCallback onEnviarEmail;
   final VoidCallback onEditar;
   // Exclui o pedido (soft-delete) após confirmação
   final VoidCallback onExcluir;
@@ -33,6 +34,7 @@ class DetalhesPedido extends StatelessWidget {
     required this.onVoltar,
     required this.onRegistrarPagamento,
     required this.onEmitirPdf,
+    required this.onEnviarEmail,
     required this.onEditar,
     required this.onExcluir,
     required this.onTapCliente,
@@ -55,6 +57,8 @@ class DetalhesPedido extends StatelessWidget {
     final pedidoFechado =
         (statusPag == 'Pago' || statusPag == 'Crédito') && statusRet == 'Entregue';
     final obs = pedido['observacoes'] as String?;
+    final clienteEmail = pedido['clientes']?['email'] as String?;
+    final temEmail = clienteEmail != null && clienteEmail.isNotEmpty;
 
     final itens = (pedido['itens_pedido'] as List? ?? [])
         .map((e) => Map<String, dynamic>.from(e as Map))
@@ -423,16 +427,33 @@ class DetalhesPedido extends StatelessWidget {
           ],
 
           const SizedBox(height: 12),
-          SizedBox(
-            width: double.infinity,
-            child: OutlinedButton.icon(
-              onPressed: salvando ? null : onEmitirPdf,
-              icon: const Icon(Icons.picture_as_pdf_outlined),
-              label: const Text('Emitir PDF'),
-              style: OutlinedButton.styleFrom(
-                padding: const EdgeInsets.symmetric(vertical: 14),
+          Row(
+            children: [
+              Expanded(
+                child: OutlinedButton.icon(
+                  onPressed: salvando ? null : onEmitirPdf,
+                  icon: const Icon(Icons.picture_as_pdf_outlined),
+                  label: const Text('Emitir PDF'),
+                  style: OutlinedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                  ),
+                ),
               ),
-            ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Tooltip(
+                  message: temEmail ? '' : 'Cadastre o e-mail do cliente para poder enviar',
+                  child: OutlinedButton.icon(
+                    onPressed: (salvando || !temEmail) ? null : onEnviarEmail,
+                    icon: const Icon(Icons.mail_outlined),
+                    label: const Text('Enviar por E-mail'),
+                    style: OutlinedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                    ),
+                  ),
+                ),
+              ),
+            ],
           ),
 
           const SizedBox(height: 24),

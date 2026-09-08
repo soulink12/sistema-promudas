@@ -113,14 +113,23 @@ class PdfDownloadService {
   }
 
   /// Extrai o nome do arquivo do cabeçalho `Content-Disposition`
-  /// (`attachment; filename="Pedido 26-1.pdf"`), com fallback seguro.
+  /// (`attachment; filename="Pedido 26-1.pdf"; filename*=UTF-8''Pedido%20...`),
+  /// com fallback seguro. Prioriza o parâmetro `filename*` (RFC 5987,
+  /// percent-encoded UTF-8) sobre o `filename=` puro ASCII, que o backend
+  /// manda sem acentos porque cabeçalhos HTTP não suportam UTF-8 direto.
   static String _nomeArquivo(String? contentDisposition, int pedidoId) {
     String nome = 'pedido_$pedidoId.pdf';
     if (contentDisposition != null) {
-      final match =
-          RegExp(r'filename="?([^"]+)"?').firstMatch(contentDisposition);
-      if (match != null && match.group(1)!.trim().isNotEmpty) {
-        nome = match.group(1)!.trim();
+      final matchExtended =
+          RegExp(r"filename\*=UTF-8''([^;]+)").firstMatch(contentDisposition);
+      if (matchExtended != null && matchExtended.group(1)!.trim().isNotEmpty) {
+        nome = Uri.decodeComponent(matchExtended.group(1)!.trim());
+      } else {
+        final match =
+            RegExp(r'filename="?([^"]+)"?').firstMatch(contentDisposition);
+        if (match != null && match.group(1)!.trim().isNotEmpty) {
+          nome = match.group(1)!.trim();
+        }
       }
     }
     // Remove caracteres inválidos para nome de arquivo no Windows.
