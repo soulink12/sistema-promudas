@@ -1,23 +1,23 @@
 {
   "schemaVersion": 1,
   "baseUrl": "http://172.28.114.71:6072/updates/",
-  "localRoot": "C:\\dev\\sistema-promudas\\front-end\\frontpromudas\\dist\\desktop_updater",
+  "localRoot": "C:\\Dev\\sistema-promudas\\front-end\\frontpromudas\\dist\\desktop_updater",
   "appArchive": {
     "path": "app-archive.json",
     "url": "http://172.28.114.71:6072/updates/app-archive.json"
   },
   "release": {
-    "version": "0.1.9",
-    "buildNumber": 10,
+    "version": "0.1.10",
+    "buildNumber": 11,
     "platform": "windows",
     "channel": "stable",
-    "path": "releases/0.1.9/windows/release.json",
-    "url": "http://172.28.114.71:6072/updates/releases/0.1.9/windows/release.json"
+    "path": "releases/0.1.10/windows/release.json",
+    "url": "http://172.28.114.71:6072/updates/releases/0.1.10/windows/release.json"
   },
   "artifact": {
-    "path": "releases/0.1.9/windows/Frontpromudas-0.1.9-windows.zip",
-    "url": "http://172.28.114.71:6072/updates/releases/0.1.9/windows/Frontpromudas-0.1.9-windows.zip",
-    "sha256": "ec5c0219492980ba2a23a78d05ef03e349a3fc57c54b2e570d375bf95fd20fc7",
-    "length": 18046212
+    "path": "releases/0.1.10/windows/Frontpromudas-0.1.10-windows.zip",
+    "url": "http://172.28.114.71:6072/updates/releases/0.1.10/windows/Frontpromudas-0.1.10-windows.zip",
+    "sha256": "224b9d68e6c641a3073d08c1eb3073a5bc289d2087b13420c1b9768ae77a97ba",
+    "length": 18006325
   }
 }
