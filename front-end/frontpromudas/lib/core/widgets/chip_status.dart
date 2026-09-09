@@ -33,7 +33,6 @@ class ChipStatus extends StatelessWidget {
       case 'realizada':
       case 'entregue':
       case 'emitida':
-      case 'aprovado':
         cor = CoresSemanticas.sucesso;
         break;
       case 'crédito':
@@ -44,7 +43,6 @@ class ChipStatus extends StatelessWidget {
         cor = CoresSemanticas.aviso;
         break;
       case 'rejeitada':
-      case 'rejeitado':
         cor = CoresSemanticas.erro;
         break;
       default:

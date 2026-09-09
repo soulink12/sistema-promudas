@@ -43,6 +43,7 @@ async function criarAmbiente() {
     // Ids dos dados criados, para limpeza ao final (ordem de FK aplicada em encerrar()).
     const lixo = {
         pedidos: new Set(),
+        orcamentos: new Set(),
         produtos: new Set(),
         clientes: new Set(),
         usuarios: new Set(),
@@ -116,9 +117,23 @@ async function criarAmbiente() {
         return id;
     }
 
+    // Cria um orçamento pela API (fluxo real). valor_total default = soma dos itens.
+    async function criarOrcamento(corpo) {
+        const valor_total = corpo.valor_total ?? corpo.itens.reduce(
+            (s, i) => s + Number(i.valor_unitario) * Number(i.quantidade), 0);
+        const res = await api('POST', '/api/orcamentos', { body: { ...corpo, valor_total } });
+        if (res.status !== 201) {
+            throw new Error(`criar orçamento falhou (${res.status}): ${JSON.stringify(res.body)}`);
+        }
+        const id = res.body.data.id;
+        lixo.orcamentos.add(id);
+        return id;
+    }
+
     // Registro manual para dados criados pela própria API no teste (usuário, forma…).
     const registrar = {
         pedido: (id) => lixo.pedidos.add(id),
+        orcamento: (id) => lixo.orcamentos.add(id),
         produto: (id) => lixo.produtos.add(id),
         cliente: (id) => lixo.clientes.add(id),
         usuario: (id) => lixo.usuarios.add(id),
@@ -126,8 +141,10 @@ async function criarAmbiente() {
     };
 
     async function encerrar() {
-        // Ordem de FK: pedido (cascade apaga itens/pagamentos/entregas) → produto →
-        // cliente → usuario → forma. Cada delete é tolerante a falha.
+        // Ordem de FK: orçamento (cascade apaga itens_orcamento; pedido_id vira null
+        // sozinho por SetNull) → pedido (cascade apaga itens/pagamentos/entregas) →
+        // produto → cliente → usuario → forma. Cada delete é tolerante a falha.
+        for (const id of lixo.orcamentos) await prisma.orcamentos.delete({ where: { id } }).catch(() => {});
         for (const id of lixo.pedidos) await prisma.pedidos.delete({ where: { id } }).catch(() => {});
         for (const id of lixo.produtos) await prisma.produtos.delete({ where: { id } }).catch(() => {});
         for (const id of lixo.clientes) await prisma.clientes.delete({ where: { id } }).catch(() => {});
@@ -145,6 +162,7 @@ async function criarAmbiente() {
         criarProduto,
         criarCliente,
         criarPedido,
+        criarOrcamento,
         registrar,
         encerrar,
         get token() { return token; },

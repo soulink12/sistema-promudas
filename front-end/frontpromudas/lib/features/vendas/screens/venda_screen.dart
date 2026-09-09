@@ -468,13 +468,7 @@ class _TelaVendaState extends State<TelaVenda> {
 
     try {
       final response = await ApiService.dio.put('/pedidos/$pedidoId', data: {
-        'itens': itens
-            .map((item) => {
-                  'produto_id': item['id'],
-                  'quantidade': item['quantidade'],
-                  'valor_unitario': item['preco'],
-                })
-            .toList(),
+        'itens': _itensParaPayload(itens),
         'ajuste': ajuste != 0.0 ? ajuste : null,
         'observacoes': _observacoes.isNotEmpty ? _observacoes : null,
       });
@@ -554,13 +548,7 @@ class _TelaVendaState extends State<TelaVenda> {
         'valor_total': _carrinhoService.totalComAjuste,
         if (ajuste != 0.0) 'ajuste': ajuste,
         if (_observacoes.isNotEmpty) 'observacoes': _observacoes,
-        'itens': itens
-            .map((item) => {
-                  'produto_id': item['id'],
-                  'quantidade': item['quantidade'],
-                  'valor_unitario': item['preco'],
-                })
-            .toList(),
+        'itens': _itensParaPayload(itens),
       });
 
       final pedidoId = respostaPedido.data['data']['id'] as int;
@@ -656,13 +644,7 @@ class _TelaVendaState extends State<TelaVenda> {
 
     try {
       await ApiService.dio.put('/orcamentos/$orcamentoId', data: {
-        'itens': itens
-            .map((item) => {
-                  'produto_id': item['id'],
-                  'quantidade': item['quantidade'],
-                  'valor_unitario': item['preco'],
-                })
-            .toList(),
+        'itens': _itensParaPayload(itens),
         'ajuste': ajuste != 0.0 ? ajuste : null,
         'observacoes': _observacoes.isNotEmpty ? _observacoes : null,
       });
@@ -703,13 +685,7 @@ class _TelaVendaState extends State<TelaVenda> {
         'valor_total': _carrinhoService.totalComAjuste,
         if (ajuste != 0.0) 'ajuste': ajuste,
         if (_observacoes.isNotEmpty) 'observacoes': _observacoes,
-        'itens': itens
-            .map((item) => {
-                  'produto_id': item['id'],
-                  'quantidade': item['quantidade'],
-                  'valor_unitario': item['preco'],
-                })
-            .toList(),
+        'itens': _itensParaPayload(itens),
       });
 
       final orcamentoId = resposta.data['data']['id'] as int;
@@ -748,3 +724,16 @@ class _TelaVendaState extends State<TelaVenda> {
 
 double _toDouble(dynamic v) =>
     v == null ? 0.0 : double.tryParse(v.toString()) ?? 0.0;
+
+/// Converte os itens do carrinho (`{'id', 'quantidade', 'preco', ...}`) para o
+/// formato esperado pela API (`{'produto_id', 'quantidade', 'valor_unitario'}`)
+/// — usado ao criar/editar pedido e ao criar/editar orçamento.
+List<Map<String, dynamic>> _itensParaPayload(List<Map<String, dynamic>> itens) {
+  return itens
+      .map((item) => {
+            'produto_id': item['id'],
+            'quantidade': item['quantidade'],
+            'valor_unitario': item['preco'],
+          })
+      .toList();
+}

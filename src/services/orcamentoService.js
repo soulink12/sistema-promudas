@@ -96,6 +96,7 @@ const atualizarOrcamento = async (id, dados) => {
         return await prisma.orcamentos.update({
             where: { id: parseInt(id) },
             data: camposOrcamento,
+            include: ORCAMENTO_INCLUDE,
         });
     }
 
@@ -108,26 +109,24 @@ const atualizarOrcamento = async (id, dados) => {
         0
     );
 
-    await prisma.itens_orcamento.deleteMany({ where: { orcamento_id: parseInt(id) } });
+    return await prisma.$transaction(async (tx) => {
+        await tx.itens_orcamento.deleteMany({ where: { orcamento_id: parseInt(id) } });
 
-    return await prisma.orcamentos.update({
-        where: { id: parseInt(id) },
-        data: {
-            ...camposOrcamento,
-            valor_total: subtotal + ajuste,
-            itens_orcamento: {
-                create: itens.map(item => ({
-                    produto_id: parseInt(item.produto_id),
-                    quantidade: parseInt(item.quantidade),
-                    valor_unitario: parseFloat(item.valor_unitario),
-                })),
+        return await tx.orcamentos.update({
+            where: { id: parseInt(id) },
+            data: {
+                ...camposOrcamento,
+                valor_total: subtotal + ajuste,
+                itens_orcamento: {
+                    create: itens.map(item => ({
+                        produto_id: parseInt(item.produto_id),
+                        quantidade: parseInt(item.quantidade),
+                        valor_unitario: parseFloat(item.valor_unitario),
+                    })),
+                },
             },
-        },
-        include: {
-            itens_orcamento: {
-                include: { produtos: { select: { nome: true } } },
-            },
-        },
+            include: ORCAMENTO_INCLUDE,
+        });
     });
 };
 
@@ -154,31 +153,16 @@ const aprovarOrcamento = async (id) => {
             throw new BusinessError('Este orçamento já foi aprovado ou recusado.');
         }
 
-        const temporada = await tx.temporadas.findFirst({ where: { ativo: true } });
-        const temporada_ano = temporada?.ano ?? null;
-        const numero_temporada = temporada
-            ? await pedidoService.proximoNumeroTemporada(tx, temporada.ano)
-            : null;
-
-        const pedido = await tx.pedidos.create({
-            data: {
-                clientes: { connect: { id: orcamento.cliente_id } },
-                valor_total: orcamento.valor_total,
-                ajuste: orcamento.ajuste,
-                observacoes: orcamento.observacoes,
-                data_pedido: new Date(),
-                status_geral: 'Ativa',
-                ativo: true,
-                temporada_ano,
-                numero_temporada,
-                itens_pedido: {
-                    create: orcamento.itens_orcamento.map(item => ({
-                        produto_id: item.produto_id,
-                        quantidade: item.quantidade,
-                        valor_unitario: item.valor_unitario,
-                    })),
-                },
-            },
+        const pedido = await pedidoService.criarPedidoTx(tx, {
+            cliente_id: orcamento.cliente_id,
+            valor_total: orcamento.valor_total,
+            ajuste: orcamento.ajuste,
+            observacoes: orcamento.observacoes,
+            itens: orcamento.itens_orcamento.map(item => ({
+                produto_id: item.produto_id,
+                quantidade: item.quantidade,
+                valor_unitario: item.valor_unitario,
+            })),
         });
 
         return await tx.orcamentos.update({
@@ -208,51 +192,23 @@ const recusarOrcamento = async (id) => {
 
 // Notificação interna (EMAIL_NOTIFICACAO_PEDIDOS) de orçamento criado/alterado —
 // best-effort, veja emailService.notificarPedidoOuOrcamento.
-const notificarOrcamentoPorEmail = async (id, tipo) => {
-    if (!process.env.EMAIL_NOTIFICACAO_PEDIDOS) return;
+// Notificação interna (EMAIL_NOTIFICACAO_PEDIDOS) de orçamento criado/alterado —
+// best-effort, veja emailService.notificarDocumentoPorEmail.
+const notificarOrcamentoPorEmail = (id, tipo) => emailService.notificarDocumentoPorEmail({
+    id,
+    tipo,
+    gerarPDF: pdfService.gerarOrcamentoPDF,
+    formatarNumero: formatarNumeroOrcamento,
+    rotulo: 'Orçamento',
+});
 
-    const orcamento = await prisma.orcamentos.findUnique({
-        where: { id: parseInt(id) },
-        select: {
-            id: true,
-            clientes: { select: { nome: true } },
-        },
-    });
-    if (!orcamento) return;
-
-    const { buffer, nomeArquivo } = await pdfService.gerarOrcamentoPDF(id);
-    await emailService.notificarPedidoOuOrcamento({
-        assunto: `Orçamento ${formatarNumeroOrcamento(orcamento)} ${tipo} — ${orcamento.clientes?.nome ?? 'cliente'}`,
-        corpo: `O orçamento ${formatarNumeroOrcamento(orcamento)} (${orcamento.clientes?.nome ?? 'cliente'}) foi ${tipo} no sistema.`,
-        anexoBuffer: buffer,
-        nomeArquivo,
-    });
-};
-
-const enviarOrcamentoPorEmail = async (id) => {
-    const orcamento = await prisma.orcamentos.findUnique({
-        where: { id: parseInt(id) },
-        select: {
-            id: true,
-            clientes: { select: { nome: true, email: true } },
-        },
-    });
-    if (!orcamento) {
-        throw new BusinessError('Orçamento não encontrado.', 404);
-    }
-    if (!orcamento.clientes?.email) {
-        throw new BusinessError('Este cliente não tem e-mail cadastrado.');
-    }
-
-    const { buffer, nomeArquivo } = await pdfService.gerarOrcamentoPDF(id);
-    await emailService.enviarPdfPorEmail({
-        destinatario: orcamento.clientes.email,
-        assunto: `Orçamento ${formatarNumeroOrcamento(orcamento)} — Viveiro Promudas`,
-        corpo: `Olá, ${orcamento.clientes.nome}!\n\nSegue em anexo o seu orçamento na Viveiro Promudas.\n\nQualquer dúvida, estamos à disposição.`,
-        anexoBuffer: buffer,
-        nomeArquivo,
-    });
-};
+const enviarOrcamentoPorEmail = (id) => emailService.enviarDocumentoPorEmail({
+    id,
+    gerarPDF: pdfService.gerarOrcamentoPDF,
+    formatarNumero: formatarNumeroOrcamento,
+    rotulo: 'Orçamento',
+    descricaoDocumento: 'o seu orçamento',
+});
 
 module.exports = {
     criarOrcamento,

@@ -84,45 +84,50 @@ const aplicarTrocaTemporada = async (client, id, campos) => {
         : await proximoNumeroTemporada(client, novoAno);
 };
 
-const criarPedido = async (dados) => {
-    return await prisma.$transaction(async (tx) => {
-        // O número de temporada vem da temporada ativa (configurada no Admin).
-        // Sem temporada ativa, o pedido fica sem número (exibe '#id' como fallback).
-        const temporada = await tx.temporadas.findFirst({ where: { ativo: true } });
-        const temporada_ano = temporada?.ano ?? null;
-        const numero_temporada = temporada
-            ? await proximoNumeroTemporada(tx, temporada.ano)
-            : null;
+// Cria o pedido dentro de uma transação já aberta pelo chamador (`tx`) — usado
+// tanto por `criarPedido` (abre sua própria transação) quanto por
+// `orcamentoService.aprovarOrcamento` (reaproveita a transação da aprovação).
+const criarPedidoTx = async (tx, dados) => {
+    // O número de temporada vem da temporada ativa (configurada no Admin).
+    // Sem temporada ativa, o pedido fica sem número (exibe '#id' como fallback).
+    const temporada = await tx.temporadas.findFirst({ where: { ativo: true } });
+    const temporada_ano = temporada?.ano ?? null;
+    const numero_temporada = temporada
+        ? await proximoNumeroTemporada(tx, temporada.ano)
+        : null;
 
-        return await tx.pedidos.create({
-            data: {
-                clientes: {
-                    connect: { id: parseInt(dados.cliente_id) }
-                },
-                valor_total: dados.valor_total,
-                ajuste: dados.ajuste ?? null,
-                observacoes: dados.observacoes,
-                // Na criação, a data do pedido é o momento atual (= criado_em).
-                // Pode ser alterada depois na consulta (PUT /pedidos/:id).
-                data_pedido: parseData(dados.data_pedido, 'data_pedido') ?? new Date(),
-                status_geral: 'Ativa',
-                ativo: true,
-                temporada_ano,
-                numero_temporada,
-
-                itens_pedido: {
-                    create: dados.itens.map(item => ({
-                        produto_id: parseInt(item.produto_id),
-                        quantidade: parseInt(item.quantidade),
-                        valor_unitario: item.valor_unitario
-                    }))
-                }
+    return await tx.pedidos.create({
+        data: {
+            clientes: {
+                connect: { id: parseInt(dados.cliente_id) }
             },
-            include: {
-                itens_pedido: true
+            valor_total: dados.valor_total,
+            ajuste: dados.ajuste ?? null,
+            observacoes: dados.observacoes,
+            // Na criação, a data do pedido é o momento atual (= criado_em).
+            // Pode ser alterada depois na consulta (PUT /pedidos/:id).
+            data_pedido: parseData(dados.data_pedido, 'data_pedido') ?? new Date(),
+            status_geral: 'Ativa',
+            ativo: true,
+            temporada_ano,
+            numero_temporada,
+
+            itens_pedido: {
+                create: dados.itens.map(item => ({
+                    produto_id: parseInt(item.produto_id),
+                    quantidade: parseInt(item.quantidade),
+                    valor_unitario: item.valor_unitario
+                }))
             }
-        });
+        },
+        include: {
+            itens_pedido: true
+        }
     });
+};
+
+const criarPedido = async (dados) => {
+    return await prisma.$transaction((tx) => criarPedidoTx(tx, dados));
 };
 
 // Status da nota fiscal do pedido, agregado a partir dos pagamentos reais
@@ -341,56 +346,22 @@ const eliminarPedido = async (id) => {
 // tenha e-mail cadastrado — a mesma checagem existe no front (botão
 // desabilitado), mas aqui é validada de novo antes de tentar enviar.
 // Notificação interna (EMAIL_NOTIFICACAO_PEDIDOS) de pedido criado/alterado —
-// best-effort, veja emailService.notificarPedidoOuOrcamento.
-const notificarPedidoPorEmail = async (id, tipo) => {
-    if (!process.env.EMAIL_NOTIFICACAO_PEDIDOS) return;
+// best-effort, veja emailService.notificarDocumentoPorEmail.
+const notificarPedidoPorEmail = (id, tipo) => emailService.notificarDocumentoPorEmail({
+    id,
+    tipo,
+    gerarPDF: pdfService.gerarPedidoPDF,
+    formatarNumero: formatarNumeroPedido,
+    rotulo: 'Pedido',
+});
 
-    const pedido = await prisma.pedidos.findUnique({
-        where: { id: parseInt(id) },
-        select: {
-            id: true,
-            temporada_ano: true,
-            numero_temporada: true,
-            clientes: { select: { nome: true } },
-        },
-    });
-    if (!pedido) return;
-
-    const { buffer, nomeArquivo } = await pdfService.gerarPedidoPDF(id);
-    await emailService.notificarPedidoOuOrcamento({
-        assunto: `Pedido ${formatarNumeroPedido(pedido)} ${tipo} — ${pedido.clientes?.nome ?? 'cliente'}`,
-        corpo: `O pedido ${formatarNumeroPedido(pedido)} (${pedido.clientes?.nome ?? 'cliente'}) foi ${tipo} no sistema.`,
-        anexoBuffer: buffer,
-        nomeArquivo,
-    });
-};
-
-const enviarPedidoPorEmail = async (id) => {
-    const pedido = await prisma.pedidos.findUnique({
-        where: { id: parseInt(id) },
-        select: {
-            id: true,
-            temporada_ano: true,
-            numero_temporada: true,
-            clientes: { select: { nome: true, email: true } },
-        },
-    });
-    if (!pedido) {
-        throw new BusinessError('Pedido não encontrado.', 404);
-    }
-    if (!pedido.clientes?.email) {
-        throw new BusinessError('Este cliente não tem e-mail cadastrado.');
-    }
-
-    const { buffer, nomeArquivo } = await pdfService.gerarPedidoPDF(id);
-    await emailService.enviarPdfPorEmail({
-        destinatario: pedido.clientes.email,
-        assunto: `Pedido ${formatarNumeroPedido(pedido)} — Viveiro Promudas`,
-        corpo: `Olá, ${pedido.clientes.nome}!\n\nSegue em anexo o recibo do seu pedido na Viveiro Promudas.\n\nQualquer dúvida, estamos à disposição.`,
-        anexoBuffer: buffer,
-        nomeArquivo,
-    });
-};
+const enviarPedidoPorEmail = (id) => emailService.enviarDocumentoPorEmail({
+    id,
+    gerarPDF: pdfService.gerarPedidoPDF,
+    formatarNumero: formatarNumeroPedido,
+    rotulo: 'Pedido',
+    descricaoDocumento: 'o recibo do seu pedido',
+});
 
 module.exports = {
     criarPedido,
@@ -400,5 +371,6 @@ module.exports = {
     eliminarPedido,
     enviarPedidoPorEmail,
     notificarPedidoPorEmail,
-    proximoNumeroTemporada
+    proximoNumeroTemporada,
+    criarPedidoTx
 };
