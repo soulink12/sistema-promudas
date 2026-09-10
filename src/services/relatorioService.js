@@ -2,6 +2,7 @@ const PDFDocument = require('pdfkit');
 const prisma = require('../config/database');
 const { formatarNumeroPedido } = require('../utils/numeroPedido');
 const { formatarMoeda } = require('../utils/moeda');
+const { formatar: formatarCpfCnpj } = require('../utils/cpfCnpj');
 const BusinessError = require('../utils/BusinessError');
 
 const moeda = formatarMoeda;
@@ -22,6 +23,16 @@ const formatarDataCurta = (d) => {
     const dia = String(dt.getDate()).padStart(2, '0');
     const mes = String(dt.getMonth() + 1).padStart(2, '0');
     return `${dia}/${mes}/${dt.getFullYear()}`;
+};
+
+// Mesmo padrão de exibição de telefone usado em pdfService.js — duplicado aqui
+// (arquivo próprio, sem import cruzado) por consistência visual entre os PDFs.
+const formatarTelefone = (telefone) => {
+    if (!telefone || !String(telefone).trim()) return '';
+    const digitos = String(telefone).replace(/\D/g, '');
+    if (digitos.length === 11) return `(${digitos.slice(0, 2)}) ${digitos.slice(2, 7)}-${digitos.slice(7)}`;
+    if (digitos.length === 10) return `(${digitos.slice(0, 2)}) ${digitos.slice(2, 6)}-${digitos.slice(6)}`;
+    return String(telefone).trim();
 };
 
 const linhaHorizontal = (doc, cor = '#cccccc') => {
@@ -366,30 +377,37 @@ const gerarRelatorioPedidosPDF = async ({ de, ate, statusPagamento, statusEntreg
     // pagamentos e entregas aninhados de uma vez.
     const LIMITE_PDF_PEDIDOS = 2000;
 
-    const pedidos = await prisma.pedidos.findMany({
-        where,
-        take: LIMITE_PDF_PEDIDOS,
-        include: {
-            clientes: { select: { nome: true } },
-            itens_pedido: {
-                include: {
-                    produtos: { select: { nome: true } },
+    const [totalEncontrados, agregado, pedidos] = await Promise.all([
+        prisma.pedidos.count({ where }),
+        prisma.pedidos.aggregate({ where, _sum: { valor_total: true } }),
+        prisma.pedidos.findMany({
+            where,
+            take: LIMITE_PDF_PEDIDOS,
+            include: {
+                clientes: { select: { nome: true, cpf_cnpj: true, cidade: true, estado: true, telefone_1: true } },
+                itens_pedido: {
+                    include: {
+                        produtos: { select: { nome: true } },
+                    },
                 },
-            },
-            pagamentos: {
-                orderBy: { criado_em: 'asc' },
-            },
-            entregas: {
-                orderBy: { criado_em: 'asc' },
-                include: {
-                    itens_entrega: {
-                        include: { produtos: { select: { nome: true } } },
+                pagamentos: {
+                    orderBy: { criado_em: 'asc' },
+                },
+                entregas: {
+                    orderBy: { criado_em: 'asc' },
+                    include: {
+                        itens_entrega: {
+                            include: { produtos: { select: { nome: true } } },
+                        },
                     },
                 },
             },
-        },
-        orderBy: { criado_em: 'desc' },
-    });
+            orderBy: { criado_em: 'desc' },
+        }),
+    ]);
+    // Query ordena por criado_em desc, então o corte sempre mostra os mais recentes.
+    const truncado = totalEncontrados > pedidos.length;
+    const valorTotalGeral = parseFloat(agregado._sum.valor_total ?? 0);
 
     return new Promise((resolve, reject) => {
         const doc = new PDFDocument({ size: 'A4', margin: 50 });
@@ -423,13 +441,30 @@ const gerarRelatorioPedidosPDF = async ({ de, ate, statusPagamento, statusEntreg
         linhaHorizontal(doc);
         doc.moveDown(0.5);
 
+        // ── AVISO DE TRUNCAMENTO ───────────────────────────────────────────
+        if (truncado) {
+            const yAviso = doc.y;
+            doc.rect(50, yAviso - 2, 495, 24).fill('#fff3cd');
+            doc.font('Helvetica-Bold').fontSize(9).fillColor('#856404')
+                .text(
+                    `Atenção: exibindo apenas os ${pedidos.length} pedidos mais recentes de ${totalEncontrados} encontrados. Refine o período para ver os demais.`,
+                    58, yAviso + 4, { width: 479 }
+                );
+            doc.fillColor('black');
+            doc.moveDown(1.2);
+        }
+
         // ── RESUMO ─────────────────────────────────────────────────────────
-        const valorTotal = pedidos.reduce((s, p) => s + parseFloat(p.valor_total ?? 0), 0);
+        // Soma do valor total usa o agregado (todos os pedidos encontrados), não só
+        // os exibidos — senão o "Valor total" ficaria errado quando truncado.
         const yRes = doc.y;
         doc.font('Helvetica-Bold').fontSize(9).fillColor('#555555');
-        doc.text(`Total de pedidos: ${pedidos.length}`, 50, yRes, { lineBreak: false });
+        doc.text(
+            truncado ? `Pedidos exibidos: ${pedidos.length} de ${totalEncontrados}` : `Total de pedidos: ${pedidos.length}`,
+            50, yRes, { lineBreak: false }
+        );
         doc.font('Helvetica-Bold').fontSize(9).fillColor('#1b5e20')
-            .text(`Valor total: ${moeda(valorTotal)}`, 300, yRes, { width: 245, align: 'right' });
+            .text(`Valor total: ${moeda(valorTotalGeral)}`, 300, yRes, { width: 245, align: 'right' });
         doc.fillColor('black');
         doc.moveDown(1);
 
@@ -448,17 +483,59 @@ const gerarRelatorioPedidosPDF = async ({ de, ate, statusPagamento, statusEntreg
                 doc.addPage();
             }
 
-            // Cabeçalho do pedido
+            // CPF/CNPJ e cidade/UF do cliente, ao lado do nome — omitidos quando
+            // o cadastro não tem o dado.
+            const detalhesCliente = [];
+            if (pedido.clientes?.cpf_cnpj) detalhesCliente.push(formatarCpfCnpj(pedido.clientes.cpf_cnpj));
+            const cidadeUf = [pedido.clientes?.cidade, pedido.clientes?.estado].filter(Boolean).join('/');
+            if (cidadeUf) detalhesCliente.push(cidadeUf);
+            const nomeCliente = pedido.clientes?.nome ?? '—';
+            // Só um espaço em cada "·": com espaço duplo, o PDFKit quebra linha
+            // sozinho mesmo com `lineBreak:false` (bug observado na prática).
+            const linhaCliente = detalhesCliente.length > 0
+                ? `${nomeCliente} · ${detalhesCliente.join(' · ')}`
+                : nomeCliente;
+
+            const linhaTelefone = pedido.clientes?.telefone_1
+                ? formatarTelefone(pedido.clientes.telefone_1)
+                : '';
+
+            // Cabeçalho do pedido — a coluna do cliente (nome + CPF/cidade) quebra
+            // linha quando não cabe, em vez de truncar; a caixa verde cresce pra
+            // acompanhar (até um teto de 3 linhas, com reticências só nesse caso
+            // extremo — texto nunca ultrapassa o fundo da caixa). O telefone, se
+            // houver, fica numa linha própria logo abaixo, na mesma coluna.
+            doc.font('Helvetica').fontSize(9);
+            const larguraCliente = 235;
+            const alturaLinha = doc.currentLineHeight();
+            const maxLinhasCliente = 3;
+            const alturaClienteTexto = Math.min(
+                doc.heightOfString(linhaCliente, { width: larguraCliente }),
+                alturaLinha * maxLinhasCliente
+            );
+            const alturaTelefone = linhaTelefone ? alturaLinha : 0;
+            const alturaCabecalho = Math.max(20, alturaClienteTexto + alturaTelefone + 10);
+
             const yPed = doc.y;
-            doc.rect(50, yPed, 495, 20).fill('#e8f5e9');
+            doc.rect(50, yPed, 495, alturaCabecalho).fill('#e8f5e9');
             doc.font('Helvetica-Bold').fontSize(10).fillColor('#1b5e20')
-                .text(`Pedido ${formatarNumeroPedido(pedido)}`, 56, yPed + 4, { width: 160, lineBreak: false });
+                .text(`Pedido ${formatarNumeroPedido(pedido)}`, 56, yPed + 4, { width: 120, lineBreak: false });
             doc.font('Helvetica').fontSize(9).fillColor('#333333')
-                .text(pedido.clientes?.nome ?? '—', 220, yPed + 5, { width: 180, lineBreak: false });
+                .text(linhaCliente, 185, yPed + 5, {
+                    width: larguraCliente,
+                    height: alturaLinha * maxLinhasCliente,
+                    ellipsis: true,
+                });
+            if (linhaTelefone) {
+                doc.text(linhaTelefone, 185, yPed + 5 + alturaClienteTexto, {
+                    width: larguraCliente,
+                    lineBreak: false,
+                });
+            }
             doc.font('Helvetica').fontSize(9).fillColor('#555555')
-                .text(formatarDataCurta(pedido.criado_em), 410, yPed + 5, { width: 130, align: 'right' });
+                .text(formatarDataCurta(pedido.criado_em), 430, yPed + 5, { width: 110, align: 'right' });
             doc.fillColor('black');
-            doc.moveDown(1.6);
+            doc.y = yPed + alturaCabecalho + 8;
 
             // Status
             const yStatus = doc.y;
@@ -482,6 +559,12 @@ const gerarRelatorioPedidosPDF = async ({ de, ate, statusPagamento, statusEntreg
             doc.moveDown(0.5);
 
             // ── Itens do pedido ────────────────────────────────────────────
+            // Quebra ANTES do cabeçalho da seção: sem isso, o `doc.text(...)` do
+            // cabeçalho podia disparar a paginação automática do PDFKit sozinho
+            // (quando `doc.y` já estava colado no rodapé), deixando o rótulo na
+            // página nova mas as colunas seguintes usando o `y` antigo (capturado
+            // ANTES da quebra) — texto ia parar fora da página, seção "sumia".
+            if (doc.y + 35 > paginaFundo) { doc.addPage(); }
             doc.moveTo(56, doc.y).lineTo(545, doc.y).strokeColor('#dddddd').lineWidth(0.5).stroke();
             doc.strokeColor('black').lineWidth(1);
             doc.moveDown(0.3);
@@ -510,6 +593,8 @@ const gerarRelatorioPedidosPDF = async ({ de, ate, statusPagamento, statusEntreg
             // ── Pagamentos ─────────────────────────────────────────────────
             if (pedido.pagamentos.length > 0) {
                 doc.moveDown(0.3);
+                // Ver comentário equivalente na seção de itens acima — mesmo risco aqui.
+                if (doc.y + 35 > paginaFundo) { doc.addPage(); }
                 doc.moveTo(56, doc.y).lineTo(545, doc.y).strokeColor('#dddddd').lineWidth(0.5).stroke();
                 doc.strokeColor('black').lineWidth(1);
                 doc.moveDown(0.3);
@@ -542,6 +627,8 @@ const gerarRelatorioPedidosPDF = async ({ de, ate, statusPagamento, statusEntreg
             // ── Entregas ───────────────────────────────────────────────────
             if (pedido.entregas.length > 0) {
                 doc.moveDown(0.3);
+                // Ver comentário equivalente na seção de itens acima — mesmo risco aqui.
+                if (doc.y + 35 > paginaFundo) { doc.addPage(); }
                 doc.moveTo(56, doc.y).lineTo(545, doc.y).strokeColor('#dddddd').lineWidth(0.5).stroke();
                 doc.strokeColor('black').lineWidth(1);
                 doc.moveDown(0.3);
