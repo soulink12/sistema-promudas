@@ -10,8 +10,27 @@ const { formatar: formatarCpfCnpj } = require('../utils/cpfCnpj');
 const moeda = formatarMoeda;
 
 // Escala global das fontes do recibo. Aumentar/diminuir aqui afeta o documento todo.
-const ESCALA_FONTE = 1.15;
+const ESCALA_FONTE = 1.25;
 const fs = (n) => n * ESCALA_FONTE;
+
+const formatarCep = (cep) => (cep && cep.length === 8 ? `${cep.slice(0, 5)}-${cep.slice(5)}` : cep);
+
+// Nome e telefone seguem no PDF o mesmo padrão de exibição das telas do app
+// (capitalizarNome/formatarTelefone em core/utils/formatadores.dart) — o valor
+// gravado no banco continua sendo o que o usuário digitou.
+const capitalizarNome = (nome) => String(nome ?? '')
+    .trim()
+    .split(/\s+/)
+    .map((palavra) => (palavra ? palavra[0].toUpperCase() + palavra.slice(1).toLowerCase() : palavra))
+    .join(' ');
+
+const formatarTelefone = (telefone) => {
+    if (!telefone || !String(telefone).trim()) return '';
+    const digitos = String(telefone).replace(/\D/g, '');
+    if (digitos.length === 11) return `(${digitos.slice(0, 2)}) ${digitos.slice(2, 7)}-${digitos.slice(7)}`;
+    if (digitos.length === 10) return `(${digitos.slice(0, 2)}) ${digitos.slice(2, 6)}-${digitos.slice(6)}`;
+    return String(telefone).trim();
+};
 
 const formatarData = (d) => {
     if (!d) return '—';
@@ -77,19 +96,23 @@ const desenharCliente = (doc, cliente) => {
     doc.font('Helvetica-Bold').fontSize(fs(10)).fillColor('#1b5e20').text('CLIENTE', 50, doc.y);
     doc.fillColor('black');
     doc.moveDown(0.2);
-    doc.font('Helvetica-Bold').fontSize(fs(11)).text(cliente?.nome || '—');
+    doc.font('Helvetica-Bold').fontSize(fs(11)).text(capitalizarNome(cliente?.nome) || '—');
 
     doc.font('Helvetica').fontSize(fs(9)).fillColor('#555555');
 
     if (cliente?.cpf_cnpj) doc.text(`CPF/CNPJ: ${formatarCpfCnpj(cliente.cpf_cnpj)}`);
-    if (cliente?.telefone_1) doc.text(`Telefone: ${cliente.telefone_1}`);
+    if (cliente?.telefone_1) doc.text(`Telefone: ${formatarTelefone(cliente.telefone_1)}`);
 
+    // Endereço sai todo em maiúsculas (padrão de etiqueta/correspondência).
     if (cliente?.logradouro) {
-        const linha1 = [cliente.logradouro, cliente.numero].filter(Boolean).join(', ');
+        const linha1 = [cliente.logradouro, cliente.numero]
+            .filter(Boolean).join(', ').toUpperCase();
         const linha2Parts = [
-            cliente.bairro,
-            cliente.cidade && cliente.estado ? `${cliente.cidade}/${cliente.estado}` : (cliente.cidade || cliente.estado),
-            cliente.cep,
+            cliente.bairro?.toUpperCase(),
+            cliente.cidade && cliente.estado
+                ? `${cliente.cidade}/${cliente.estado}`.toUpperCase()
+                : (cliente.cidade || cliente.estado || '').toUpperCase(),
+            formatarCep(cliente.cep),
         ].filter(Boolean);
         doc.text(linha1);
         if (linha2Parts.length > 0) doc.text(linha2Parts.join(' — '));
@@ -194,20 +217,43 @@ const desenharObservacoes = (doc, observacoes) => {
     doc.moveDown(0.5);
 };
 
-// Rodapé com a data de geração do documento.
+// Altura reservada para o rodapé (linha separadora + uma linha de texto).
+const ALTURA_RODAPE = 26;
+
+// Campo de assinatura do vendedor: centralizado e logo acima do rodapé.
+// Posição absoluta em relação à página (não flui a partir de doc.y), para
+// ficar sempre no mesmo lugar independente do tamanho do conteúdo.
+const desenharAssinatura = (doc) => {
+    const largura = 240;
+    const x = (doc.page.width - largura) / 2;
+    const yLinha = doc.page.height - doc.page.margins.bottom - ALTURA_RODAPE - 44;
+
+    doc.moveTo(x, yLinha).lineTo(x + largura, yLinha)
+        .strokeColor('#888888').lineWidth(0.7).stroke();
+    doc.strokeColor('black').lineWidth(1);
+
+    doc.font('Helvetica').fontSize(fs(8)).fillColor('#555555')
+        .text('Assinatura do Vendedor', x, yLinha + 5, { width: largura, align: 'center' });
+    doc.fillColor('black');
+};
+
+// Rodapé com a data de geração — fixo no pé da página.
 const desenharRodape = (doc) => {
-    doc.moveDown(3);
-    linha(doc);
-    doc.moveDown(0.4);
+    const y = doc.page.height - doc.page.margins.bottom - ALTURA_RODAPE;
+
+    doc.moveTo(50, y).lineTo(545, y).strokeColor('#cccccc').lineWidth(0.5).stroke();
+    doc.strokeColor('black').lineWidth(1);
+
     doc.font('Helvetica').fontSize(fs(8)).fillColor('#aaaaaa')
         .text(`Viveiro Promudas — documento gerado em ${formatarData(new Date())}`,
-            50, doc.y, { width: 495, align: 'right' });
+            50, y + 6, { width: 495, align: 'right' });
+    doc.fillColor('black');
 };
 
 const gerarPedidoPDF = async (pedidoId, copias = 1) => {
     const [pedido, formasPosteriores] = await Promise.all([
         prisma.pedidos.findUnique({
-            where: { id: parseInt(pedidoId) },
+            where: { id: parseInt(pedidoId), ativo: true },
             include: {
                 clientes: true,
                 itens_pedido: {
@@ -486,6 +532,10 @@ const gerarPedidoPDF = async (pedidoId, copias = 1) => {
             });
         }
 
+        // ── ASSINATURA ──────────────────────────────────────────────────────────
+
+        desenharAssinatura(doc);
+
         // ── RODAPÉ ──────────────────────────────────────────────────────────────
 
         desenharRodape(doc);
@@ -506,7 +556,7 @@ const gerarPedidoPDF = async (pedidoId, copias = 1) => {
 // dois. Sempre 1 via (orçamento não tem a opção de imprimir 3 vias).
 const gerarOrcamentoPDF = async (orcamentoId) => {
     const orcamento = await prisma.orcamentos.findUnique({
-        where: { id: parseInt(orcamentoId) },
+        where: { id: parseInt(orcamentoId), ativo: true },
         include: {
             clientes: true,
             itens_orcamento: {
@@ -578,6 +628,10 @@ const gerarOrcamentoPDF = async (orcamentoId) => {
         // ── OBSERVAÇÕES ─────────────────────────────────────────────────────────
 
         desenharObservacoes(doc, orcamento.observacoes);
+
+        // ── ASSINATURA ──────────────────────────────────────────────────────────
+
+        desenharAssinatura(doc);
 
         // ── RODAPÉ ──────────────────────────────────────────────────────────────
 

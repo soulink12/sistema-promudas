@@ -14,7 +14,7 @@ const criarOrcamento = async (req, res, next) => {
         }
 
         const novoOrcamento = await orcamentoService.criarOrcamento(dados);
-        orcamentoService.notificarOrcamentoPorEmail(novoOrcamento.id, 'criado')
+        orcamentoService.notificarOrcamentoPorEmail(novoOrcamento.id, 'orcamentoCriado')
             .catch((erro) => console.error('Falha ao enviar notificação de e-mail do orçamento:', erro));
         return res.status(201).json({
             mensagem: 'Orçamento registrado com sucesso!',
@@ -54,7 +54,7 @@ const listarOrcamentos = async (req, res, next) => {
 const atualizarOrcamento = async (req, res, next) => {
     try {
         const orcamento = await orcamentoService.atualizarOrcamento(req.params.id, req.body);
-        orcamentoService.notificarOrcamentoPorEmail(orcamento.id, 'alterado')
+        orcamentoService.notificarOrcamentoPorEmail(orcamento.id, 'orcamentoAlterado')
             .catch((erro) => console.error('Falha ao enviar notificação de e-mail do orçamento:', erro));
         res.json(orcamento);
     } catch (erro) {
@@ -95,7 +95,7 @@ const enviarEmail = async (req, res, next) => {
 const aprovarOrcamento = async (req, res, next) => {
     try {
         const orcamento = await orcamentoService.aprovarOrcamento(req.params.id);
-        pedidoService.notificarPedidoPorEmail(orcamento.pedido_id, 'criado a partir da aprovação do orçamento')
+        pedidoService.notificarPedidoPorEmail(orcamento.pedido_id, 'orcamentoAprovado')
             .catch((erro) => console.error('Falha ao enviar notificação de e-mail do pedido:', erro));
         res.json(orcamento);
     } catch (erro) {
@@ -106,7 +106,7 @@ const aprovarOrcamento = async (req, res, next) => {
 const recusarOrcamento = async (req, res, next) => {
     try {
         const orcamento = await orcamentoService.recusarOrcamento(req.params.id);
-        orcamentoService.notificarOrcamentoPorEmail(orcamento.id, 'recusado')
+        orcamentoService.notificarOrcamentoPorEmail(orcamento.id, 'orcamentoRecusado')
             .catch((erro) => console.error('Falha ao enviar notificação de e-mail do orçamento:', erro));
         res.json(orcamento);
     } catch (erro) {

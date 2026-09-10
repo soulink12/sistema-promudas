@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import '../../../core/services/api_service.dart';
+import '../../../core/services/pendencias_service.dart';
 import '../../configuracoes/screens/configuracoes_screen.dart';
 import '../../configuracoes/screens/configuracoes_sistema_screen.dart';
 import '../../relatorios/screens/relatorios_hub_screen.dart';
@@ -22,6 +22,9 @@ class _TelaAdminState extends State<TelaAdmin> {
   // Total de pendências (cheques a depositar + pagamentos sem conta) exibido como
   // badge do card de Notificações — o sino geral do sistema, agora na Administração.
   int _totalNotificacoes = 0;
+  // true quando alguma contagem falhou: o badge mostra "—" em vez de um número
+  // que pareceria "nenhuma pendência" quando na verdade não se sabe.
+  bool _contagemIncerta = false;
 
   @override
   void initState() {
@@ -32,16 +35,13 @@ class _TelaAdminState extends State<TelaAdmin> {
   /// Soma as pendências de todos os tipos. Falha silenciosa por tipo — o badge
   /// apenas não conta aquele tipo se o endpoint falhar.
   Future<void> _carregarNotificacoes() async {
-    int total = 0;
-    try {
-      final r = await ApiService.dio.get('/cheques/a-depositar');
-      total += (r.data as List).length;
-    } catch (_) {}
-    try {
-      final r = await ApiService.dio.get('/pagamentos/pendentes-conta');
-      total += (r.data as List).length;
-    } catch (_) {}
-    if (mounted) setState(() => _totalNotificacoes = total);
+    final pendencias = await PendenciasService.contar();
+    if (mounted) {
+      setState(() {
+        _totalNotificacoes = pendencias.total;
+        _contagemIncerta = pendencias.algumaFalhou;
+      });
+    }
   }
 
   /// Abre uma sub-tela e, ao voltar, recarrega a contagem (pode ter mudado).
@@ -64,8 +64,10 @@ class _TelaAdminState extends State<TelaAdmin> {
           Padding(
             padding: const EdgeInsets.only(right: 8),
             child: Badge(
-              isLabelVisible: _totalNotificacoes > 0,
-              label: Text('$_totalNotificacoes'),
+              isLabelVisible: _totalNotificacoes > 0 || _contagemIncerta,
+              label: Text(_contagemIncerta && _totalNotificacoes == 0
+                  ? '—'
+                  : '$_totalNotificacoes'),
               child: IconButton(
                 icon: const Icon(Icons.notifications),
                 iconSize: 28,

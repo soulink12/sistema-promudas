@@ -3,12 +3,31 @@ const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const BusinessError = require('../utils/BusinessError');
 
+const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const SENHA_MIN_LENGTH = 6;
+
 const registrarUsuario = async (dadosUsuario) => {
+    // Cadastro pode ser desligado via .env (ex.: depois de criar as contas
+    // necessárias em produção) sem precisar remover a rota.
+    if (process.env.CADASTRO_USUARIOS_HABILITADO === 'false') {
+        throw new BusinessError('Cadastro de novos usuários está desabilitado.', 403);
+    }
+
+    if (!dadosUsuario.nome || !dadosUsuario.nome.trim()) {
+        throw new BusinessError('Informe o nome.');
+    }
+    if (!dadosUsuario.email || !EMAIL_REGEX.test(dadosUsuario.email.trim())) {
+        throw new BusinessError('Informe um e-mail válido.');
+    }
+    if (!dadosUsuario.senha || dadosUsuario.senha.length < SENHA_MIN_LENGTH) {
+        throw new BusinessError(`A senha precisa ter pelo menos ${SENHA_MIN_LENGTH} caracteres.`);
+    }
+
     // Verifica se o email já existe no banco
     const usuarioExistente = await prisma.usuarios.findUnique({
         where: { email: dadosUsuario.email }
     });
-    
+
     if (usuarioExistente) {
         throw new BusinessError('Este email já está em uso.', 400);
     }
@@ -20,8 +39,8 @@ const registrarUsuario = async (dadosUsuario) => {
     // Cria o usuário
     const novoUsuario = await prisma.usuarios.create({
         data: {
-            nome: dadosUsuario.nome,
-            email: dadosUsuario.email,
+            nome: dadosUsuario.nome.trim(),
+            email: dadosUsuario.email.trim(),
             senha_hash: senha_hash
         }
     });

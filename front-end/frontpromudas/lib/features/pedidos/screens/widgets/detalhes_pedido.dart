@@ -48,8 +48,8 @@ class DetalhesPedido extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final nomeCliente = capitalizarNome(pedido['clientes']?['nome'] as String? ?? '—');
-    final total = _toDouble(pedido['valor_total']);
-    final ajuste = _toDouble(pedido['ajuste']);
+    final total = paraDouble(pedido['valor_total']);
+    final ajuste = paraDouble(pedido['ajuste']);
     final dataPedidoRaw = pedido['data_pedido'] ?? pedido['criado_em'];
     final data = formatarDataHora(dataPedidoRaw);
     final statusPag = pedido['status_pagamento'] as String? ?? 'Pendente';
@@ -82,7 +82,7 @@ class DetalhesPedido extends StatelessWidget {
     final pagamentosReais =
         todosPagamentos.where((p) => p['pagamento_posterior'] != true).toList();
     final totalPagoReal = pagamentosReais
-        .fold<double>(0.0, (s, p) => s + _toDouble(p['valor_pago']));
+        .fold<double>(0.0, (s, p) => s + paraDouble(p['valor_pago']));
     final saldoCredito = (total - totalPagoReal).clamp(0.0, double.infinity);
 
     final podePagar = statusPag == 'Pendente' || statusPag == 'Parcial';
@@ -344,7 +344,7 @@ class DetalhesPedido extends StatelessWidget {
                         final nomeProduto =
                             item['produtos']?['nome'] as String? ?? '—';
                         final qtd = item['quantidade'] as int? ?? 0;
-                        final preco = _toDouble(item['valor_unitario']);
+                        final preco = paraDouble(item['valor_unitario']);
                         final totalItem = preco * qtd;
                         return Column(
                           children: [
@@ -465,6 +465,4 @@ class DetalhesPedido extends StatelessWidget {
 
 // ── Funções utilitárias ───────────────────────────────────────────────────────
 
-double _toDouble(dynamic v) =>
-    v == null ? 0.0 : double.tryParse(v.toString()) ?? 0.0;
 

@@ -113,7 +113,9 @@ class _TelaLoginState extends State<TelaLogin> {
                           validator: (v) => (v == null || v.trim().isEmpty)
                               ? 'Informe o e-mail'
                               : null,
-                          onFieldSubmitted: (_) => _fazerLogin(),
+                          onFieldSubmitted: (_) {
+                            if (!_carregando) _fazerLogin();
+                          },
                         ),
                         const SizedBox(height: 16),
                         TextFormField(
@@ -137,7 +139,9 @@ class _TelaLoginState extends State<TelaLogin> {
                           validator: (v) => (v == null || v.isEmpty)
                               ? 'Informe a senha'
                               : null,
-                          onFieldSubmitted: (_) => _fazerLogin(),
+                          onFieldSubmitted: (_) {
+                            if (!_carregando) _fazerLogin();
+                          },
                         ),
                         if (_erro != null) ...[
                           const SizedBox(height: 12),

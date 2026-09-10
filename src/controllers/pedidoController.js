@@ -1,4 +1,5 @@
 const pedidoService = require('../services/pedidoService');
+const pagamentoService = require('../services/pagamentoService');
 const pdfService = require('../services/pdfService');
 const { contentDisposition } = require('../utils/contentDisposition');
 
@@ -13,7 +14,7 @@ const criarPedido = async (req, res, next) => {
         }
 
         const novoPedido = await pedidoService.criarPedido(dados);
-        pedidoService.notificarPedidoPorEmail(novoPedido.id, 'criado')
+        pedidoService.notificarPedidoPorEmail(novoPedido.id, 'pedidoCriado')
             .catch((erro) => console.error('Falha ao enviar notificação de e-mail do pedido:', erro));
         return res.status(201).json({
             mensagem: 'Pedido registrado com sucesso!',
@@ -38,11 +39,12 @@ const buscarPedido = async (req, res, next) => {
 const listarPedidos = async (req, res, next) => {
     try {
         const {
-            cliente, statusEntrega, statusPagamento, statusNota, de, ate,
+            cliente, clienteId, statusEntrega, statusPagamento, statusNota, de, ate,
             numero, temporadaAno, formaPagamento,
         } = req.query;
         const filtros = {};
         if (cliente) filtros.cliente = cliente;
+        if (clienteId) filtros.clienteId = clienteId;
         if (statusEntrega) filtros.statusEntrega = statusEntrega;
         if (statusPagamento) filtros.statusPagamento = statusPagamento;
         if (statusNota) filtros.statusNota = statusNota;
@@ -61,9 +63,30 @@ const listarPedidos = async (req, res, next) => {
 const atualizarPedido = async (req, res, next) => {
     try {
         const pedido = await pedidoService.atualizarPedido(req.params.id, req.body);
-        pedidoService.notificarPedidoPorEmail(pedido.id, 'alterado')
+        pedidoService.notificarPedidoPorEmail(pedido.id, 'pedidoAlterado')
             .catch((erro) => console.error('Falha ao enviar notificação de e-mail do pedido:', erro));
         res.json({ ...pedido, creditoGerado: pedido.creditoGerado ?? 0 });
+    } catch (erro) {
+        next(erro);
+    }
+};
+
+// Registra vários pagamentos de uma vez, abatendo o crediário do pedido na
+// mesma transação (ver pagamentoService.registrarPagamentosDoPedido).
+const registrarPagamentos = async (req, res, next) => {
+    try {
+        const { pagamentos } = req.body;
+
+        if (!Array.isArray(pagamentos) || pagamentos.length === 0) {
+            return res.status(400).json({ erro: 'Informe ao menos um pagamento.' });
+        }
+
+        await pagamentoService.registrarPagamentosDoPedido(req.params.id, pagamentos);
+        pedidoService.notificarPedidoPorEmail(req.params.id, 'pedidoPagamento')
+            .catch((erro) => console.error('Falha ao enviar notificacao de e-mail do pedido:', erro));
+
+        const pedido = await pedidoService.buscarPedido(req.params.id);
+        return res.status(201).json(pedido);
     } catch (erro) {
         next(erro);
     }
@@ -108,6 +131,7 @@ module.exports = {
     listarPedidos,
     buscarPedido,
     atualizarPedido,
+    registrarPagamentos,
     eliminarPedido,
     gerarPDF,
     enviarEmail

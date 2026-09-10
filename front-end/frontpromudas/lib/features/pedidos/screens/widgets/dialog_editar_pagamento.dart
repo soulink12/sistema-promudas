@@ -32,7 +32,7 @@ class _DialogEditarPagamentoState extends State<DialogEditarPagamento> {
   @override
   void initState() {
     super.initState();
-    final valor = _toDouble(widget.pagamento['valor_pago']);
+    final valor = paraDouble(widget.pagamento['valor_pago']);
     _valorCtrl = TextEditingController(text: valor.toStringAsFixed(2));
     _nomePagadorCtrl = TextEditingController(
         text: widget.pagamento['nome_pagador'] as String? ?? '');
@@ -77,16 +77,20 @@ class _DialogEditarPagamentoState extends State<DialogEditarPagamento> {
         contas.add(_contaSelecionada!);
       }
 
-      setState(() {
-        _formas = reais;
-        _contas = contas;
-        _carregando = false;
-      });
+      if (mounted) {
+        setState(() {
+          _formas = reais;
+          _contas = contas;
+          _carregando = false;
+        });
+      }
     } catch (_) {
-      setState(() {
-        _erro = 'Não foi possível carregar as formas de pagamento.';
-        _carregando = false;
-      });
+      if (mounted) {
+        setState(() {
+          _erro = 'Não foi possível carregar as formas de pagamento.';
+          _carregando = false;
+        });
+      }
     }
   }
 
@@ -155,7 +159,7 @@ class _DialogEditarPagamentoState extends State<DialogEditarPagamento> {
                           final nova = await selecionarDataHora(
                               context, _dataPagamento);
                           if (nova != null) {
-                            setState(() => _dataPagamento = nova);
+                            if (mounted) setState(() => _dataPagamento = nova);
                           }
                         },
                         borderRadius: BorderRadius.circular(4),
@@ -236,5 +240,3 @@ class _DialogEditarPagamentoState extends State<DialogEditarPagamento> {
   }
 }
 
-double _toDouble(dynamic v) =>
-    v == null ? 0.0 : double.tryParse(v.toString()) ?? 0.0;

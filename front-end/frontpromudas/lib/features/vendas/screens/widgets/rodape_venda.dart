@@ -86,15 +86,19 @@ class _RodapeVendaState extends State<RodapeVenda> with RouteAware {
     });
     try {
       final produtos = await ProdutoService().listar();
-      setState(() {
-        _produtos = produtos;
-        _carregando = false;
-      });
+      if (mounted) {
+        setState(() {
+          _produtos = produtos;
+          _carregando = false;
+        });
+      }
     } catch (_) {
-      setState(() {
-        _erroCarregamento = 'Não foi possível carregar os produtos.';
-        _carregando = false;
-      });
+      if (mounted) {
+        setState(() {
+          _erroCarregamento = 'Não foi possível carregar os produtos.';
+          _carregando = false;
+        });
+      }
     }
   }
 

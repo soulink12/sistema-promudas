@@ -6,13 +6,18 @@
 // parametro estendido.
 const DIACRITICOS = /[̀-ͯ]/g;
 
+// Versao do nome sem acento e sem caractere fora do ASCII imprimivel.
+// Usada como fallback no header HTTP e como nome do anexo de e-mail, onde
+// nome nao-ASCII em MIME chega corrompido no cliente de e-mail.
+const nomeArquivoAscii = (nomeArquivo) => String(nomeArquivo ?? '')
+    .normalize('NFD')
+    .replace(DIACRITICOS, '')
+    .replace(/[^\x20-\x7E]/g, '_');
+
 const contentDisposition = (nomeArquivo) => {
-    const asciiFallback = nomeArquivo
-        .normalize('NFD')
-        .replace(DIACRITICOS, '')
-        .replace(/[^\x20-\x7E]/g, '_');
+    const asciiFallback = nomeArquivoAscii(nomeArquivo);
     const utf8Encoded = encodeURIComponent(nomeArquivo);
     return `attachment; filename="${asciiFallback}"; filename*=UTF-8''${utf8Encoded}`;
 };
 
-module.exports = { contentDisposition };
+module.exports = { contentDisposition, nomeArquivoAscii };

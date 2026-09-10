@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../../core/services/api_service.dart';
 import '../../../core/theme/cores_semanticas.dart';
+import '../../../core/utils/api_feedback.dart';
 import '../../../core/utils/formatadores.dart';
 
 class TelaProdutos extends StatefulWidget {
@@ -13,6 +14,7 @@ class TelaProdutos extends StatefulWidget {
 class _TelaProdutosState extends State<TelaProdutos> {
   List<Map<String, dynamic>> _produtos = [];
   bool _carregando = true;
+  String? _erro;
 
   @override
   void initState() {
@@ -21,19 +23,31 @@ class _TelaProdutosState extends State<TelaProdutos> {
   }
 
   Future<void> _carregar() async {
-    setState(() => _carregando = true);
+    setState(() {
+      _carregando = true;
+      _erro = null;
+    });
     try {
       final response = await ApiService.dio.get('/produtos');
       final dados = response.data as List;
-      setState(() {
-        _produtos = dados
-            .map<Map<String, dynamic>>(
-                (e) => Map<String, dynamic>.from(e as Map))
-            .toList();
-        _carregando = false;
-      });
-    } catch (_) {
-      setState(() => _carregando = false);
+      if (mounted) {
+        setState(() {
+          _produtos = dados
+              .map<Map<String, dynamic>>(
+                  (e) => Map<String, dynamic>.from(e as Map))
+              .toList();
+          _carregando = false;
+        });
+      }
+    } catch (e) {
+      // Antes o erro era engolido e a tela mostrava "Nenhum produto
+      // cadastrado", indistinguível de catálogo realmente vazio.
+      if (mounted) {
+        setState(() {
+          _erro = extrairErroApi(e, 'Não foi possível carregar os produtos.');
+          _carregando = false;
+        });
+      }
     }
   }
 
@@ -85,7 +99,26 @@ class _TelaProdutosState extends State<TelaProdutos> {
       ),
       body: _carregando
           ? const Center(child: CircularProgressIndicator())
-          : _produtos.isEmpty
+          : _erro != null
+              ? Center(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        _erro!,
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(color: CoresSemanticas.erro),
+                      ),
+                      const SizedBox(height: 12),
+                      FilledButton.tonalIcon(
+                        onPressed: _carregar,
+                        icon: const Icon(Icons.refresh),
+                        label: const Text('Tentar novamente'),
+                      ),
+                    ],
+                  ),
+                )
+              : _produtos.isEmpty
               ? Center(
                   child: Text(
                     'Nenhum produto cadastrado.',

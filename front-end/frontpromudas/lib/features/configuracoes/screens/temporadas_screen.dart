@@ -15,6 +15,8 @@ class _TelaTemporadasState extends State<TelaTemporadas> {
   final _service = TemporadaService();
   List<Map<String, dynamic>> _temporadas = [];
   bool _carregando = true;
+  // Trava de duplo clique: dois toques disparavam dois PUT.
+  bool _ativando = false;
 
   @override
   void initState() {
@@ -38,7 +40,8 @@ class _TelaTemporadasState extends State<TelaTemporadas> {
   }
 
   Future<void> _ativar(Map<String, dynamic> t) async {
-    if (t['ativo'] == true) return;
+    if (t['ativo'] == true || _ativando) return;
+    setState(() => _ativando = true);
     try {
       await _service.ativar(t['id'] as int);
       await _carregar();
@@ -47,6 +50,8 @@ class _TelaTemporadasState extends State<TelaTemporadas> {
       }
     } catch (e) {
       if (mounted) mostrarErro(context, extrairErroApi(e));
+    } finally {
+      if (mounted) setState(() => _ativando = false);
     }
   }
 

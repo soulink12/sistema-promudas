@@ -23,9 +23,39 @@ const errorHandler = require('./middlewares/errorHandler');
 const prismaTest = require('./config/database');
 console.log("Prisma carregado com sucesso:", !!prismaTest);
 
+// Sem isso o servidor sobe com configuração faltando e só quebra na primeira
+// requisição — sem JWT_SECRET, por exemplo, todo login falha com erro cru.
+const VARIAVEIS_OBRIGATORIAS = [
+    'JWT_SECRET',
+    'DATABASE_HOST',
+    'DATABASE_USER',
+    'DATABASE_NAME',
+];
+
+const faltando = VARIAVEIS_OBRIGATORIAS.filter((nome) => !process.env[nome]);
+if (faltando.length > 0) {
+    console.error(`Variáveis de ambiente obrigatórias ausentes: ${faltando.join(', ')}.`);
+    console.error('Confira o .env (local) ou o .env.docker (produção) antes de subir o servidor.');
+    process.exit(1);
+}
+
 const app = express();
 
-app.use(cors());
+// O cliente é um app desktop na rede local, não um site: liberar qualquer
+// origem só amplia a superfície de ataque a partir do navegador. CORS_ORIGENS
+// aceita uma lista separada por vírgula; sem ela, nenhuma origem de navegador
+// é liberada (o app desktop não é afetado, pois não manda Origin).
+const origensPermitidas = (process.env.CORS_ORIGENS ?? '')
+    .split(',')
+    .map((o) => o.trim())
+    .filter(Boolean);
+
+app.use(cors({
+    origin: (origin, callback) => {
+        if (!origin || origensPermitidas.includes(origin)) return callback(null, true);
+        callback(null, false);
+    },
+}));
 app.use(express.json());
 
 // Rota pública — login e registro
@@ -65,6 +95,20 @@ if (require.main === module) {
     const PORT = process.env.PORT || 6072;
     app.listen(PORT, () => {
         console.log(`Servidor rodando na porta ${PORT}`);
+    });
+
+    // Uma promise rejeitada fora de um .catch derruba o processo inteiro sem
+    // deixar rastro. Registrado só quando o servidor roda de verdade, para não
+    // interferir no runner de testes, que tem o tratamento dele.
+    process.on('unhandledRejection', (motivo) => {
+        console.error('Promise rejeitada sem tratamento:', motivo);
+    });
+
+    process.on('uncaughtException', (erro) => {
+        console.error('Exceção não capturada:', erro);
+        // Estado do processo passa a ser incerto: encerra e deixa o supervisor
+        // (PM2/Docker) subir de novo, em vez de seguir rodando quebrado.
+        process.exit(1);
     });
 }
 

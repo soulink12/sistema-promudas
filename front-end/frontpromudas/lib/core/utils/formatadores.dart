@@ -1,5 +1,11 @@
 // Formatadores puros reutilizados em todo o app (moeda e data/hora).
 
+/// Converte para double um valor que pode vir da API como String
+/// (Decimal do Prisma vira String no JSON), num, ou null. Estava
+/// duplicado, identico, em 11 arquivos como `_toDouble`.
+double paraDouble(dynamic valor) =>
+    valor == null ? 0.0 : double.tryParse(valor.toString()) ?? 0.0;
+
 /// Formata um valor monetário no padrão brasileiro: `R$ 1.234,56`
 /// (ponto separando o milhar, vírgula separando os centavos, prefixo `R$ `).
 String formatarMoeda(num valor) {
@@ -57,6 +63,32 @@ String capitalizarNome(String nome) {
         return palavra[0].toUpperCase() + palavra.substring(1).toLowerCase();
       })
       .join(' ');
+}
+
+/// Formata um CEP como `77400-000`. O valor é guardado só com dígitos, então
+/// normaliza antes; devolve o original quando não tem 8 dígitos.
+String formatarCep(String? cep) {
+  if (cep == null || cep.trim().isEmpty) return '';
+  final digitos = cep.replaceAll(RegExp(r'\D'), '');
+  if (digitos.length != 8) return cep.trim();
+  return '${digitos.substring(0, 5)}-${digitos.substring(5)}';
+}
+
+/// Padroniza a exibição de um telefone brasileiro: `(63) 99999-9999` para
+/// celular (11 dígitos) e `(63) 3333-3333` para fixo (10 dígitos). O valor é
+/// gravado como foi digitado, então normaliza para dígitos antes de formatar —
+/// assim cadastros antigos com e sem máscara aparecem iguais. Devolve o valor
+/// original quando não tem a quantidade de dígitos esperada.
+String formatarTelefone(String? telefone) {
+  if (telefone == null || telefone.trim().isEmpty) return '';
+  final digitos = telefone.replaceAll(RegExp(r'\D'), '');
+  if (digitos.length == 11) {
+    return '(${digitos.substring(0, 2)}) ${digitos.substring(2, 7)}-${digitos.substring(7)}';
+  }
+  if (digitos.length == 10) {
+    return '(${digitos.substring(0, 2)}) ${digitos.substring(2, 6)}-${digitos.substring(6)}';
+  }
+  return telefone.trim();
 }
 
 /// Formata um `DateTime` (ou ISO string) como `dd/MM/yyyy  HH:mm` no fuso local.

@@ -2,6 +2,14 @@ const entregaService = require('../services/entregaService');
 
 const criarEntrega = async (req, res, next) => {
     try {
+        const { pedido_id, itens } = req.body ?? {};
+
+        if (!pedido_id || !Array.isArray(itens) || itens.length === 0) {
+            return res.status(400).json({
+                erro: 'Informe o pedido e ao menos um item de entrega.'
+            });
+        }
+
         const id = await entregaService.criarEntrega(req.body);
         res.status(201).json({ mensagem: 'Entrega criada com sucesso', id });
     } catch (erro) {

@@ -38,7 +38,7 @@ class ListaClientes extends StatelessWidget {
         final tel = c['telefone_1'] as String?;
         final subtitulo = [
           if (cpf != null && cpf.isNotEmpty) formatarCpfCnpj(cpf),
-          if (tel != null && tel.isNotEmpty) tel,
+          if (tel != null && tel.isNotEmpty) formatarTelefone(tel),
         ].join(' • ');
         final cs = Theme.of(context).colorScheme;
         return ListTile(

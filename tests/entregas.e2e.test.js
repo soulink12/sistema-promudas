@@ -106,3 +106,8 @@ test('listar entregas inclui cliente e nome dos produtos', async () => {
     assert.equal(minha.pedidos.clientes.nome, cliente.nome);
     assert.ok(minha.itens_entrega[0].produtos?.nome, 'item de entrega sem nome do produto');
 });
+
+test('criar entrega sem corpo retorna 400 (não 500)', async () => {
+    const res = await amb.api('POST', '/api/entregas', { body: {} });
+    assert.equal(res.status, 400, JSON.stringify(res.body));
+});

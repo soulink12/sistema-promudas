@@ -39,8 +39,8 @@ class DetalhesOrcamento extends StatelessWidget {
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final nomeCliente = capitalizarNome(orcamento['clientes']?['nome'] as String? ?? '—');
-    final total = _toDouble(orcamento['valor_total']);
-    final ajuste = _toDouble(orcamento['ajuste']);
+    final total = paraDouble(orcamento['valor_total']);
+    final ajuste = paraDouble(orcamento['ajuste']);
     final data = formatarDataHora(orcamento['data_orcamento'] ?? orcamento['criado_em']);
     final status = orcamento['status'] as String? ?? 'Pendente';
     final pendente = status == 'Pendente';
@@ -223,7 +223,7 @@ class DetalhesOrcamento extends StatelessWidget {
                       ...itens.map((item) {
                         final nomeProduto = item['produtos']?['nome'] as String? ?? '—';
                         final qtd = item['quantidade'] as int? ?? 0;
-                        final preco = _toDouble(item['valor_unitario']);
+                        final preco = paraDouble(item['valor_unitario']);
                         final totalItem = preco * qtd;
                         return Column(
                           children: [
@@ -317,4 +317,3 @@ class DetalhesOrcamento extends StatelessWidget {
   }
 }
 
-double _toDouble(dynamic v) => v == null ? 0.0 : double.tryParse(v.toString()) ?? 0.0;

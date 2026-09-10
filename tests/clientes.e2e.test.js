@@ -181,3 +181,40 @@ test('editar cliente mantendo o próprio cpf/cnpj não gera falso positivo de du
     assert.equal(busca.body.cpf_cnpj, cpf);
     assert.match(busca.body.nome, /_editado$/);
 });
+
+test('campos protegidos (saldo_credito, ativo) não podem ser gravados pela API', async () => {
+    const c = await amb.criarCliente();
+    amb.registrar.cliente(c.id);
+
+    const upd = await amb.api('PUT', `/api/clientes/${c.id}`, {
+        body: { nome: 'Nome Novo', saldo_credito: 99999, ativo: false },
+    });
+    assert.equal(upd.status, 200, JSON.stringify(upd.body));
+
+    const busca = await amb.api('GET', `/api/clientes/${c.id}`);
+    assert.equal(busca.status, 200, 'cliente sumiu — o campo ativo foi aplicado');
+    assert.equal(busca.body.nome, 'Nome Novo', 'o campo permitido não foi gravado');
+    assert.ok(
+        Math.abs(Number(busca.body.saldo_credito ?? 0)) < 0.01,
+        `saldo_credito foi gravado pela API: ${busca.body.saldo_credito}`,
+    );
+});
+
+test('criar cliente ignora saldo_credito vindo do corpo', async () => {
+    const res = await amb.api('POST', '/api/clientes', {
+        body: { nome: 'Cliente Teste Saldo', saldo_credito: 5000 },
+    });
+    assert.equal(res.status, 201, JSON.stringify(res.body));
+    amb.registrar.cliente(res.body.id);
+
+    const busca = await amb.api('GET', `/api/clientes/${res.body.id}`);
+    assert.ok(
+        Math.abs(Number(busca.body.saldo_credito ?? 0)) < 0.01,
+        `saldo_credito foi gravado na criação: ${busca.body.saldo_credito}`,
+    );
+});
+
+test('excluir cliente inexistente retorna 404 (não 500)', async () => {
+    const res = await amb.api('DELETE', '/api/clientes/2000000000');
+    assert.equal(res.status, 404, JSON.stringify(res.body));
+});

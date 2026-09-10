@@ -2,6 +2,7 @@ const PDFDocument = require('pdfkit');
 const prisma = require('../config/database');
 const { formatarNumeroPedido } = require('../utils/numeroPedido');
 const { formatarMoeda } = require('../utils/moeda');
+const BusinessError = require('../utils/BusinessError');
 
 const moeda = formatarMoeda;
 
@@ -28,21 +29,42 @@ const linhaHorizontal = (doc, cor = '#cccccc') => {
     doc.strokeColor('black').lineWidth(1);
 };
 
+// Converte um parâmetro de data do relatório. Data inválida virava
+// `Invalid Date` e estourava 500; e um "até" sem hora (ex.: "2026-09-09")
+// virava meia-noite, excluindo os pagamentos do próprio dia.
+const _parsearData = (valor, campo, { fimDoDia = false } = {}) => {
+    if (!valor) return undefined;
+
+    const data = new Date(valor);
+    if (Number.isNaN(data.getTime())) {
+        throw new BusinessError(`Data inválida no campo "${campo}".`);
+    }
+
+    const soData = typeof valor === 'string' && !valor.includes('T');
+    if (fimDoDia && soData) {
+        data.setHours(23, 59, 59, 999);
+    }
+    return data;
+};
+
 const _montarWhere = ({ de, ate, forma }) => {
+    const inicio = _parsearData(de, 'de');
+    const fim = _parsearData(ate, 'ate', { fimDoDia: true });
+
     // TODO: quando data_pagamento se tornar obrigatório, remover o OR e filtrar só por data_pagamento
-    const whereData = (de || ate) ? {
+    const whereData = (inicio || fim) ? {
         OR: [
             {
                 data_pagamento: {
-                    ...(de && { gte: new Date(de) }),
-                    ...(ate && { lte: new Date(ate) }),
+                    ...(inicio && { gte: inicio }),
+                    ...(fim && { lte: fim }),
                 }
             },
             {
                 data_pagamento: null,
                 criado_em: {
-                    ...(de && { gte: new Date(de) }),
-                    ...(ate && { lte: new Date(ate) }),
+                    ...(inicio && { gte: inicio }),
+                    ...(fim && { lte: fim }),
                 }
             }
         ]
@@ -50,9 +72,27 @@ const _montarWhere = ({ de, ate, forma }) => {
 
     return {
         ...whereData,
-        ...(forma ? { forma_pagamento: forma } : {})
+        ...(forma ? { forma_pagamento: forma } : {}),
+        // Sem isso o relatório somava pagamentos de pedidos cancelados/apagados
+        // e inflava o faturamento (listarPagamentos já filtrava, o relatório não).
+        pedidos: { ativo: true },
     };
 };
+
+// Filtro de pedidos usado pelo relatório em JSON e pelo PDF — era duplicado
+// verbatim nos dois, com risco de divergirem numa mudança futura.
+const _montarWherePedidos = ({ de, ate, statusPagamento, statusEntrega, clienteId }) => ({
+    ativo: true,
+    ...(de || ate ? {
+        criado_em: {
+            ...(de && { gte: _parsearData(de, 'de') }),
+            ...(ate && { lte: _parsearData(ate, 'ate', { fimDoDia: true }) }),
+        }
+    } : {}),
+    ...(statusPagamento ? { status_pagamento: statusPagamento } : {}),
+    ...(statusEntrega ? { status_entrega: statusEntrega } : {}),
+    ...(clienteId ? { cliente_id: parseInt(clienteId) } : {}),
+});
 
 const relatorioPagamentos = async ({ de, ate, forma }) => {
     const where = _montarWhere({ de, ate, forma });
@@ -275,18 +315,7 @@ const gerarRelatorioPDF = async ({ de, ate, forma }) => {
 };
 
 const relatorioPedidos = async ({ de, ate, statusPagamento, statusEntrega, clienteId }) => {
-    const where = {
-        ativo: true,
-        ...(de || ate ? {
-            criado_em: {
-                ...(de && { gte: new Date(de) }),
-                ...(ate && { lte: new Date(ate) }),
-            }
-        } : {}),
-        ...(statusPagamento ? { status_pagamento: statusPagamento } : {}),
-        ...(statusEntrega ? { status_entrega: statusEntrega } : {}),
-        ...(clienteId ? { cliente_id: parseInt(clienteId) } : {}),
-    };
+    const where = _montarWherePedidos({ de, ate, statusPagamento, statusEntrega, clienteId });
 
     const pedidos = await prisma.pedidos.findMany({
         where,
@@ -304,10 +333,15 @@ const relatorioPedidos = async ({ de, ate, statusPagamento, statusEntrega, clien
         orderBy: { criado_em: 'desc' },
     });
 
-    const valorTotal = pedidos.reduce((s, p) => s + parseFloat(p.valor_total), 0);
+    const valorTotal = pedidos.reduce((s, p) => s + parseFloat(p.valor_total ?? 0), 0);
 
+    // A coluna é nullable e pode ter valor fora deste conjunto: sem o fallback,
+    // `porStatusPagamento[undefined]++` gerava NaN e criava a chave "null".
     const porStatusPagamento = { Pago: 0, Crédito: 0, Parcial: 0, Pendente: 0 };
-    pedidos.forEach(p => { porStatusPagamento[p.status_pagamento]++; });
+    pedidos.forEach(p => {
+        const status = p.status_pagamento ?? 'Pendente';
+        porStatusPagamento[status] = (porStatusPagamento[status] ?? 0) + 1;
+    });
 
     return {
         resumo: { total: pedidos.length, valorTotal, porStatusPagamento },
@@ -326,21 +360,15 @@ const relatorioPedidos = async ({ de, ate, statusPagamento, statusEntrega, clien
 };
 
 const gerarRelatorioPedidosPDF = async ({ de, ate, statusPagamento, statusEntrega, clienteId }) => {
-    const where = {
-        ativo: true,
-        ...(de || ate ? {
-            criado_em: {
-                ...(de && { gte: new Date(de) }),
-                ...(ate && { lte: new Date(ate) }),
-            }
-        } : {}),
-        ...(statusPagamento ? { status_pagamento: statusPagamento } : {}),
-        ...(statusEntrega ? { status_entrega: statusEntrega } : {}),
-        ...(clienteId ? { cliente_id: parseInt(clienteId) } : {}),
-    };
+    const where = _montarWherePedidos({ de, ate, statusPagamento, statusEntrega, clienteId });
+
+    // Sem período informado, isto carregaria todos os pedidos com itens,
+    // pagamentos e entregas aninhados de uma vez.
+    const LIMITE_PDF_PEDIDOS = 2000;
 
     const pedidos = await prisma.pedidos.findMany({
         where,
+        take: LIMITE_PDF_PEDIDOS,
         include: {
             clientes: { select: { nome: true } },
             itens_pedido: {
@@ -396,7 +424,7 @@ const gerarRelatorioPedidosPDF = async ({ de, ate, statusPagamento, statusEntreg
         doc.moveDown(0.5);
 
         // ── RESUMO ─────────────────────────────────────────────────────────
-        const valorTotal = pedidos.reduce((s, p) => s + parseFloat(p.valor_total), 0);
+        const valorTotal = pedidos.reduce((s, p) => s + parseFloat(p.valor_total ?? 0), 0);
         const yRes = doc.y;
         doc.font('Helvetica-Bold').fontSize(9).fillColor('#555555');
         doc.text(`Total de pedidos: ${pedidos.length}`, 50, yRes, { lineBreak: false });

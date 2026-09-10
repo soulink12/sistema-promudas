@@ -56,16 +56,60 @@ const recalcularStatusPedido = async (pedido_id) => {
 
 // ============================================================
 
-const criarPagamento = async (dadosPagamento) => {
+// Monta o `data` do insert: normaliza datas e prepara os cheques (opcionais,
+// criados junto ao pagamento — cada um entra sem data_deposito, ou seja
+// "a depositar", salvo se já vier informada).
+const montarDadosPagamento = (dadosPagamento) => {
+    const { cheques, ...dadosSemCheques } = dadosPagamento;
+    const dados = normalizarDatas(dadosSemCheques, ['data_pagamento', 'data_emissao_nota']);
+
+    if (Array.isArray(cheques) && cheques.length > 0) {
+        dados.cheques = {
+            create: cheques.map((c) => {
+                const valor = parseFloat(c.valor);
+                if (isNaN(valor) || valor <= 0) {
+                    throw new BusinessError('Cada cheque precisa de um valor maior que zero.');
+                }
+                return normalizarDatas(
+                    {
+                        numero: c.numero ?? null,
+                        banco: c.banco ?? null,
+                        agencia: c.agencia ?? null,
+                        conta_corrente: c.conta_corrente ?? null,
+                        valor,
+                        bom_para: c.bom_para ?? null,
+                        data_deposito: c.data_deposito ?? null,
+                        depositado: c.data_deposito ? true : (c.depositado ?? false),
+                    },
+                    ['bom_para', 'data_deposito']
+                );
+            }),
+        };
+    }
+
+    return dados;
+};
+
+// Valida o saldo do pedido e cria o pagamento dentro de uma transação já
+// aberta pelo chamador. Relê o pedido a cada chamada, então funciona também em
+// laço (cada iteração enxerga os pagamentos inseridos pelas anteriores).
+const criarPagamentoTx = async (tx, dadosPagamento, formasPosteriores) => {
     const { pedido_id, valor_pago } = dadosPagamento;
 
-    const [pedido, formasPosteriores] = await Promise.all([
-        prisma.pedidos.findUnique({
-            where: { id: parseInt(pedido_id) },
-            include: { pagamentos: true }
-        }),
-        formaPagamentoService.listarPosteriores()
-    ]);
+    // As checagens abaixo são só de teto (valor > saldo). Sem esta validação,
+    // valor negativo passava e reduzia o total recebido do pedido, e valor não
+    // numérico virava NaN, escapava de toda comparação e estourava no insert.
+    const valorNumerico = parseFloat(valor_pago);
+    if (!Number.isFinite(valorNumerico) || valorNumerico <= 0) {
+        throw new BusinessError('O valor do pagamento precisa ser maior que zero.');
+    }
+
+    const dados = montarDadosPagamento(dadosPagamento);
+
+    const pedido = await tx.pedidos.findUnique({
+        where: { id: parseInt(pedido_id) },
+        include: { pagamentos: true }
+    });
 
     if (!pedido) {
         throw new BusinessError('Pedido não encontrado.', 404);
@@ -104,45 +148,109 @@ const criarPagamento = async (dadosPagamento) => {
         }
     }
 
-    // Cheques (opcionais) são criados junto ao pagamento. Cada cheque entra sem
-    // data_deposito (= "a depositar") salvo se já vier informada.
-    const { cheques, ...dadosSemCheques } = dadosPagamento;
-    const dados = normalizarDatas(dadosSemCheques, ['data_pagamento', 'data_emissao_nota']);
+    return await tx.pagamentos.create({ data: dados });
+};
 
-    if (Array.isArray(cheques) && cheques.length > 0) {
-        dados.cheques = {
-            create: cheques.map((c) => {
-                const valor = parseFloat(c.valor);
-                if (isNaN(valor) || valor <= 0) {
-                    throw new BusinessError('Cada cheque precisa de um valor maior que zero.');
-                }
-                return normalizarDatas(
-                    {
-                        numero: c.numero ?? null,
-                        banco: c.banco ?? null,
-                        agencia: c.agencia ?? null,
-                        conta_corrente: c.conta_corrente ?? null,
-                        valor,
-                        bom_para: c.bom_para ?? null,
-                        data_deposito: c.data_deposito ?? null,
-                        depositado: c.data_deposito ? true : (c.depositado ?? false),
-                    },
-                    ['bom_para', 'data_deposito']
-                );
-            }),
-        };
-    }
+const criarPagamento = async (dadosPagamento) => {
+    const formasPosteriores = await formaPagamentoService.listarPosteriores();
 
-    const novoPagamento = await prisma.pagamentos.create({ data: dados });
+    const novoPagamento = await prisma.$transaction(
+        (tx) => criarPagamentoTx(tx, dadosPagamento, formasPosteriores)
+    );
 
-    await recalcularStatusPedido(pedido_id);
+    await recalcularStatusPedido(dadosPagamento.pedido_id);
 
     return novoPagamento.id;
 };
 
-const listarPagamentos = async () => {
+// Registra os pagamentos reais de um pedido e abate o crediário existente na
+// MESMA transação: o valor recebido reduz o "a receber" do cliente. Antes isso
+// era orquestrado pelo app em várias chamadas soltas (apagar todos os
+// crediários, depois recriar o saldo), e qualquer falha no meio — rede, erro do
+// servidor, app fechado — apagava o crediário do cliente sem deixar rastro.
+const registrarPagamentosDoPedido = async (pedidoId, pagamentos) => {
+    const id = parseInt(pedidoId);
+    const formasPosteriores = await formaPagamentoService.listarPosteriores();
+    const nomesPosteriores = new Set(formasPosteriores.map(f => f.nome));
+
+    await prisma.$transaction(async (tx) => {
+        const pedido = await tx.pedidos.findUnique({
+            where: { id },
+            include: { pagamentos: true },
+        });
+
+        if (!pedido) {
+            throw new BusinessError('Pedido não encontrado.', 404);
+        }
+        if (pedido.ativo === false) {
+            throw new BusinessError('Não é possível registrar pagamentos para um pedido desativado ou cancelado.');
+        }
+
+        // Crediários existentes ANTES desta chamada — capturados aqui para não
+        // confundir com qualquer coisa criada no laço abaixo.
+        const crediarios = pedido.pagamentos
+            .filter((p) => nomesPosteriores.has(p.forma_pagamento));
+
+        let totalRealPago = 0;
+        for (const pagamento of pagamentos) {
+            const criado = await criarPagamentoTx(
+                tx,
+                { ...pagamento, pedido_id: id },
+                formasPosteriores
+            );
+            if (!nomesPosteriores.has(criado.forma_pagamento)) {
+                totalRealPago += parseFloat(criado.valor_pago);
+            }
+        }
+
+        if (crediarios.length === 0 || totalRealPago <= 0.005) return;
+
+        const totalCredito = crediarios
+            .reduce((soma, p) => soma + parseFloat(p.valor_pago), 0);
+
+        await tx.pagamentos.deleteMany({
+            where: { id: { in: crediarios.map((c) => c.id) } },
+        });
+
+        const novoSaldoCredito = totalCredito - totalRealPago;
+        if (novoSaldoCredito > 0.005) {
+            await tx.pagamentos.create({
+                data: {
+                    pedido_id: id,
+                    valor_pago: novoSaldoCredito,
+                    forma_pagamento: crediarios[0].forma_pagamento,
+                    data_pagamento: new Date(),
+                },
+            });
+        }
+    });
+
+    await recalcularStatusPedido(id);
+};
+
+// Listagem geral de pagamentos. Aceita intervalo de datas e tem teto de
+// resultados — antes devolvia a tabela inteira com joins a cada chamada.
+const LIMITE_PADRAO_PAGAMENTOS = 200;
+const LIMITE_MAXIMO_PAGAMENTOS = 1000;
+
+const listarPagamentos = async ({ de, ate, limite } = {}) => {
+    const take = Math.min(
+        Number.parseInt(limite, 10) || LIMITE_PADRAO_PAGAMENTOS,
+        LIMITE_MAXIMO_PAGAMENTOS
+    );
+
+    const intervalo = (de || ate) ? {
+        criado_em: {
+            ...(de && { gte: new Date(de) }),
+            ...(ate && { lte: new Date(ate) }),
+        }
+    } : {};
+
     return await prisma.pagamentos.findMany({
+        take,
+        orderBy: { criado_em: 'desc' },
         where: {
+            ...intervalo,
             pedidos: { ativo: true }
         },
         include: {
@@ -201,41 +309,71 @@ const listarPagamentosPendentesDeConta = async () => {
     });
 };
 
+// Campos editáveis de um pagamento já existente. `pedido_id` fica de fora de
+// propósito: trocar o pedido de um pagamento só recalculava o status do pedido
+// NOVO, deixando o antigo marcado como pago sem ter o dinheiro. Cheques são
+// gerenciados pelos endpoints de /api/cheques, não por aqui.
+const CAMPOS_PAGAMENTO_EDITAVEIS = [
+    'valor_pago',
+    'forma_pagamento',
+    'data_pagamento',
+    'conta',
+    'parcelas',
+    'nome_pagador',
+    'cpf_cnpj_pagador',
+    'escambo_quantidade',
+    'status_nota',
+    'numero_nota',
+    'data_emissao_nota',
+];
+
 const atualizarPagamento = async (id, dados) => {
-    const pagamentoAtual = await prisma.pagamentos.findUnique({
-        where: { id: parseInt(id) },
-        include: {
-            pedidos: {
-                include: { pagamentos: true }
+    const camposPermitidos = Object.fromEntries(
+        Object.entries(dados).filter(([chave]) => CAMPOS_PAGAMENTO_EDITAVEIS.includes(chave))
+    );
+    const dadosNormalizados = normalizarDatas(camposPermitidos, ['data_pagamento', 'data_emissao_nota']);
+
+    if (dadosNormalizados.valor_pago !== undefined) {
+        const valorNumerico = parseFloat(dadosNormalizados.valor_pago);
+        if (!Number.isFinite(valorNumerico) || valorNumerico <= 0) {
+            throw new BusinessError('O valor do pagamento precisa ser maior que zero.');
+        }
+    }
+
+    const pagamentoAtualizado = await prisma.$transaction(async (tx) => {
+        const pagamentoAtual = await tx.pagamentos.findUnique({
+            where: { id: parseInt(id) },
+            include: {
+                pedidos: {
+                    include: { pagamentos: true }
+                }
+            }
+        });
+
+        if (!pagamentoAtual) {
+            throw new BusinessError('Pagamento não encontrado.', 404);
+        }
+
+        if (dados.valor_pago !== undefined) {
+            const pedido = pagamentoAtual.pedidos;
+            const novoValorPago = parseFloat(dados.valor_pago);
+
+            const totalPagoOutros = pedido.pagamentos.reduce((soma, p) => {
+                if (p.id === parseInt(id)) return soma;
+                return soma + parseFloat(p.valor_pago);
+            }, 0);
+
+            const saldoPermitido = parseFloat(pedido.valor_total) - totalPagoOutros;
+
+            if (novoValorPago > (saldoPermitido + 0.01)) {
+                throw new BusinessError(`Valor excede o saldo devedor. O máximo permitido para esta edição é R$ ${saldoPermitido.toFixed(2)}.`);
             }
         }
-    });
 
-    if (!pagamentoAtual) {
-        throw new BusinessError('Pagamento não encontrado.', 404);
-    }
-
-    if (dados.valor_pago !== undefined) {
-        const pedido = pagamentoAtual.pedidos;
-        const novoValorPago = parseFloat(dados.valor_pago);
-
-        const totalPagoOutros = pedido.pagamentos.reduce((soma, p) => {
-            if (p.id === parseInt(id)) return soma;
-            return soma + parseFloat(p.valor_pago);
-        }, 0);
-
-        const saldoPermitido = parseFloat(pedido.valor_total) - totalPagoOutros;
-
-        if (novoValorPago > (saldoPermitido + 0.01)) {
-            throw new BusinessError(`Valor excede o saldo devedor. O máximo permitido para esta edição é R$ ${saldoPermitido.toFixed(2)}.`);
-        }
-    }
-
-    // Cheques são gerenciados pelos endpoints de /api/cheques, não por aqui.
-    const { cheques: _ignorado, ...dadosSemCheques } = dados;
-    const pagamentoAtualizado = await prisma.pagamentos.update({
-        where: { id: parseInt(id) },
-        data: normalizarDatas(dadosSemCheques, ['data_pagamento', 'data_emissao_nota']),
+        return await tx.pagamentos.update({
+            where: { id: parseInt(id) },
+            data: dadosNormalizados,
+        });
     });
 
     await recalcularStatusPedido(pagamentoAtualizado.pedido_id);
@@ -263,6 +401,7 @@ const eliminarPagamento = async (id) => {
 
 module.exports = {
     criarPagamento,
+    registrarPagamentosDoPedido,
     listarPagamentos,
     listarPagamentosPendentesDeConta,
     atualizarPagamento,

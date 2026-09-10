@@ -33,7 +33,7 @@ class ListaOrcamentos extends StatelessWidget {
         final nomeCliente = capitalizarNome(
           o['clientes']?['nome'] as String? ?? 'Cliente desconhecido',
         );
-        final total = _toDouble(o['valor_total']);
+        final total = paraDouble(o['valor_total']);
         final data = formatarDataHora(o['data_orcamento'] ?? o['criado_em']);
         final status = o['status'] as String? ?? 'Pendente';
 
@@ -94,5 +94,3 @@ class ListaOrcamentos extends StatelessWidget {
   }
 }
 
-double _toDouble(dynamic v) =>
-    v == null ? 0.0 : double.tryParse(v.toString()) ?? 0.0;

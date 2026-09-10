@@ -6,6 +6,7 @@ import '../../../core/theme/cores_semanticas.dart';
 import '../../../core/utils/api_feedback.dart';
 import '../../../core/utils/formatadores.dart';
 import '../../../core/utils/enviar_email_documento.dart';
+import '../../../core/utils/pagamentos_descartados.dart';
 import '../../../core/widgets/pesquisa_cliente_lista.dart';
 import '../../../core/widgets/dialog_confirmacao.dart';
 import '../../../core/widgets/filtro_multi_status.dart';
@@ -111,17 +112,25 @@ class _TelaPedidosState extends State<TelaPedidos> {
       _erro = null;
     });
     try {
-      final params = <String, dynamic>{
-        'de': _de.toIso8601String(),
-        // Inclui o dia inteiro do "até".
-        'ate': DateTime(_ate.year, _ate.month, _ate.day, 23, 59, 59)
-            .toIso8601String(),
-      };
       final clienteNome = _clienteFiltro?['nome'] as String?;
-      if (clienteNome != null && clienteNome.isNotEmpty) {
+      final buscandoPorCliente = clienteNome != null && clienteNome.isNotEmpty;
+      final buscandoPorNumero = _numeroFiltro.isNotEmpty;
+
+      // Quando se procura algo específico (número ou cliente), o intervalo de
+      // datas só atrapalha: um pedido fora da janela padrão simplesmente não
+      // apareceria na busca.
+      final params = <String, dynamic>{
+        if (!buscandoPorCliente && !buscandoPorNumero) ...{
+          'de': _de.toIso8601String(),
+          // Inclui o dia inteiro do "até".
+          'ate': DateTime(_ate.year, _ate.month, _ate.day, 23, 59, 59)
+              .toIso8601String(),
+        },
+      };
+      if (buscandoPorCliente) {
         params['cliente'] = clienteNome;
       }
-      if (_numeroFiltro.isNotEmpty) {
+      if (buscandoPorNumero) {
         params['numero'] = _numeroFiltro;
       }
       if (_statusPagamento.isNotEmpty) {
@@ -144,19 +153,23 @@ class _TelaPedidosState extends State<TelaPedidos> {
         queryParameters: params,
       );
       final dados = response.data as List;
-      setState(() {
-        _pedidos = dados
-            .map<Map<String, dynamic>>(
-              (e) => Map<String, dynamic>.from(e as Map),
-            )
-            .toList();
-        _carregando = false;
-      });
+      if (mounted) {
+        setState(() {
+          _pedidos = dados
+              .map<Map<String, dynamic>>(
+                (e) => Map<String, dynamic>.from(e as Map),
+              )
+              .toList();
+          _carregando = false;
+        });
+      }
     } catch (_) {
-      setState(() {
-        _erro = 'Não foi possível carregar os pedidos.';
-        _carregando = false;
-      });
+      if (mounted) {
+        setState(() {
+          _erro = 'Não foi possível carregar os pedidos.';
+          _carregando = false;
+        });
+      }
     }
   }
 
@@ -164,11 +177,13 @@ class _TelaPedidosState extends State<TelaPedidos> {
     try {
       final response = await ApiService.dio.get('/pedidos/$pedidoId');
       final atualizado = Map<String, dynamic>.from(response.data as Map);
-      setState(() {
-        _pedidoSelecionado = atualizado;
-        final idx = _pedidos.indexWhere((p) => p['id'] == pedidoId);
-        if (idx != -1) _pedidos[idx] = atualizado;
-      });
+      if (mounted) {
+        setState(() {
+          _pedidoSelecionado = atualizado;
+          final idx = _pedidos.indexWhere((p) => p['id'] == pedidoId);
+          if (idx != -1) _pedidos[idx] = atualizado;
+        });
+      }
     } catch (_) {
       // Falha silenciosa — mantém dados antigos
     }
@@ -207,15 +222,17 @@ class _TelaPedidosState extends State<TelaPedidos> {
       lastDate: DateTime(2100),
     );
     if (data == null) return;
-    setState(() {
-      if (isDe) {
-        _de = data;
-        if (_ate.isBefore(_de)) _ate = _de;
-      } else {
-        _ate = data;
-        if (_de.isAfter(_ate)) _de = _ate;
-      }
-    });
+    if (mounted) {
+      setState(() {
+        if (isDe) {
+          _de = data;
+          if (_ate.isBefore(_de)) _ate = _de;
+        } else {
+          _ate = data;
+          if (_de.isAfter(_ate)) _de = _ate;
+        }
+      });
+    }
     _carregarPedidos();
   }
 
@@ -234,13 +251,13 @@ class _TelaPedidosState extends State<TelaPedidos> {
   }
 
   void _abrirModalPagamento(Map<String, dynamic> pedido) {
-    final total = _toDouble(pedido['valor_total']);
+    final total = paraDouble(pedido['valor_total']);
     final pedidoId = pedido['id'] as int;
 
     final pagamentos = (pedido['pagamentos'] as List? ?? []);
     final totalPagoReal = pagamentos.fold<double>(0.0, (soma, p) {
       final isPosterior = (p as Map)['pagamento_posterior'] == true;
-      return isPosterior ? soma : soma + _toDouble(p['valor_pago']);
+      return isPosterior ? soma : soma + paraDouble(p['valor_pago']);
     });
     final saldoRestante = (total - totalPagoReal).clamp(0.0, total);
 
@@ -282,73 +299,43 @@ class _TelaPedidosState extends State<TelaPedidos> {
     setState(() => _salvando = true);
 
     try {
+      // Envia tudo numa chamada só: o backend registra os pagamentos e abate o
+      // crediário do pedido dentro de uma transação. Antes isso era feito aqui
+      // em várias chamadas (apagar os crediários, depois recriar o saldo), e uma
+      // falha no meio apagava o crediário do cliente sem deixar rastro.
       final pagamentosReais = pagamentos
           .where((p) => p['pagamentoPosterior'] != true)
           .toList();
 
       double restante = saldoParaPagar;
-      double totalRealPago = 0;
+      final corpo = <Map<String, dynamic>>[];
       for (final p in pagamentosReais) {
         if (restante <= 0.005) break;
         final valorPago = (p['valor'] as double).clamp(0.0, restante);
-        await ApiService.dio.post(
-          '/pagamentos',
-          data: {
-            'pedido_id': pedidoId,
-            'valor_pago': valorPago,
-            'forma_pagamento': p['forma'],
-            // Cheque (depósito posterior): data fica nula até o depósito.
-            if (p['depositoPosterior'] != true)
-              'data_pagamento': DateTime.now().toUtc().toIso8601String(),
-            if (p['parcelas'] != null) 'parcelas': p['parcelas'],
-            if (p['escamboQuantidade'] != null)
-              'escambo_quantidade': p['escamboQuantidade'],
-            if (p['conta'] != null) 'conta': p['conta'],
-            if (p['nomePagador'] != null) 'nome_pagador': p['nomePagador'],
-            if (p['cpfPagador'] != null) 'cpf_cnpj_pagador': p['cpfPagador'],
-            if (p['cheques'] != null) 'cheques': p['cheques'],
-          },
-        );
-        totalRealPago += valorPago;
+        corpo.add({
+          'valor_pago': valorPago,
+          'forma_pagamento': p['forma'],
+          // Cheque (depósito posterior): data fica nula até o depósito.
+          if (p['depositoPosterior'] != true)
+            'data_pagamento': DateTime.now().toUtc().toIso8601String(),
+          if (p['parcelas'] != null) 'parcelas': p['parcelas'],
+          if (p['escamboQuantidade'] != null)
+            'escambo_quantidade': p['escamboQuantidade'],
+          if (p['conta'] != null) 'conta': p['conta'],
+          if (p['nomePagador'] != null) 'nome_pagador': p['nomePagador'],
+          if (p['cpfPagador'] != null) 'cpf_cnpj_pagador': p['cpfPagador'],
+          if (p['cheques'] != null) 'cheques': p['cheques'],
+        });
         restante -= valorPago;
       }
 
-      final pagamentosAtuais =
-          (_pedidoSelecionado!['pagamentos'] as List? ?? [])
-              .map((e) => Map<String, dynamic>.from(e as Map))
-              .toList();
-      final crediariosExistentes = pagamentosAtuais
-          .where((p) => p['pagamento_posterior'] == true)
-          .toList();
-
-      if (crediariosExistentes.isNotEmpty) {
-        final nomeFormaCredito =
-            crediariosExistentes.first['forma_pagamento'] as String;
-        final totalCreditoAtual = crediariosExistentes.fold<double>(
-          0.0,
-          (s, p) => s + _toDouble(p['valor_pago']),
-        );
-
-        for (final c in crediariosExistentes) {
-          await ApiService.dio.delete('/pagamentos/${c['id']}');
-        }
-
-        final novoSaldoCredito = totalCreditoAtual - totalRealPago;
-        if (novoSaldoCredito > 0.005) {
-          await ApiService.dio.post(
-            '/pagamentos',
-            data: {
-              'pedido_id': pedidoId,
-              'valor_pago': novoSaldoCredito,
-              'forma_pagamento': nomeFormaCredito,
-              'data_pagamento': DateTime.now().toUtc().toIso8601String(),
-            },
-          );
-        }
+      if (corpo.isNotEmpty) {
+        await ApiService.dio.post('/pedidos/$pedidoId/pagamentos',
+            data: {'pagamentos': corpo});
       }
 
       await _recarregarSilencioso(pedidoId);
-      setState(() => _salvando = false);
+      if (mounted) setState(() => _salvando = false);
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -357,6 +344,13 @@ class _TelaPedidosState extends State<TelaPedidos> {
             backgroundColor: CoresSemanticas.sucesso,
           ),
         );
+        if (haPagamentosDescartados(pagamentosReais, saldoParaPagar)) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Valor de troco não registrado como pagamento.'),
+            ),
+          );
+        }
         await PdfDownloadService.baixarESalvar(
           context,
           pedidoId,
@@ -385,7 +379,7 @@ class _TelaPedidosState extends State<TelaPedidos> {
         'data_pedido': novaData.toUtc().toIso8601String(),
       });
       await _recarregarSilencioso(pedidoId);
-      setState(() => _salvando = false);
+      if (mounted) setState(() => _salvando = false);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
@@ -499,6 +493,16 @@ class _TelaPedidosState extends State<TelaPedidos> {
     if (mounted) setState(() => _salvando = false);
   }
 
+  Future<void> _emitirPdfPedido() async {
+    setState(() => _salvando = true);
+    await PdfDownloadService.baixarESalvar(
+      context,
+      _pedidoSelecionado!['id'] as int,
+      clienteEmail: _pedidoSelecionado!['clientes']?['email'] as String?,
+    );
+    if (mounted) setState(() => _salvando = false);
+  }
+
   Future<void> _excluirPedido() async {
     final pedidoId = _pedidoSelecionado!['id'] as int;
     final confirmado = await mostrarDialogConfirmacao(
@@ -510,7 +514,7 @@ class _TelaPedidosState extends State<TelaPedidos> {
     );
     if (!confirmado) return;
 
-    setState(() => _salvando = true);
+    if (mounted) setState(() => _salvando = true);
     try {
       await ApiService.dio.delete('/pedidos/$pedidoId');
       if (!mounted) return;
@@ -543,7 +547,7 @@ class _TelaPedidosState extends State<TelaPedidos> {
     if (resultado == null) return;
 
     final pedidoId = _pedidoSelecionado!['id'] as int;
-    setState(() => _salvando = true);
+    if (mounted) setState(() => _salvando = true);
     try {
       await ApiService.dio.put(
         '/pagamentos/${pagamento['id']}',
@@ -557,7 +561,7 @@ class _TelaPedidosState extends State<TelaPedidos> {
         },
       );
       await _recarregarSilencioso(pedidoId);
-      setState(() => _salvando = false);
+      if (mounted) setState(() => _salvando = false);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
@@ -583,11 +587,11 @@ class _TelaPedidosState extends State<TelaPedidos> {
     if (!confirmado) return;
 
     final pedidoId = _pedidoSelecionado!['id'] as int;
-    setState(() => _salvando = true);
+    if (mounted) setState(() => _salvando = true);
     try {
       await ApiService.dio.delete('/pagamentos/${pagamento['id']}');
       await _recarregarSilencioso(pedidoId);
-      setState(() => _salvando = false);
+      if (mounted) setState(() => _salvando = false);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
@@ -610,7 +614,7 @@ class _TelaPedidosState extends State<TelaPedidos> {
     if (resultado == null) return;
 
     final pedidoId = _pedidoSelecionado!['id'] as int;
-    setState(() => _salvando = true);
+    if (mounted) setState(() => _salvando = true);
     try {
       await ApiService.dio.put('/pagamentos/${pagamento['id']}', data: {
         'status_nota': resultado['status_nota'],
@@ -618,7 +622,7 @@ class _TelaPedidosState extends State<TelaPedidos> {
         'data_emissao_nota': resultado['data_emissao_nota'],
       });
       await _recarregarSilencioso(pedidoId);
-      setState(() => _salvando = false);
+      if (mounted) setState(() => _salvando = false);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
@@ -655,11 +659,7 @@ class _TelaPedidosState extends State<TelaPedidos> {
                     onVoltar: () => setState(() => _pedidoSelecionado = null),
                     onRegistrarPagamento: () =>
                         _abrirModalPagamento(_pedidoSelecionado!),
-                    onEmitirPdf: () => PdfDownloadService.baixarESalvar(
-                      context,
-                      _pedidoSelecionado!['id'] as int,
-                      clienteEmail: _pedidoSelecionado!['clientes']?['email'] as String?,
-                    ),
+                    onEmitirPdf: _emitirPdfPedido,
                     onEnviarEmail: _enviarEmailPedido,
                     onEditar: () => _abrirEdicaoPedido(_pedidoSelecionado!),
                     onExcluir: _excluirPedido,
@@ -809,5 +809,3 @@ class _TelaPedidosState extends State<TelaPedidos> {
   }
 }
 
-double _toDouble(dynamic v) =>
-    v == null ? 0.0 : double.tryParse(v.toString()) ?? 0.0;

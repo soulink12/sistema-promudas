@@ -32,7 +32,7 @@ class ListaPedidos extends StatelessWidget {
         final nomeCliente = capitalizarNome(
           p['clientes']?['nome'] as String? ?? 'Cliente desconhecido',
         );
-        final total = _toDouble(p['valor_total']);
+        final total = paraDouble(p['valor_total']);
         final data = formatarDataHora(p['data_pedido'] ?? p['criado_em']);
         final statusPag = p['status_pagamento'] as String? ?? 'Pendente';
         final statusEntrega = p['status_entrega'] as String? ?? 'Pendente';
@@ -128,5 +128,3 @@ String _statusNotaPedido(List pagamentos) {
   return 'Parcial';
 }
 
-double _toDouble(dynamic v) =>
-    v == null ? 0.0 : double.tryParse(v.toString()) ?? 0.0;

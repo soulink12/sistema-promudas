@@ -4,6 +4,7 @@ const pdfService = require('./pdfService');
 const emailService = require('./emailService');
 const pedidoService = require('./pedidoService');
 const { formatarNumeroOrcamento } = require('../utils/numeroOrcamento');
+const { retryColisao } = require('../utils/retryColisao');
 const BusinessError = require('../utils/BusinessError');
 
 const ORCAMENTO_INCLUDE = {
@@ -14,12 +15,20 @@ const ORCAMENTO_INCLUDE = {
 };
 
 const criarOrcamento = async (dados) => {
+    // valor_total é sempre recalculado a partir dos itens (não confia no
+    // cliente), mesma lógica de pedidoService.criarPedidoTx.
+    const subtotal = dados.itens.reduce(
+        (s, item) => s + parseFloat(item.valor_unitario) * parseInt(item.quantidade),
+        0
+    );
+    const ajuste = Number(dados.ajuste ?? 0);
+
     return await prisma.orcamentos.create({
         data: {
             clientes: {
                 connect: { id: parseInt(dados.cliente_id) }
             },
-            valor_total: dados.valor_total,
+            valor_total: subtotal + ajuste,
             ajuste: dados.ajuste ?? null,
             observacoes: dados.observacoes,
             data_orcamento: new Date(),
@@ -62,7 +71,7 @@ const listarOrcamentos = async (filtros = {}) => {
 
     return await prisma.orcamentos.findMany({
         where,
-        orderBy: { criado_em: 'desc' },
+        orderBy: [{ data_orcamento: 'desc' }, { criado_em: 'desc' }],
         include: ORCAMENTO_INCLUDE
     });
 };
@@ -140,8 +149,11 @@ const eliminarOrcamento = async (id) => {
 // Aprova o orçamento: cria um Pedido de verdade com os mesmos dados (cliente,
 // itens, ajuste, observações) — nasce sem pagamento/entrega, como um pedido
 // novo qualquer — e marca o orçamento como Aprovado, vinculado ao pedido criado.
+// Mesma corrida de numero_temporada de pedidoService.criarPedido (a aprovação
+// cria um pedido de verdade via criarPedidoTx) — retryColisao tenta de novo
+// em vez de propagar um 500 por uma colisão que se resolve sozinha na repetição.
 const aprovarOrcamento = async (id) => {
-    return await prisma.$transaction(async (tx) => {
+    return await retryColisao(() => prisma.$transaction(async (tx) => {
         const orcamento = await tx.orcamentos.findUnique({
             where: { id: parseInt(id) },
             include: { itens_orcamento: true },
@@ -170,7 +182,7 @@ const aprovarOrcamento = async (id) => {
             data: { status: 'Aprovado', pedido_id: pedido.id },
             include: ORCAMENTO_INCLUDE,
         });
-    });
+    }));
 };
 
 const recusarOrcamento = async (id) => {
@@ -190,24 +202,20 @@ const recusarOrcamento = async (id) => {
     });
 };
 
-// Notificação interna (EMAIL_NOTIFICACAO_PEDIDOS) de orçamento criado/alterado —
-// best-effort, veja emailService.notificarPedidoOuOrcamento.
-// Notificação interna (EMAIL_NOTIFICACAO_PEDIDOS) de orçamento criado/alterado —
-// best-effort, veja emailService.notificarDocumentoPorEmail.
-const notificarOrcamentoPorEmail = (id, tipo) => emailService.notificarDocumentoPorEmail({
+// Dispara os e-mails de um evento de orçamento — best-effort, veja
+// emailService.notificarEvento. `evento` é uma chave de emailService.EVENTOS.
+const notificarOrcamentoPorEmail = (id, evento) => emailService.notificarEvento({
     id,
-    tipo,
+    evento,
     gerarPDF: pdfService.gerarOrcamentoPDF,
     formatarNumero: formatarNumeroOrcamento,
-    rotulo: 'Orçamento',
 });
 
 const enviarOrcamentoPorEmail = (id) => emailService.enviarDocumentoPorEmail({
     id,
+    evento: 'orcamentoManual',
     gerarPDF: pdfService.gerarOrcamentoPDF,
     formatarNumero: formatarNumeroOrcamento,
-    rotulo: 'Orçamento',
-    descricaoDocumento: 'o seu orçamento',
 });
 
 module.exports = {

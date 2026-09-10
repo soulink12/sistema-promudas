@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../../../../core/utils/cpf_cnpj.dart';
+import '../../../../core/utils/mascaras.dart';
+import '../../../../core/utils/formatadores.dart';
+import '../../../../core/services/cep_service.dart';
 import '../../../../core/widgets/dialog_confirmacao.dart';
 
 class FormEdicaoCliente extends StatefulWidget {
@@ -48,10 +51,14 @@ class _FormEdicaoClienteState extends State<FormEdicaoCliente> {
     _inscricao = TextEditingController(
       text: c['inscricao_estadual'] as String? ?? '',
     );
-    _tel1 = TextEditingController(text: c['telefone_1'] as String? ?? '');
-    _tel2 = TextEditingController(text: c['telefone_2'] as String? ?? '');
+    _tel1 = TextEditingController(
+      text: formatarTelefone(c['telefone_1'] as String?),
+    );
+    _tel2 = TextEditingController(
+      text: formatarTelefone(c['telefone_2'] as String?),
+    );
     _email = TextEditingController(text: c['email'] as String? ?? '');
-    _cep = TextEditingController(text: c['cep'] as String? ?? '');
+    _cep = TextEditingController(text: formatarCep(c['cep'] as String?));
     _logradouro = TextEditingController(text: c['logradouro'] as String? ?? '');
     _numero = TextEditingController(text: c['numero'] as String? ?? '');
     _bairro = TextEditingController(text: c['bairro'] as String? ?? '');
@@ -112,6 +119,35 @@ class _FormEdicaoClienteState extends State<FormEdicaoCliente> {
     await widget.onSalvar(body);
   }
 
+
+  // Busca o endereço no ViaCEP quando o CEP fica completo (8 dígitos), e
+  // preenche só os campos que ainda estão vazios — para não sobrescrever algo
+  // que o operador já ajustou na mão. Falha silenciosa: é conveniência.
+  bool _buscandoCep = false;
+
+  Future<void> _buscarEnderecoPorCep() async {
+    final digitos = _cep.text.replaceAll(RegExp(r'\D'), '');
+    if (digitos.length != 8 || _buscandoCep) return;
+
+    setState(() => _buscandoCep = true);
+    final endereco = await CepService.buscar(digitos);
+    if (!mounted) return;
+    setState(() => _buscandoCep = false);
+    if (endereco == null) return;
+
+    void preencher(TextEditingController controller, String valor) {
+      if (valor.isNotEmpty && controller.text.trim().isEmpty) {
+        controller.text = valor;
+      }
+    }
+
+    preencher(_logradouro, endereco.logradouro);
+    preencher(_bairro, endereco.bairro);
+    preencher(_cidade, endereco.cidade);
+    if (endereco.estado.isNotEmpty) _estado.text = endereco.estado;
+    setState(() {});
+  }
+
   @override
   Widget build(BuildContext context) {
     return SingleChildScrollView(
@@ -156,7 +192,7 @@ class _FormEdicaoClienteState extends State<FormEdicaoCliente> {
                   ],
                 ),
                 const Divider(height: 24),
-                _campo(_nome, 'Nome *', obrigatorio: true),
+                _campo(_nome, 'Nome *', obrigatorio: true, limite: 100),
                 _subtitulo(context, 'Identificação'),
                 _campo(
                   _cpf,
@@ -165,33 +201,46 @@ class _FormEdicaoClienteState extends State<FormEdicaoCliente> {
                   inputFormatters: [CpfCnpjInputFormatter()],
                   validator: validarCampoCpfCnpj,
                 ),
-                _campo(_inscricao, 'Inscrição Estadual'),
+                _campo(_inscricao, 'Inscrição Estadual', limite: 30),
                 _subtitulo(context, 'Contato'),
-                _campo(_tel1, 'Telefone'),
-                _campo(_tel2, 'Telefone 2'),
+                _campo(_tel1, 'Telefone',
+                        keyboardType: TextInputType.phone,
+                        inputFormatters: [TelefoneInputFormatter()]),
+                _campo(_tel2, 'Telefone 2',
+                        keyboardType: TextInputType.phone,
+                        inputFormatters: [TelefoneInputFormatter()]),
                 _campo(
                   _email,
                   'E-mail',
                   keyboardType: TextInputType.emailAddress,
                   validator: _validarEmail,
+                  limite: 150,
                 ),
                 _subtitulo(context, 'Endereço'),
                 Row(
                   children: [
-                    Expanded(flex: 2, child: _campo(_cep, 'CEP')),
+                    Expanded(
+                        flex: 2,
+                        child: _campo(_cep, 'CEP',
+                            keyboardType: TextInputType.number,
+                            inputFormatters: [CepInputFormatter()],
+                            onChanged: (_) => _buscarEnderecoPorCep())),
                     const SizedBox(width: 12),
-                    Expanded(flex: 3, child: _campo(_estado, 'Estado')),
+                    Expanded(
+                        flex: 3, child: _campo(_estado, 'Estado', limite: 2)),
                   ],
                 ),
-                _campo(_logradouro, 'Logradouro'),
+                _campo(_logradouro, 'Logradouro', limite: 150),
                 Row(
                   children: [
-                    Expanded(flex: 3, child: _campo(_bairro, 'Bairro')),
+                    Expanded(
+                        flex: 3, child: _campo(_bairro, 'Bairro', limite: 100)),
                     const SizedBox(width: 12),
-                    Expanded(flex: 1, child: _campo(_numero, 'Número')),
+                    Expanded(
+                        flex: 1, child: _campo(_numero, 'Número', limite: 20)),
                   ],
                 ),
-                _campo(_cidade, 'Cidade'),
+                _campo(_cidade, 'Cidade', limite: 100),
               ],
             ),
           ),
@@ -227,6 +276,8 @@ Widget _subtitulo(BuildContext context, String texto) {
   );
 }
 
+// `limite` espelha o tamanho da coluna no banco — ver _campo do
+// dialog_cadastro_cliente.dart, que segue o mesmo critério.
 Widget _campo(
   TextEditingController controller,
   String label, {
@@ -234,13 +285,19 @@ Widget _campo(
   TextInputType? keyboardType,
   List<TextInputFormatter>? inputFormatters,
   String? Function(String?)? validator,
+  int? limite,
+  ValueChanged<String>? onChanged,
 }) {
   return Padding(
     padding: const EdgeInsets.only(bottom: 12),
     child: TextFormField(
       controller: controller,
       keyboardType: keyboardType,
-      inputFormatters: inputFormatters,
+      inputFormatters: [
+        ...?inputFormatters,
+        if (limite != null) LengthLimitingTextInputFormatter(limite),
+      ],
+      onChanged: onChanged,
       decoration: InputDecoration(
         labelText: label,
         border: const OutlineInputBorder(),

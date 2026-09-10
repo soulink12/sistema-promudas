@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'campo_busca_cliente.dart';
+import '../utils/formatadores.dart';
 
 /// Barra de filtro por cliente para telas de listagem (pedidos, entregas).
 ///
@@ -45,9 +46,13 @@ class PesquisaClienteLista extends StatelessWidget {
                   child: ListTile(
                     leading: Icon(Icons.person_outline, color: cs.primary),
                     title: Text(
-                      clienteSelecionado!['nome'] as String,
+                      capitalizarNome(clienteSelecionado!['nome'] as String? ?? ''),
                       style: const TextStyle(fontWeight: FontWeight.w600),
                     ),
+                    subtitle: const Text('Toque para pesquisar outro cliente'),
+                    // Clicar no card já volta para a busca — antes só o "X" no
+                    // canto fazia isso, e não era óbvio.
+                    onTap: onLimpar,
                     trailing: IconButton(
                       icon: const Icon(Icons.close),
                       tooltip: 'Remover filtro',

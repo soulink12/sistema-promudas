@@ -70,11 +70,21 @@ class _PdfPreviewScreenState extends State<PdfPreviewScreen> {
 
   bool _enviandoEmail = false;
 
-  // Preenchidos a cada build de _paginaAjustada, usados para limitar o pan
-  // às bordas da página (ver _limitarPan).
+  // Cache das medidas do último layout, usado só para limitar o pan às bordas
+  // da página (ver _limitarPan). NÃO é estado de UI: é gravado durante o
+  // build, então nada aqui pode chamar setState — ver _guardarMedidas.
   Size? _tamanhoViewport;
   double? _larguraBase;
   double? _alturaBase;
+
+  /// Guarda as medidas do layout atual. Chamado de dentro do `build` do
+  /// LayoutBuilder, por isso não dispara setState: o pan é recalculado no
+  /// próximo gesto, não neste frame.
+  void _guardarMedidas(BoxConstraints constraints, double larguraBase, double alturaBase) {
+    _tamanhoViewport = Size(constraints.maxWidth, constraints.maxHeight);
+    _larguraBase = larguraBase;
+    _alturaBase = alturaBase;
+  }
 
   void _definirZoom(double novoZoom) {
     setState(() {
@@ -131,7 +141,7 @@ class _PdfPreviewScreenState extends State<PdfPreviewScreen> {
       return;
     }
 
-    setState(() => _carregando3Vias = true);
+    if (mounted) setState(() => _carregando3Vias = true);
     try {
       final response = await ApiService.dio.get(
         '/pedidos/${widget.pedidoId}/pdf',
@@ -269,9 +279,7 @@ class _PdfPreviewScreenState extends State<PdfPreviewScreen> {
           final centroX = constraints.maxWidth / 2;
           final centroY = constraints.maxHeight / 2;
 
-          _tamanhoViewport = Size(constraints.maxWidth, constraints.maxHeight);
-          _larguraBase = larguraBase;
-          _alturaBase = alturaBase;
+          _guardarMedidas(constraints, larguraBase, alturaBase);
 
           final matriz = Matrix4.identity()
             ..translateByDouble(centroX + _pan.dx, centroY + _pan.dy, 0, 1)

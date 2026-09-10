@@ -42,12 +42,14 @@ class _TelaConsultaEntregasState extends State<TelaConsultaEntregas> {
           .map<Map<String, dynamic>>((e) => Map<String, dynamic>.from(e as Map))
           .toList();
 
-      setState(() {
-        _entregas = lista;
-        _carregando = false;
-      });
+      if (mounted) {
+        setState(() {
+          _entregas = lista;
+          _carregando = false;
+        });
+      }
     } catch (_) {
-      setState(() => _carregando = false);
+      if (mounted) setState(() => _carregando = false);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(

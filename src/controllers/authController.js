@@ -16,7 +16,12 @@ const registrar = async (req, res, next) => {
 
 const login = async (req, res, next) => {
     try {
-        const { email, senha } = req.body;
+        const { email, senha } = req.body ?? {};
+
+        // Sem isso, um POST sem corpo estourava 500 num endpoint público.
+        if (!email || !senha) {
+            return res.status(400).json({ erro: 'Informe e-mail e senha.' });
+        }
 
         // Valida as credenciais através do Service
         const usuario = await authService.validarLogin(email, senha);

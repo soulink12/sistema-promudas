@@ -57,7 +57,13 @@ class _TelaListaClientesState extends State<TelaListaClientes> {
 
   /// Carrega os clientes. Sem [busca], traz os 20 últimos cadastrados;
   /// com [busca], pesquisa no backend (nome, CPF/CNPJ ou telefone).
-  Future<void> _carregarClientes([String? busca]) async {
+  // Contador das buscas disparadas. O debounce reduz as chamadas, mas não
+  // impede que uma requisição lenta chegue depois de outra mais recente e
+  // sobrescreva a lista com o resultado errado — por isso a resposta fora de
+  // ordem é descartada.
+  int _buscaAtual = 0;
+
+  Future<void> _carregarClientes([String? busca, int? sequencia]) async {
     setState(() {
       _carregando = true;
       _erroCarregamento = null;
@@ -69,6 +75,9 @@ class _TelaListaClientesState extends State<TelaListaClientes> {
             ? {'busca': busca}
             : null,
       );
+      if (sequencia != null && sequencia != _buscaAtual) return;
+      if (!mounted) return;
+
       final dados = response.data as List<dynamic>;
       setState(() {
         _clientes = dados
@@ -81,10 +90,13 @@ class _TelaListaClientesState extends State<TelaListaClientes> {
 
       await _preSelecionarInicial();
     } catch (_) {
-      setState(() {
-        _erroCarregamento = 'Não foi possível carregar os clientes.';
-        _carregando = false;
-      });
+      if (sequencia != null && sequencia != _buscaAtual) return;
+      if (mounted) {
+        setState(() {
+          _erroCarregamento = 'Não foi possível carregar os clientes.';
+          _carregando = false;
+        });
+      }
     }
   }
 
@@ -124,7 +136,7 @@ class _TelaListaClientesState extends State<TelaListaClientes> {
       _textoBusca = '';
     });
     _atualizandoProgramaticamente = false;
-    _carregarPedidosCliente(cliente['nome'] as String? ?? '');
+    _carregarPedidosCliente(cliente['id'] as int);
   }
 
   void _limparSelecao() {
@@ -139,24 +151,28 @@ class _TelaListaClientesState extends State<TelaListaClientes> {
     _carregarClientes(); // volta a mostrar os 20 mais recentes
   }
 
-  Future<void> _carregarPedidosCliente(String nome) async {
+  // Busca por id, não por nome: o filtro por nome usa `contains` no backend,
+  // então a ficha da "Ana" acabava listando pedidos de "Ana Maria" e "Mariana".
+  Future<void> _carregarPedidosCliente(int clienteId) async {
     setState(() => _carregandoPedidos = true);
     try {
       final response = await ApiService.dio.get(
         '/pedidos',
-        queryParameters: {'cliente': nome},
+        queryParameters: {'clienteId': clienteId},
       );
       final dados = response.data as List;
-      setState(() {
-        _pedidosCliente = dados
-            .map<Map<String, dynamic>>(
-              (e) => Map<String, dynamic>.from(e as Map),
-            )
-            .toList();
-        _carregandoPedidos = false;
-      });
+      if (mounted) {
+        setState(() {
+          _pedidosCliente = dados
+              .map<Map<String, dynamic>>(
+                (e) => Map<String, dynamic>.from(e as Map),
+              )
+              .toList();
+          _carregandoPedidos = false;
+        });
+      }
     } catch (_) {
-      setState(() => _carregandoPedidos = false);
+      if (mounted) setState(() => _carregandoPedidos = false);
     }
   }
 
@@ -166,11 +182,13 @@ class _TelaListaClientesState extends State<TelaListaClientes> {
       final id = _clienteSelecionado!['id'];
       final response = await ApiService.dio.put('/clientes/$id', data: body);
       final atualizado = Map<String, dynamic>.from(response.data as Map);
-      setState(() {
-        _clienteSelecionado = atualizado;
-        _editando = false;
-        _salvandoEdicao = false;
-      });
+      if (mounted) {
+        setState(() {
+          _clienteSelecionado = atualizado;
+          _editando = false;
+          _salvandoEdicao = false;
+        });
+      }
       _carregarClientes();
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -215,7 +233,7 @@ class _TelaListaClientesState extends State<TelaListaClientes> {
       ),
     );
     if (mounted && _clienteSelecionado != null) {
-      _carregarPedidosCliente(_clienteSelecionado!['nome'] as String? ?? '');
+      _carregarPedidosCliente(_clienteSelecionado!['id'] as int);
     }
   }
 
@@ -226,7 +244,7 @@ class _TelaListaClientesState extends State<TelaListaClientes> {
       MaterialPageRoute(builder: (_) => TelaPedidos(clienteInicial: c)),
     );
     if (mounted && _clienteSelecionado != null) {
-      _carregarPedidosCliente(_clienteSelecionado!['nome'] as String? ?? '');
+      _carregarPedidosCliente(_clienteSelecionado!['id'] as int);
     }
   }
 
@@ -299,7 +317,8 @@ class _TelaListaClientesState extends State<TelaListaClientes> {
           // Debounce para não consultar a API a cada tecla
           _debounce?.cancel();
           _debounce = Timer(const Duration(milliseconds: 350), () {
-            _carregarClientes(texto.trim());
+            _buscaAtual++;
+            _carregarClientes(texto.trim(), _buscaAtual);
           });
         },
       ),

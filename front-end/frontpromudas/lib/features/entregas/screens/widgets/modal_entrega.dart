@@ -143,7 +143,19 @@ class _ModalEntregaState extends State<ModalEntrega> {
 
   bool get _podeSalvar {
     if (_localSaida == null) return false;
+    if (_algumaQuantidadeAcimaDoSaldo) return false;
     return _qtdControllers.any((c) => (int.tryParse(c.text) ?? 0) > 0);
+  }
+
+  /// Compara cada quantidade digitada com o saldo já exibido ao lado dela.
+  /// Antes só o backend recusava, e o erro chegava depois de tudo preenchido.
+  bool get _algumaQuantidadeAcimaDoSaldo {
+    for (int i = 0; i < _itensComSaldo.length; i++) {
+      final qtd = int.tryParse(_qtdControllers[i].text) ?? 0;
+      final saldo = _itensComSaldo[i]['saldo'] as int? ?? 0;
+      if (qtd > saldo) return true;
+    }
+    return false;
   }
 
   Future<void> _confirmar() async {
@@ -185,7 +197,7 @@ class _ModalEntregaState extends State<ModalEntrega> {
       }
       widget.onSalvo();
     } catch (e) {
-      setState(() => _salvando = false);
+      if (mounted) setState(() => _salvando = false);
       final acao = _modoEdicao ? 'atualizar' : 'registrar';
       if (mounted) {
         mostrarErro(context, extrairErroApi(e, 'Erro ao $acao entrega.'));

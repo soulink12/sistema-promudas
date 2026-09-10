@@ -28,7 +28,7 @@ class DetalhesCliente extends StatelessWidget {
     final c = cliente;
     final nome = capitalizarNome(c['nome'] as String? ?? '');
     final cpfCnpj = c['cpf_cnpj'] as String?;
-    final saldoCredito = _toDouble(c['saldo_credito']);
+    final saldoCredito = paraDouble(c['saldo_credito']);
     final pendentes = pedidosCliente.where((p) {
       final s = p['status_pagamento'] as String? ?? '';
       return s == 'Pendente' || s == 'Parcial';
@@ -102,17 +102,17 @@ class DetalhesCliente extends StatelessWidget {
                       ('Inscrição Estadual', c['inscricao_estadual']),
                     ]),
                     _secao(context, 'Contato', [
-                      ('Telefone', c['telefone_1']),
-                      ('Telefone 2', c['telefone_2']),
+                      ('Telefone', formatarTelefone(c['telefone_1'] as String?)),
+                      ('Telefone 2', formatarTelefone(c['telefone_2'] as String?)),
                       ('E-mail', c['email']),
                     ]),
                     _secao(context, 'Endereço', [
-                      ('CEP', c['cep']),
-                      ('Logradouro', c['logradouro']),
-                      ('Número', c['numero']),
-                      ('Bairro', c['bairro']),
-                      ('Cidade', c['cidade']),
-                      ('Estado', c['estado']),
+                      ('CEP', formatarCep(c['cep'] as String?)),
+                      ('Logradouro', _emMaiusculas(c['logradouro'])),
+                      ('Número', _emMaiusculas(c['numero'])),
+                      ('Bairro', _emMaiusculas(c['bairro'])),
+                      ('Cidade', _emMaiusculas(c['cidade'])),
+                      ('Estado', _emMaiusculas(c['estado'])),
                     ]),
                     _secao(context, 'Sistema', [
                       ('Cadastrado em', _formatarData(c['criado_em'])),
@@ -238,7 +238,7 @@ class DetalhesCliente extends StatelessWidget {
               child: Column(
                 children: pendentes.map((p) {
                   final numero = formatarNumeroPedido(p);
-                  final total = _toDouble(p['valor_total']);
+                  final total = paraDouble(p['valor_total']);
                   final status = p['status_pagamento'] as String? ?? 'Pendente';
                   final data = _formatarData(p['criado_em']) ?? '—';
                   final pagamentos = (p['pagamentos'] as List? ?? []);
@@ -250,7 +250,7 @@ class DetalhesCliente extends StatelessWidget {
                         (pag as Map)['pagamento_posterior'] == true;
                     return isPosterior
                         ? soma
-                        : soma + _toDouble(pag['valor_pago']);
+                        : soma + paraDouble(pag['valor_pago']);
                   });
                   final valorPendente = (total - totalPagoReal).clamp(
                     0.0,
@@ -329,6 +329,12 @@ class DetalhesCliente extends StatelessWidget {
 
 // ── Widgets auxiliares ──────────────────────────────────────────────────────
 
+// Endereço é exibido todo em maiúsculas (padrão de etiqueta/correspondência).
+String? _emMaiusculas(dynamic valor) {
+  final texto = valor?.toString().trim() ?? '';
+  return texto.isEmpty ? null : texto.toUpperCase();
+}
+
 Widget? _secao(
   BuildContext context,
   String titulo,
@@ -389,8 +395,6 @@ String _iniciais(String nome) {
   return partes.take(2).map((p) => p[0].toUpperCase()).join();
 }
 
-double _toDouble(dynamic v) =>
-    v == null ? 0.0 : double.tryParse(v.toString()) ?? 0.0;
 
 String? _formatarData(dynamic valor) {
   if (valor == null) return null;

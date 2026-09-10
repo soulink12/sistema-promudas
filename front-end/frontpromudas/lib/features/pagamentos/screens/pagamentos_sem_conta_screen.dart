@@ -31,12 +31,14 @@ class _TelaPagamentosSemContaState extends State<TelaPagamentosSemConta> {
       final lista = (response.data as List)
           .map<Map<String, dynamic>>((e) => Map<String, dynamic>.from(e as Map))
           .toList();
-      setState(() {
-        _pagamentos = lista;
-        _carregando = false;
-      });
+      if (mounted) {
+        setState(() {
+          _pagamentos = lista;
+          _carregando = false;
+        });
+      }
     } catch (_) {
-      setState(() => _carregando = false);
+      if (mounted) setState(() => _carregando = false);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
@@ -138,8 +140,6 @@ class _CardPagamentoSemConta extends StatelessWidget {
         '${dt.month.toString().padLeft(2, '0')}/${dt.year}';
   }
 
-  double _toDouble(dynamic v) =>
-      v == null ? 0.0 : double.tryParse(v.toString()) ?? 0.0;
 
   @override
   Widget build(BuildContext context) {
@@ -152,7 +152,7 @@ class _CardPagamentoSemConta extends StatelessWidget {
             '—';
     final forma = pagamento['forma_pagamento'] as String? ?? '—';
     final data = _formatarData(pagamento['criado_em']);
-    final valor = _toDouble(pagamento['valor_pago']);
+    final valor = paraDouble(pagamento['valor_pago']);
 
     return Card(
       child: Padding(
@@ -268,16 +268,20 @@ class _DialogDefinirContaState extends State<_DialogDefinirConta> {
   Future<void> _carregar() async {
     try {
       final contas = await ContaService().listar();
-      setState(() {
-        _contas = contas;
-        _selecionada = contas.isNotEmpty ? contas.first : null;
-        _carregando = false;
-      });
+      if (mounted) {
+        setState(() {
+          _contas = contas;
+          _selecionada = contas.isNotEmpty ? contas.first : null;
+          _carregando = false;
+        });
+      }
     } catch (_) {
-      setState(() {
-        _erro = 'Não foi possível carregar as contas.';
-        _carregando = false;
-      });
+      if (mounted) {
+        setState(() {
+          _erro = 'Não foi possível carregar as contas.';
+          _carregando = false;
+        });
+      }
     }
   }
 

@@ -22,7 +22,10 @@ const FRONT_DIR = path.join(RAIZ, 'front-end', 'frontpromudas');
 const PUBSPEC = path.join(FRONT_DIR, 'pubspec.yaml');
 const DIST_DIR = path.join(FRONT_DIR, 'dist', 'desktop_updater');
 const UPDATES_DIR = path.join(RAIZ, 'updates');
-const IP_SERVIDOR = '172.28.114.71:6072';
+// Endereço do servidor de produção, usado só na instrução impressa ao final.
+// Estava fixo num IP antigo (172.28.114.71), então a mensagem apontava para a
+// máquina errada depois da migração para o ZimaOS.
+const IP_SERVIDOR = process.env.IP_SERVIDOR || '192.168.1.62:6072';
 
 // Encerra com mensagem de erro e código 1.
 function abortar(mensagem) {

@@ -12,6 +12,11 @@ class ApiService {
   static Dio? _dio;
   static Dio get dio => _dio ??= _criarDio();
 
+  /// Chamado quando a API responde 401 numa rota autenticada, ou seja, quando a
+  /// sessão expirou (o token dura 8h). Definido no `main()`, que sabe navegar
+  /// para o login — assim o `core` não precisa conhecer as telas.
+  static void Function()? aoExpirarSessao;
+
   static Dio _criarDio() {
     final d = Dio(
       BaseOptions(
@@ -27,6 +32,20 @@ class ApiService {
           options.headers['Authorization'] = 'Bearer ${AuthService.token}';
         }
         handler.next(options);
+      },
+      onError: (erro, handler) {
+        // Sessão expirada: sem isso, num PDV aberto o dia inteiro toda ação
+        // passava a falhar com erro genérico e o operador ficava preso até
+        // fechar e reabrir o app. O 401 do próprio login é senha errada, não
+        // expiração — esse segue para a tela tratar.
+        final ehRotaDeAuth = erro.requestOptions.path.contains('/auth/');
+        if (erro.response?.statusCode == 401 &&
+            !ehRotaDeAuth &&
+            AuthService.token != null) {
+          AuthService.logout();
+          aoExpirarSessao?.call();
+        }
+        handler.next(erro);
       },
     ));
     return d;

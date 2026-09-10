@@ -1,8 +1,19 @@
 const pagamentoService = require('../services/pagamentoService');
+const pedidoService = require('../services/pedidoService');
 
 const criarPagamento = async (req, res, next) => {
     try {
+        const { pedido_id, valor_pago, forma_pagamento } = req.body ?? {};
+
+        if (!pedido_id || valor_pago === undefined || !forma_pagamento) {
+            return res.status(400).json({
+                erro: 'Informe o pedido, o valor pago e a forma de pagamento.'
+            });
+        }
+
         const id = await pagamentoService.criarPagamento(req.body);
+        pedidoService.notificarPedidoPorEmail(pedido_id, 'pedidoPagamento')
+            .catch((erro) => console.error('Falha ao enviar notificacao de e-mail do pedido:', erro));
         res.status(201).json({ mensagem: 'Pagamento criado com sucesso', id });
     } catch (erro) {
         next(erro);
@@ -11,7 +22,8 @@ const criarPagamento = async (req, res, next) => {
 
 const listarPagamentos = async (req, res, next) => {
     try {
-        const pagamentos = await pagamentoService.listarPagamentos();
+        const { de, ate, limite } = req.query;
+        const pagamentos = await pagamentoService.listarPagamentos({ de, ate, limite });
         res.status(200).json(pagamentos);
     } catch (erro) {
         next(erro);

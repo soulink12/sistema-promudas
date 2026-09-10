@@ -28,12 +28,17 @@ class CarrinhoService {
   bool get ehPercentualAjuste => _ehPercentual;
   double get percentualAjuste => _percentual;
 
+  /// Arredonda para 2 casas — os totais aqui são double, mas no banco são
+  /// Decimal(10,2); sem isso o acúmulo de ponto flutuante diverge em centavos
+  /// do total recalculado pelo servidor.
+  static double _emCentavos(double valor) => (valor * 100).round() / 100;
+
   /// Soma dos totais dos itens, sem ajuste.
   double get subtotal =>
-      _itens.fold(0, (s, i) => s + (i['total'] as double));
+      _emCentavos(_itens.fold(0, (s, i) => s + (i['total'] as double)));
 
   /// Total final após aplicar desconto ou acréscimo.
-  double get totalComAjuste => subtotal + ajuste;
+  double get totalComAjuste => _emCentavos(subtotal + ajuste);
 
   /// Adiciona um produto ao carrinho com a [quantidade] informada (padrão: 1).
   /// Se o produto já existir (mesmo id), soma a quantidade e recalcula o total.

@@ -51,12 +51,14 @@ class _TelaRelatorioPedidosState extends State<TelaRelatorioPedidos> {
         queryParameters: params,
       );
 
-      setState(() {
-        _resultado = Map<String, dynamic>.from(response.data as Map);
-        _carregando = false;
-      });
+      if (mounted) {
+        setState(() {
+          _resultado = Map<String, dynamic>.from(response.data as Map);
+          _carregando = false;
+        });
+      }
     } catch (_) {
-      setState(() => _carregando = false);
+      if (mounted) setState(() => _carregando = false);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
@@ -97,7 +99,34 @@ class _TelaRelatorioPedidosState extends State<TelaRelatorioPedidos> {
       );
 
       if (caminho == null) return;
-      await File(caminho).writeAsBytes(bytes);
+
+      // Falha ao gravar em disco é problema diferente de falha ao gerar: com
+      // um catch só, pasta inválida aparecia como "não foi possível gerar".
+      try {
+        await File(caminho).writeAsBytes(bytes);
+      } catch (_) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text(
+                  'PDF gerado, mas não foi possível salvar no local escolhido.'),
+              backgroundColor: CoresSemanticas.erro,
+              duration: Duration(seconds: 4),
+            ),
+          );
+        }
+        return;
+      }
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Relatório salvo em $caminho'),
+            backgroundColor: CoresSemanticas.sucesso,
+            duration: const Duration(seconds: 4),
+          ),
+        );
+      }
     } catch (_) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -122,15 +151,17 @@ class _TelaRelatorioPedidosState extends State<TelaRelatorioPedidos> {
       lastDate: DateTime(2100),
     );
     if (data == null) return;
-    setState(() {
-      if (isDe) {
-        _de = data;
-        if (_ate != null && _ate!.isBefore(_de!)) _ate = null;
-      } else {
-        _ate = data;
-        if (_de != null && _de!.isAfter(_ate!)) _de = null;
-      }
-    });
+    if (mounted) {
+      setState(() {
+        if (isDe) {
+          _de = data;
+          if (_ate != null && _ate!.isBefore(_de!)) _ate = null;
+        } else {
+          _ate = data;
+          if (_de != null && _de!.isAfter(_ate!)) _de = null;
+        }
+      });
+    }
   }
 
   String _formatarData(DateTime? dt) {

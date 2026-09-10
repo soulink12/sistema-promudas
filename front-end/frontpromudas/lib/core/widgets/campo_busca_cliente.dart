@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../services/cliente_service.dart';
+import '../utils/formatadores.dart';
 
 /// Autocomplete de clientes reutilizável.
 /// Pesquisa os clientes diretamente no backend conforme o usuário digita
@@ -75,7 +76,7 @@ class _CampoBuscaClienteState extends State<CampoBuscaCliente> {
   Widget build(BuildContext context) {
     return Autocomplete<Map<String, dynamic>>(
       optionsBuilder: (valor) => _buscar(valor.text),
-      displayStringForOption: (c) => c['nome'] as String,
+      displayStringForOption: (c) => capitalizarNome(c['nome'] as String? ?? ''),
       onSelected: widget.onSelecionado,
       fieldViewBuilder: (context, controller, focusNode, onEditingComplete) {
         return TextField(

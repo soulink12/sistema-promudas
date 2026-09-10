@@ -90,6 +90,14 @@ class AppConfig {
         // Cobre tanto a linha "# comentário" quanto "url # comentário".
         final l = linha.split('#').first.trim();
         if (l.isEmpty) continue;
+        // Um typo (ex.: faltar o "http://") gerava erro de rede confuso em
+        // todas as telas; sem scheme válido, mantém o padrão.
+        final uri = Uri.tryParse(l);
+        if (uri == null || !uri.hasScheme || uri.host.isEmpty) {
+          // ignore: avoid_print
+          print('AppConfig: URL inválida em config.txt ("$l"); usando padrão ($apiBaseUrl).');
+          break;
+        }
         apiBaseUrl = l;
         break;
       }

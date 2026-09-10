@@ -49,6 +49,8 @@ model pedidos {
 
   @@index([cliente_id])
   @@index([temporada_ano])
+  @@index([criado_em])
+  @@unique([temporada_ano, numero_temporada])
 }
 
 // Documento prévio ligado a um cliente, criado na mesma tela de venda do
@@ -71,6 +73,7 @@ model orcamentos {
   itens_orcamento itens_orcamento[]
 
   @@index([cliente_id])
+  @@index([criado_em])
 }
 
 model produtos {
@@ -157,6 +160,8 @@ model pagamentos {
   cheques           cheques[]
 
   @@index([pedido_id])
+  @@index([criado_em])
+  @@index([data_pagamento])
 }
 
 // Cheques de um pagamento (1 pagamento pode ter vários cheques, ex.: pré-datados).

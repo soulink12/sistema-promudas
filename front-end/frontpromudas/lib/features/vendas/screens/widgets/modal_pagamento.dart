@@ -4,6 +4,7 @@ import '../../../../core/services/conta_service.dart';
 import '../../../../core/theme/cores_semanticas.dart';
 import '../../../../core/utils/formatadores.dart';
 import '../../../../core/widgets/campo_obrigatorio.dart';
+import '../../../../core/widgets/dialog_confirmacao.dart';
 import 'linha_parcela.dart';
 import 'campos_cheque.dart';
 import 'campos_escambo.dart';
@@ -77,19 +78,23 @@ class _ModalPagamentoState extends State<ModalPagamento> {
     try {
       final formas = await FormaPagamentoService().listar();
       final contas = await ContaService().listar();
-      setState(() {
-        _formasPagamento = formas;
-        _formaSelecionada = _formaPadrao(formas);
-        _contas = contas;
-        _contaSelecionada = contas.isNotEmpty ? contas.first : null;
-        _valorCtrl.text = widget.totalPedido.toStringAsFixed(2);
-        _carregando = false;
-      });
+      if (mounted) {
+        setState(() {
+          _formasPagamento = formas;
+          _formaSelecionada = _formaPadrao(formas);
+          _contas = contas;
+          _contaSelecionada = contas.isNotEmpty ? contas.first : null;
+          _valorCtrl.text = widget.totalPedido.toStringAsFixed(2);
+          _carregando = false;
+        });
+      }
     } catch (_) {
-      setState(() {
-        _erroCarregamento = 'Não foi possível carregar as formas de pagamento.';
-        _carregando = false;
-      });
+      if (mounted) {
+        setState(() {
+          _erroCarregamento = 'Não foi possível carregar as formas de pagamento.';
+          _carregando = false;
+        });
+      }
     }
     if (mounted) _valorFocusNode.requestFocus();
   }
@@ -238,9 +243,58 @@ class _ModalPagamentoState extends State<ModalPagamento> {
 
   double get _restante => widget.totalPedido - _totalPago;
 
-  // Tolerância para imprecisão de ponto flutuante
-  bool get _podeFinalizar =>
-      widget.parcialPermitido ? _pagamentos.isNotEmpty : _restante < 0.005;
+  // Forma de crediário (pagamento posterior) cadastrada — usada para lançar
+  // automaticamente o saldo que o cliente não pagou na hora.
+  Map<String, dynamic>? get _formaCrediario {
+    for (final f in _formasPagamento) {
+      if (f['pagamentoPosterior'] == true) return f;
+    }
+    return null;
+  }
+
+  // Tolerância para imprecisão de ponto flutuante.
+  // Sem parcialPermitido, o saldo restante não precisa ser digitado à mão: ele
+  // vira crediário na finalização (ver _finalizar). Por isso o botão libera
+  // mesmo com restante, desde que exista uma forma de crediário cadastrada.
+  bool get _podeFinalizar => widget.parcialPermitido
+      ? _pagamentos.isNotEmpty
+      : (_restante < 0.005 || _formaCrediario != null);
+
+  /// Fecha o modal devolvendo os pagamentos. Quando sobra saldo (o cliente não
+  /// pagou tudo agora), confirma com o operador e lança o restante como
+  /// crediário — nenhum pedido fica sem pagamento.
+  Future<void> _finalizar() async {
+    final pagamentos = List<Map<String, dynamic>>.of(_pagamentos);
+    final restante = _restante;
+
+    if (!widget.parcialPermitido && restante > 0.005) {
+      final crediario = _formaCrediario;
+      if (crediario == null) return;
+
+      final confirmado = await mostrarDialogConfirmacao(
+        context: context,
+        titulo: 'Lançar ${crediario['nome']}',
+        mensagem:
+            'Faltam ${formatarMoeda(restante)} para fechar o pedido. '
+            'Lançar esse valor como ${crediario['nome']}?',
+        textoCancelar: 'Voltar',
+        textoConfirmar: 'Lançar',
+      );
+      if (!confirmado || !mounted) return;
+
+      pagamentos.add({
+        'forma': crediario['nome'],
+        'valor': restante,
+        'pagamentoPosterior': true,
+        'depositoPosterior': false,
+        'parcelas': 1,
+      });
+    }
+
+    if (!mounted) return;
+    Navigator.pop(context);
+    widget.onConfirmar(pagamentos);
+  }
 
   /// Registra a parcela atual e prepara o campo para a próxima entrada.
   void _adicionarPagamento() {
@@ -684,12 +738,7 @@ class _ModalPagamentoState extends State<ModalPagamento> {
                     ),
                     const SizedBox(width: 8),
                     FilledButton.icon(
-                      onPressed: _podeFinalizar
-                          ? () {
-                              Navigator.pop(context);
-                              widget.onConfirmar(List.of(_pagamentos));
-                            }
-                          : null,
+                      onPressed: _podeFinalizar ? _finalizar : null,
                       icon: const Icon(Icons.check_circle_outline, size: 18),
                       label: const Text('Finalizar Pagamento'),
                       style: FilledButton.styleFrom(

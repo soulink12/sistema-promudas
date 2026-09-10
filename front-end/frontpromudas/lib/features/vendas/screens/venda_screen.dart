@@ -5,6 +5,7 @@ import '../../../core/services/carrinho_service.dart';
 import '../../../core/theme/cores_semanticas.dart';
 import '../../../core/utils/api_feedback.dart';
 import '../../../core/utils/formatadores.dart';
+import '../../../core/utils/pagamentos_descartados.dart';
 import '../../clientes/screens/widgets/dialog_cadastro_cliente.dart';
 import 'widgets/detalhes_app_bar.dart';
 import 'widgets/modal_busca_cliente.dart';
@@ -57,9 +58,11 @@ class _TelaVendaState extends State<TelaVenda> {
   // Total pago em pagamentos reais antes da edição (somente modo edição)
   double _totalPagoReal = 0.0;
 
-  // Valor total do pedido antes da edição (somente modo edição) — usado para
-  // saber quanto o valor aumentou e exigir cobertura desse aumento ao salvar.
-  double _valorTotalOriginal = 0.0;
+  // Tudo que já está alocado no pedido: pagamento real + crediário. É contra
+  // isso que se mede o quanto falta cobrir ao aumentar o pedido — o crediário
+  // existente já cobre parte do total.
+  double _totalCoberto = 0.0;
+
 
   @override
   void initState() {
@@ -82,6 +85,9 @@ class _TelaVendaState extends State<TelaVenda> {
         'nome': cliente['nome'] as String? ?? '—',
         'cpf': 'Não informado',
         'telefone': 'Não informado',
+        // Sem o e-mail aqui, o preview do PDF aberto logo após salvar recebia
+        // clienteEmail nulo e o botão "Enviar por e-mail" ficava desabilitado.
+        'email': cliente['email'],
       };
     }
 
@@ -90,7 +96,7 @@ class _TelaVendaState extends State<TelaVenda> {
         .toList();
 
     for (final item in itens) {
-      final preco = _toDouble(item['valor_unitario']);
+      final preco = paraDouble(item['valor_unitario']);
       _carrinhoService.adicionarItem(
         {
           'id': item['produto_id'],
@@ -101,7 +107,7 @@ class _TelaVendaState extends State<TelaVenda> {
       );
     }
 
-    final ajuste = _toDouble(orcamento['ajuste']);
+    final ajuste = paraDouble(orcamento['ajuste']);
     if (ajuste.abs() > 0.001) {
       _carrinhoService.aplicarAjuste(ajuste, ajuste < 0 ? 'Desconto' : 'Acréscimo');
     }
@@ -116,6 +122,9 @@ class _TelaVendaState extends State<TelaVenda> {
         'nome': cliente['nome'] as String? ?? '—',
         'cpf': 'Não informado',
         'telefone': 'Não informado',
+        // Sem o e-mail aqui, o preview do PDF aberto logo após salvar recebia
+        // clienteEmail nulo e o botão "Enviar por e-mail" ficava desabilitado.
+        'email': cliente['email'],
       };
     }
 
@@ -124,7 +133,7 @@ class _TelaVendaState extends State<TelaVenda> {
         .toList();
 
     for (final item in itens) {
-      final preco = _toDouble(item['valor_unitario']);
+      final preco = paraDouble(item['valor_unitario']);
       _carrinhoService.adicionarItem(
         {
           'id': item['produto_id'],
@@ -135,7 +144,7 @@ class _TelaVendaState extends State<TelaVenda> {
       );
     }
 
-    final ajuste = _toDouble(pedido['ajuste']);
+    final ajuste = paraDouble(pedido['ajuste']);
     if (ajuste.abs() > 0.001) {
       _carrinhoService.aplicarAjuste(
         ajuste,
@@ -146,9 +155,11 @@ class _TelaVendaState extends State<TelaVenda> {
     final pagamentos = (pedido['pagamentos'] as List? ?? []);
     _totalPagoReal = pagamentos
         .where((p) => (p as Map)['pagamento_posterior'] != true)
-        .fold(0.0, (s, p) => s + _toDouble((p as Map)['valor_pago']));
+        .fold(0.0, (s, p) => s + paraDouble((p as Map)['valor_pago']));
 
-    _valorTotalOriginal = _toDouble(pedido['valor_total']);
+    _totalCoberto = pagamentos.fold(
+        0.0, (s, p) => s + paraDouble((p as Map)['valor_pago']));
+
   }
 
   @override
@@ -402,7 +413,7 @@ class _TelaVendaState extends State<TelaVenda> {
       builder: (_) => DialogObservacoes(observacoesAtuais: _observacoes),
     );
     if (resultado != null && mounted) {
-      setState(() => _observacoes = resultado);
+      if (mounted) setState(() => _observacoes = resultado);
     }
   }
 
@@ -426,19 +437,23 @@ class _TelaVendaState extends State<TelaVenda> {
   Future<void> _confirmarEdicao() async {
     final pedidoId = widget.pedidoParaEditar!['id'] as int;
     final novoTotal = _carrinhoService.totalComAjuste;
-    final aumento = novoTotal - _valorTotalOriginal;
 
-    // Valor do pedido aumentou: exige cobertura do aumento (pagamento real
-    // e/ou crediário) antes de salvar, igual ao fechamento de um pedido novo.
-    if (aumento > 0.01) {
+    // O que falta cobrir é medido contra o que o cliente JÁ pagou, não contra
+    // o total anterior do pedido. Usando a diferença de totais, um pedido que
+    // havia sido reduzido (e gerou crédito) pedia pagamento ao ser aumentado de
+    // novo, e o backend recusava com "este pedido já está totalmente coberto"
+    // — porque o pagamento existente ainda cobria o novo total.
+    final aCobrir = novoTotal - _totalCoberto;
+
+    if (aCobrir > 0.01) {
       showDialog<void>(
         context: context,
         builder: (_) => ModalPagamento(
-          totalPedido: aumento,
+          totalPedido: aCobrir,
           onConfirmar: (pagamentos) => _salvarEdicao(
             pedidoId,
             pagamentosAdicionais: pagamentos,
-            valorACobrir: aumento,
+            valorACobrir: aCobrir,
           ),
         ),
       );
@@ -499,8 +514,8 @@ class _TelaVendaState extends State<TelaVenda> {
         }
       }
 
-      final creditoGerado = _toDouble(response.data['creditoGerado']);
-      setState(() => _salvando = false);
+      final creditoGerado = paraDouble(response.data['creditoGerado']);
+      if (mounted) setState(() => _salvando = false);
 
       if (mounted) {
         final mensagem = pagamentosAdicionais != null &&
@@ -518,6 +533,14 @@ class _TelaVendaState extends State<TelaVenda> {
             duration: Duration(seconds: creditoGerado > 0.01 ? 5 : 3),
           ),
         );
+        if (pagamentosAdicionais != null &&
+            haPagamentosDescartados(pagamentosAdicionais, valorACobrir ?? 0.0)) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Valor de troco não registrado como pagamento.'),
+            ),
+          );
+        }
         Navigator.pop(context);
       }
     } catch (e) {
@@ -545,7 +568,6 @@ class _TelaVendaState extends State<TelaVenda> {
       // 1. Cria o pedido com os itens
       final respostaPedido = await ApiService.dio.post('/pedidos', data: {
         'cliente_id': cliente['id'],
-        'valor_total': _carrinhoService.totalComAjuste,
         if (ajuste != 0.0) 'ajuste': ajuste,
         if (_observacoes.isNotEmpty) 'observacoes': _observacoes,
         'itens': _itensParaPayload(itens),
@@ -554,7 +576,8 @@ class _TelaVendaState extends State<TelaVenda> {
       final pedidoId = respostaPedido.data['data']['id'] as int;
 
       // 2. Registra cada forma de pagamento, capeando pelo saldo restante (descarta troco)
-      double restante = _carrinhoService.totalComAjuste;
+      final totalPedido = _carrinhoService.totalComAjuste;
+      double restante = totalPedido;
       for (final p in pagamentos) {
         if (restante <= 0.005) break;
         final valorPago =
@@ -578,12 +601,14 @@ class _TelaVendaState extends State<TelaVenda> {
       }
 
       // 3. Reinicia o estado da tela
-      setState(() {
-        _carrinhoService.limpar();
-        _clienteSelecionado = _consumidorPadrao;
-        _observacoes = '';
-        _salvando = false;
-      });
+      if (mounted) {
+        setState(() {
+          _carrinhoService.limpar();
+          _clienteSelecionado = _consumidorPadrao;
+          _observacoes = '';
+          _salvando = false;
+        });
+      }
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -592,6 +617,13 @@ class _TelaVendaState extends State<TelaVenda> {
             backgroundColor: CoresSemanticas.sucesso,
           ),
         );
+        if (haPagamentosDescartados(pagamentos, totalPedido)) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Valor de troco não registrado como pagamento.'),
+            ),
+          );
+        }
         await PdfDownloadService.baixarESalvar(
           context,
           pedidoId,
@@ -614,13 +646,26 @@ class _TelaVendaState extends State<TelaVenda> {
 
   // ── Orçamento (atalho F11) ────────────────────────────────────────────────
 
-  void _finalizarOrcamento() {
+  Future<void> _finalizarOrcamento() async {
     if (_carrinhoService.itens.isEmpty || _salvando) return;
 
     if (widget.orcamentoParaEditar != null) {
       _confirmarEdicaoOrcamento();
       return;
     }
+
+    // F11 fica ao lado de F12 (fechar venda), então confirma antes de criar —
+    // evita gerar um orçamento por tecla apertada sem intenção.
+    final confirmado = await mostrarDialogConfirmacao(
+      context: context,
+      titulo: 'Salvar como orçamento',
+      mensagem:
+          'Salvar este carrinho como orçamento de ${formatarMoeda(_carrinhoService.totalComAjuste)}? '
+          'Nenhum pagamento é registrado agora.',
+      textoConfirmar: 'Salvar orçamento',
+    );
+    if (!confirmado || !mounted) return;
+
     _registrarOrcamento();
   }
 
@@ -649,7 +694,7 @@ class _TelaVendaState extends State<TelaVenda> {
         'observacoes': _observacoes.isNotEmpty ? _observacoes : null,
       });
 
-      setState(() => _salvando = false);
+      if (mounted) setState(() => _salvando = false);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
@@ -682,7 +727,6 @@ class _TelaVendaState extends State<TelaVenda> {
     try {
       final resposta = await ApiService.dio.post('/orcamentos', data: {
         'cliente_id': cliente['id'],
-        'valor_total': _carrinhoService.totalComAjuste,
         if (ajuste != 0.0) 'ajuste': ajuste,
         if (_observacoes.isNotEmpty) 'observacoes': _observacoes,
         'itens': _itensParaPayload(itens),
@@ -690,12 +734,14 @@ class _TelaVendaState extends State<TelaVenda> {
 
       final orcamentoId = resposta.data['data']['id'] as int;
 
-      setState(() {
-        _carrinhoService.limpar();
-        _clienteSelecionado = _consumidorPadrao;
-        _observacoes = '';
-        _salvando = false;
-      });
+      if (mounted) {
+        setState(() {
+          _carrinhoService.limpar();
+          _clienteSelecionado = _consumidorPadrao;
+          _observacoes = '';
+          _salvando = false;
+        });
+      }
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -722,8 +768,6 @@ class _TelaVendaState extends State<TelaVenda> {
   }
 }
 
-double _toDouble(dynamic v) =>
-    v == null ? 0.0 : double.tryParse(v.toString()) ?? 0.0;
 
 /// Converte os itens do carrinho (`{'id', 'quantidade', 'preco', ...}`) para o
 /// formato esperado pela API (`{'produto_id', 'quantidade', 'valor_unitario'}`)

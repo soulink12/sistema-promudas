@@ -28,7 +28,7 @@ class LinhaPagamento extends StatelessWidget {
     final formaBase = pag['forma_pagamento'] as String? ?? '—';
     final parcelas = pag['parcelas'] as int? ?? 1;
     final forma = parcelas > 1 ? '$formaBase ($parcelas' 'x)' : formaBase;
-    final valor = _toDouble(pag['valor_pago']);
+    final valor = paraDouble(pag['valor_pago']);
     final conta = pag['conta'] as String?;
     final temConta = conta != null && conta.isNotEmpty;
     final posterior = pag['pagamento_posterior'] == true;
@@ -182,8 +182,6 @@ class LinhaPagamento extends StatelessWidget {
   }
 }
 
-double _toDouble(dynamic v) =>
-    v == null ? 0.0 : double.tryParse(v.toString()) ?? 0.0;
 
 /// Resumo de um cheque na linha de pagamento: identificação, valor e situação
 /// (a depositar / depositado em dd/mm/aaaa).
@@ -193,7 +191,7 @@ String _textoCheque(Map<String, dynamic> c) {
   final partes = <String>['Cheque'];
   if (numero != null && numero.isNotEmpty) partes.add('nº $numero');
   if (banco != null && banco.isNotEmpty) partes.add(banco);
-  var texto = '${partes.join(' ')} · ${formatarMoeda(_toDouble(c['valor']))}';
+  var texto = '${partes.join(' ')} · ${formatarMoeda(paraDouble(c['valor']))}';
   final dep = c['data_deposito'];
   if (dep != null) {
     final dt = DateTime.tryParse(dep.toString())?.toLocal();

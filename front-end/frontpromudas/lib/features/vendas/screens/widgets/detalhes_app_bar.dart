@@ -58,7 +58,7 @@ class DetalhesAppBar extends StatelessWidget {
                   subtituloOverride ??
                       (isVendaDireta
                           ? 'Venda Direta / Balcão'
-                          : 'ID: ${clienteSelecionado!['id']} • CPF: ${clienteSelecionado!['cpf']} • Tel: ${clienteSelecionado!['telefone']}'),
+                          : 'ID: ${clienteSelecionado!['id']} • CPF: ${clienteSelecionado!['cpf']} • Tel: ${formatarTelefone(clienteSelecionado!['telefone'] as String?)}'),
                   style: TextStyle(
                     fontSize: 13,
                     fontWeight: FontWeight.normal,

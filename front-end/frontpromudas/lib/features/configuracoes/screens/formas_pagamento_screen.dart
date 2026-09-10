@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../../core/services/api_service.dart';
 import '../../../core/theme/cores_semanticas.dart';
+import '../../../core/utils/api_feedback.dart';
 
 class TelaFormasPagamento extends StatefulWidget {
   const TelaFormasPagamento({super.key});
@@ -24,14 +25,16 @@ class _TelaFormasPagamentoState extends State<TelaFormasPagamento> {
     try {
       final response = await ApiService.dio.get('/formas-pagamento');
       final dados = response.data as List;
-      setState(() {
-        _formas = dados
-            .map<Map<String, dynamic>>((e) => Map<String, dynamic>.from(e as Map))
-            .toList();
-        _carregando = false;
-      });
+      if (mounted) {
+        setState(() {
+          _formas = dados
+              .map<Map<String, dynamic>>((e) => Map<String, dynamic>.from(e as Map))
+              .toList();
+          _carregando = false;
+        });
+      }
     } catch (_) {
-      setState(() => _carregando = false);
+      if (mounted) setState(() => _carregando = false);
     }
   }
 
@@ -254,11 +257,15 @@ class _DialogFormaState extends State<_DialogForma> {
         await ApiService.dio.post('/formas-pagamento', data: body);
       }
       if (mounted) Navigator.pop(context, true);
-    } catch (_) {
-      setState(() {
-        _erro = 'Erro ao salvar. Tente novamente.';
-        _salvando = false;
-      });
+    } catch (e) {
+      // Mostra a mensagem do backend (ex.: forma já usada não pode ser
+      // renomeada) em vez de um erro genérico que não diz o que fazer.
+      if (mounted) {
+        setState(() {
+          _erro = extrairErroApi(e, 'Erro ao salvar. Tente novamente.');
+          _salvando = false;
+        });
+      }
     }
   }
 

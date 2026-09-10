@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../../core/services/api_service.dart';
+import '../../../core/services/pendencias_service.dart';
 import '../../../core/services/auth_service.dart';
 import '../../../core/theme/cores_semanticas.dart';
 import '../../../core/widgets/pesquisa_cliente_lista.dart';
@@ -36,13 +37,8 @@ class _TelaEntregasState extends State<TelaEntregas> {
   /// Conta os pagamentos sem conta definida para alimentar o sino do drawer.
   /// Falha silenciosa — o badge simplesmente não aparece se a chamada falhar.
   Future<void> _carregarPendentesSemConta() async {
-    try {
-      final response = await ApiService.dio.get('/pagamentos/pendentes-conta');
-      final qtd = (response.data as List).length;
-      if (mounted) setState(() => _pendentesSemConta = qtd);
-    } catch (_) {
-      // Ignora — não atrapalha o módulo
-    }
+    final pendencias = await PendenciasService.contar();
+    if (mounted) setState(() => _pendentesSemConta = pendencias.total);
   }
 
   /// Abre a tela de pagamentos sem conta (acionada pelo sino do drawer).
@@ -75,12 +71,14 @@ class _TelaEntregasState extends State<TelaEntregas> {
           .take(20)
           .toList();
 
-      setState(() {
-        _pedidos = lista;
-        _carregando = false;
-      });
+      if (mounted) {
+        setState(() {
+          _pedidos = lista;
+          _carregando = false;
+        });
+      }
     } catch (_) {
-      setState(() => _carregando = false);
+      if (mounted) setState(() => _carregando = false);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(

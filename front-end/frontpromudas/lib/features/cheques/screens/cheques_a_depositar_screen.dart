@@ -30,12 +30,14 @@ class _TelaChequesADepositarState extends State<TelaChequesADepositar> {
     setState(() => _carregando = true);
     try {
       final lista = await _service.listarADepositar();
-      setState(() {
-        _cheques = lista;
-        _carregando = false;
-      });
+      if (mounted) {
+        setState(() {
+          _cheques = lista;
+          _carregando = false;
+        });
+      }
     } catch (e) {
-      setState(() => _carregando = false);
+      if (mounted) setState(() => _carregando = false);
       if (mounted) mostrarErro(context, extrairErroApi(e, 'Erro ao carregar os cheques.'));
     }
   }
@@ -100,8 +102,6 @@ class _CardCheque extends StatelessWidget {
 
   const _CardCheque({required this.cheque, required this.onDepositar});
 
-  double _toDouble(dynamic v) =>
-      v == null ? 0.0 : double.tryParse(v.toString()) ?? 0.0;
 
   String? _data(dynamic iso) {
     if (iso == null) return null;
@@ -124,7 +124,7 @@ class _CardCheque extends StatelessWidget {
     final numero = cheque['numero'] as String?;
     final banco = cheque['banco'] as String?;
     final bomPara = _data(cheque['bom_para']);
-    final valor = _toDouble(cheque['valor']);
+    final valor = paraDouble(cheque['valor']);
 
     final detalhe = <String>[
       if (numero != null && numero.isNotEmpty) 'nº $numero',

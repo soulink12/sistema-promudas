@@ -35,6 +35,26 @@ const criarForma = async ({
 const atualizarForma = async (id, dados) => {
     const existe = await prisma.formas_pagamento.findUnique({ where: { id } });
     if (!existe) throw new BusinessError('Forma de pagamento não encontrada.', 404);
+
+    // `pagamentos.forma_pagamento` guarda o NOME da forma, não uma chave
+    // estrangeira, e toda a lógica financeira (crediário e cheque em
+    // recalcularStatusPedido) casa por esse nome. Renomear uma forma já usada
+    // reclassificaria silenciosamente todos os pagamentos antigos — crediário
+    // viraria dinheiro recebido e o pedido apareceria como Pago sem ter sido.
+    // Os demais campos continuam editáveis normalmente.
+    const renomeando = dados.nome !== undefined && dados.nome !== existe.nome;
+    if (renomeando) {
+        const emUso = await prisma.pagamentos.count({
+            where: { forma_pagamento: existe.nome },
+        });
+        if (emUso > 0) {
+            throw new BusinessError(
+                `Esta forma de pagamento já foi usada em ${emUso} ${emUso === 1 ? 'pagamento' : 'pagamentos'} e não pode ser renomeada. ` +
+                'Para parar de usá-la, desative-a e crie uma nova com o nome desejado.'
+            );
+        }
+    }
+
     return await prisma.formas_pagamento.update({
         where: { id },
         data: dados

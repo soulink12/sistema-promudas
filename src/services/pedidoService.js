@@ -5,6 +5,7 @@ const formaPagamentoService = require('./formaPagamentoService');
 const pdfService = require('./pdfService');
 const emailService = require('./emailService');
 const { formatarNumeroPedido } = require('../utils/numeroPedido');
+const { retryColisao } = require('../utils/retryColisao');
 const BusinessError = require('../utils/BusinessError');
 
 // Campos de pagamento retornados ao montar um pedido completo (listar/buscar).
@@ -96,12 +97,20 @@ const criarPedidoTx = async (tx, dados) => {
         ? await proximoNumeroTemporada(tx, temporada.ano)
         : null;
 
+    // valor_total é sempre recalculado a partir dos itens (não confia no cliente),
+    // mesma lógica usada no branch com itens de atualizarPedido.
+    const subtotal = dados.itens.reduce(
+        (s, item) => s + parseFloat(item.valor_unitario) * parseInt(item.quantidade),
+        0
+    );
+    const ajuste = Number(dados.ajuste ?? 0);
+
     return await tx.pedidos.create({
         data: {
             clientes: {
                 connect: { id: parseInt(dados.cliente_id) }
             },
-            valor_total: dados.valor_total,
+            valor_total: subtotal + ajuste,
             ajuste: dados.ajuste ?? null,
             observacoes: dados.observacoes,
             // Na criação, a data do pedido é o momento atual (= criado_em).
@@ -126,8 +135,13 @@ const criarPedidoTx = async (tx, dados) => {
     });
 };
 
+// Duas criações concorrentes na mesma temporada podem calcular o mesmo
+// próximo numero_temporada antes de qualquer uma gravar — a constraint única
+// (schema.prisma) rejeita a segunda com P2002. retryColisao tenta de novo
+// (recalculando o número dentro de uma nova transação) em vez de propagar
+// um 500 por uma corrida que se resolve sozinha na repetição.
 const criarPedido = async (dados) => {
-    return await prisma.$transaction((tx) => criarPedidoTx(tx, dados));
+    return await retryColisao(() => prisma.$transaction((tx) => criarPedidoTx(tx, dados)));
 };
 
 // Status da nota fiscal do pedido, agregado a partir dos pagamentos reais
@@ -150,7 +164,12 @@ const statusNotaPedido = (pagamentos) => {
 
 const listarPedidos = async (filtros = {}) => {
     const where = { ativo: true };
-    if (filtros.cliente) {
+    // Filtrar por id é o correto quando se sabe de qual cliente se trata (ex.:
+    // a ficha do cliente). Por nome, `contains` traz homônimos junto — "Ana"
+    // devolve pedidos de "Ana Maria" e "Mariana".
+    if (filtros.clienteId) {
+        where.cliente_id = parseInt(filtros.clienteId);
+    } else if (filtros.cliente) {
         where.clientes = { nome: { contains: filtros.cliente } };
     }
     // Filtra por status de entrega (ex.: 'Pendente,Parcial') quando informado
@@ -200,7 +219,7 @@ const listarPedidos = async (filtros = {}) => {
     const [pedidos, formasPosteriores] = await Promise.all([
         prisma.pedidos.findMany({
             where,
-            orderBy: { criado_em: 'desc' },
+            orderBy: [{ data_pedido: 'desc' }, { criado_em: 'desc' }],
             include: PEDIDO_INCLUDE
         }),
         formaPagamentoService.listarPosteriores()
@@ -226,16 +245,29 @@ const listarPedidos = async (filtros = {}) => {
     return comFlag;
 };
 
+// Campos editáveis via PUT /pedidos/:id quando o body não envia itens (ex.:
+// só mudar a data ou a temporada). Fora daqui ficam campos que ou dependem
+// de itens (ajuste, valor_total) ou são geridos por outros fluxos
+// (status_pagamento, status_entrega, ativo, cliente_id, numero_temporada).
+const CAMPOS_PEDIDO_SEM_ITENS = ['data_pedido', 'temporada_ano', 'observacoes'];
+
 const atualizarPedido = async (id, dados) => {
     const { itens, ...camposBrutos } = dados;
     const camposPedido = normalizarDatas(camposBrutos, ['data_pedido']);
 
     if (!itens) {
+        // Edição de metadados (sem itens) continua liberada mesmo com o pedido
+        // fechado (pago + entregue) — só a edição de itens é bloqueada nesse
+        // caso (ver branch abaixo). A trava aqui é só a whitelist de campos.
+        const camposPermitidos = Object.fromEntries(
+            Object.entries(camposPedido).filter(([chave]) => CAMPOS_PEDIDO_SEM_ITENS.includes(chave))
+        );
+
         return await prisma.$transaction(async (tx) => {
-            await aplicarTrocaTemporada(tx, id, camposPedido);
+            await aplicarTrocaTemporada(tx, id, camposPermitidos);
             return await tx.pedidos.update({
                 where: { id: parseInt(id) },
-                data: camposPedido,
+                data: camposPermitidos,
             });
         });
     }
@@ -246,6 +278,7 @@ const atualizarPedido = async (id, dados) => {
             select: {
                 ajuste: true,
                 cliente_id: true,
+                valor_total: true,
                 status_pagamento: true,
                 status_entrega: true,
                 pagamentos: { select: { valor_pago: true, forma_pagamento: true } },
@@ -278,35 +311,59 @@ const atualizarPedido = async (id, dados) => {
         .reduce((s, p) => s + parseFloat(p.valor_pago), 0);
 
     const novoTotal = subtotal + ajuste;
-    const creditoGerado = Math.max(0, totalPagoReal - novoTotal);
 
-    if (creditoGerado > 0.01 && pedidoAtual?.cliente_id) {
-        await prisma.clientes.update({
-            where: { id: pedidoAtual.cliente_id },
-            data: { saldo_credito: { increment: creditoGerado } },
+    // O crédito do cliente por causa deste pedido é sempre a sobra atual
+    // (pago real - total), não um incremento por edição. Creditar
+    // `totalPagoReal - novoTotal` direto duplicava a mesma sobra a cada nova
+    // edição, porque os pagamentos não são reduzidos ao conceder o crédito.
+    // Aqui move-se só a diferença entre a sobra de antes e a de agora — o que
+    // também estorna o crédito quando o pedido volta a subir de valor.
+    const totalAnterior = Number(pedidoAtual?.valor_total ?? 0);
+    const sobraAnterior = Math.max(0, totalPagoReal - totalAnterior);
+    const sobraAtual = Math.max(0, totalPagoReal - novoTotal);
+    const creditoGerado = sobraAtual - sobraAnterior;
+
+    let resultado;
+    await prisma.$transaction(async (tx) => {
+        if (Math.abs(creditoGerado) > 0.01 && pedidoAtual?.cliente_id) {
+            const cliente = await tx.clientes.findUnique({
+                where: { id: pedidoAtual.cliente_id },
+                select: { saldo_credito: true },
+            });
+            // Estorno nunca deixa o saldo negativo — dados anteriores a esta
+            // correção podem ter crédito inflado ou já consumido.
+            const saldoAtual = Number(cliente?.saldo_credito ?? 0);
+            const delta = Math.max(creditoGerado, -saldoAtual);
+
+            if (Math.abs(delta) > 0.01) {
+                await tx.clientes.update({
+                    where: { id: pedidoAtual.cliente_id },
+                    data: { saldo_credito: { increment: delta } },
+                });
+            }
+        }
+
+        await tx.itens_pedido.deleteMany({ where: { pedido_id: parseInt(id) } });
+
+        resultado = await tx.pedidos.update({
+            where: { id: parseInt(id) },
+            data: {
+                ...camposPedido,
+                valor_total: novoTotal,
+                itens_pedido: {
+                    create: itens.map(item => ({
+                        produto_id: parseInt(item.produto_id),
+                        quantidade: parseInt(item.quantidade),
+                        valor_unitario: parseFloat(item.valor_unitario),
+                    })),
+                },
+            },
+            include: {
+                itens_pedido: {
+                    include: { produtos: { select: { nome: true } } },
+                },
+            },
         });
-    }
-
-    await prisma.itens_pedido.deleteMany({ where: { pedido_id: parseInt(id) } });
-
-    const resultado = await prisma.pedidos.update({
-        where: { id: parseInt(id) },
-        data: {
-            ...camposPedido,
-            valor_total: novoTotal,
-            itens_pedido: {
-                create: itens.map(item => ({
-                    produto_id: parseInt(item.produto_id),
-                    quantidade: parseInt(item.quantidade),
-                    valor_unitario: parseFloat(item.valor_unitario),
-                })),
-            },
-        },
-        include: {
-            itens_pedido: {
-                include: { produtos: { select: { nome: true } } },
-            },
-        },
     });
 
     await recalcularStatusPedido(id);
@@ -345,22 +402,21 @@ const eliminarPedido = async (id) => {
 // Gera o PDF do pedido e envia por e-mail ao cliente. Exige que o cliente
 // tenha e-mail cadastrado — a mesma checagem existe no front (botão
 // desabilitado), mas aqui é validada de novo antes de tentar enviar.
-// Notificação interna (EMAIL_NOTIFICACAO_PEDIDOS) de pedido criado/alterado —
-// best-effort, veja emailService.notificarDocumentoPorEmail.
-const notificarPedidoPorEmail = (id, tipo) => emailService.notificarDocumentoPorEmail({
+// Dispara os e-mails de um evento de pedido (administração e, conforme o
+// evento, o cliente) — best-effort, veja emailService.notificarEvento.
+// `evento` é uma chave de emailService.EVENTOS.
+const notificarPedidoPorEmail = (id, evento) => emailService.notificarEvento({
     id,
-    tipo,
+    evento,
     gerarPDF: pdfService.gerarPedidoPDF,
     formatarNumero: formatarNumeroPedido,
-    rotulo: 'Pedido',
 });
 
 const enviarPedidoPorEmail = (id) => emailService.enviarDocumentoPorEmail({
     id,
+    evento: 'pedidoManual',
     gerarPDF: pdfService.gerarPedidoPDF,
     formatarNumero: formatarNumeroPedido,
-    rotulo: 'Pedido',
-    descricaoDocumento: 'o recibo do seu pedido',
 });
 
 module.exports = {

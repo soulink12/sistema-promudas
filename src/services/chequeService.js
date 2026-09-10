@@ -37,17 +37,21 @@ const atualizarCheque = async (id, dados) => {
     const cheque = await prisma.cheques.findUnique({ where: { id: parseInt(id) } });
     if (!cheque) throw new BusinessError('Cheque não encontrado.', 404);
 
-    if (dados.valor !== undefined) {
-        const valor = parseFloat(dados.valor);
-        if (isNaN(valor) || valor <= 0) {
-            throw new BusinessError('O valor do cheque deve ser maior que zero.');
-        }
-    }
-
     // `conta` é a conta de destino — vive no pagamento pai, não no cheque. Ao
     // depositar, define a conta do pagamento (tira-o da lista "sem conta").
     const { conta, ...dadosCheque } = dados;
     const dadosNormalizados = normalizarDatas(dadosCheque, ['bom_para', 'data_deposito']);
+
+    if (dadosNormalizados.valor !== undefined) {
+        const valor = parseFloat(dadosNormalizados.valor);
+        if (!Number.isFinite(valor) || valor <= 0) {
+            throw new BusinessError('O valor do cheque deve ser maior que zero.');
+        }
+        // Grava o valor já convertido: antes o parseFloat servia só para a
+        // checagem e o valor bruto do body ia para o banco, então "12,50"
+        // passava na validação como 12.5 e estourava no Prisma.
+        dadosNormalizados.valor = valor;
+    }
 
     // Depositado segue a presença de data_deposito (informar data = depositar;
     // limpar a data = voltar a "a depositar").
@@ -55,17 +59,23 @@ const atualizarCheque = async (id, dados) => {
         dadosNormalizados.depositado = !!dadosNormalizados.data_deposito;
     }
 
-    const atualizado = await prisma.cheques.update({
-        where: { id: parseInt(id) },
-        data: dadosNormalizados,
-    });
-
-    if (conta !== undefined) {
-        await prisma.pagamentos.update({
-            where: { id: cheque.pagamento_id },
-            data: { conta },
+    // Cheque e conta do pagamento mudam juntos: sem transação, uma falha no
+    // segundo update deixava o cheque depositado sem conta definida.
+    const atualizado = await prisma.$transaction(async (tx) => {
+        const chequeAtualizado = await tx.cheques.update({
+            where: { id: parseInt(id) },
+            data: dadosNormalizados,
         });
-    }
+
+        if (conta !== undefined) {
+            await tx.pagamentos.update({
+                where: { id: cheque.pagamento_id },
+                data: { conta },
+            });
+        }
+
+        return chequeAtualizado;
+    });
 
     // Depositar/desfazer um cheque muda o valor recebido do pedido → recalcula
     // o status de pagamento (cheque só conta como recebido depois de depositado).

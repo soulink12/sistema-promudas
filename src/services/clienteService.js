@@ -28,9 +28,60 @@ const normalizarCpfCnpj = async (dados, idExcluir) => {
     dados.cpf_cnpj = valorLimpo;
 };
 
+// Normaliza cep para só dígitos e valida o tamanho (8 dígitos). Não faz nada
+// se a chave nem foi enviada no body (undefined); string vazia/null limpa o campo.
+const normalizarCep = (dados) => {
+    if (dados.cep === undefined) return;
+    const valorLimpo = String(dados.cep ?? '').replace(/\D/g, '');
+    if (!valorLimpo) {
+        dados.cep = null;
+        return;
+    }
+    if (valorLimpo.length !== 8) {
+        throw new BusinessError('CEP inválido.');
+    }
+    dados.cep = valorLimpo;
+};
+
+// Campos que o cliente da API pode gravar. Fora daqui ficam `saldo_credito`
+// (só o backend mexe, ao editar pedido pago) e `ativo` (gerido pelo
+// soft-delete): antes o req.body ia inteiro pro Prisma, então um PUT com
+// {"saldo_credito": 99999} gravava e {"ativo": true} ressuscitava cliente apagado.
+const CAMPOS_CLIENTE_EDITAVEIS = [
+    'nome',
+    'cpf_cnpj',
+    'inscricao_estadual',
+    'telefone_1',
+    'telefone_2',
+    'email',
+    'cep',
+    'logradouro',
+    'numero',
+    'bairro',
+    'cidade',
+    'estado',
+];
+
+const filtrarCamposCliente = (dadosCliente) => Object.fromEntries(
+    Object.entries(dadosCliente).filter(([chave]) => CAMPOS_CLIENTE_EDITAVEIS.includes(chave))
+);
+
+// Guarda telefone só com dígitos, como cpf_cnpj e cep — a máscara é aplicada
+// na exibição (formatarTelefone). Sem validar tamanho de propósito: número
+// antigo/incompleto no cadastro não pode impedir a edição do cliente.
+const normalizarTelefones = (dados) => {
+    for (const campo of ['telefone_1', 'telefone_2']) {
+        if (dados[campo] === undefined) continue;
+        const digitos = String(dados[campo] ?? '').replace(/\D/g, '');
+        dados[campo] = digitos || null;
+    }
+};
+
 const criarCliente = async (dadosCliente) => {
-    const dados = { ...dadosCliente };
+    const dados = filtrarCamposCliente(dadosCliente);
     await normalizarCpfCnpj(dados);
+    normalizarCep(dados);
+    normalizarTelefones(dados);
     const novoCliente = await prisma.clientes.create({
         data: dados
     });
@@ -71,13 +122,15 @@ const listarClientes = async (filtros = {}) => {
 
 const buscarCliente = async (id) => {
     return await prisma.clientes.findUnique({
-        where: { id: parseInt(id) }
+        where: { id: parseInt(id), ativo: true }
     });
 };
 
 const atualizarCliente = async (id, dadosCliente) => {
-  const dados = { ...dadosCliente };
+  const dados = filtrarCamposCliente(dadosCliente);
   await normalizarCpfCnpj(dados, parseInt(id));
+  normalizarCep(dados);
+  normalizarTelefones(dados);
   return await prisma.clientes.update({
     where: { id: parseInt(id) },
     data: dados,

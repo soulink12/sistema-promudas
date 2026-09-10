@@ -1,12 +1,16 @@
 import 'package:flutter/material.dart';
 import '../../../core/services/api_service.dart';
+import '../../../core/services/forma_pagamento_service.dart';
 import '../../../core/theme/cores_semanticas.dart';
 import '../../../core/utils/api_feedback.dart';
 import '../../../core/utils/enviar_email_documento.dart';
 import '../../../core/utils/formatadores.dart';
+import '../../../core/utils/pagamentos_descartados.dart';
+import '../../vendas/screens/widgets/modal_pagamento.dart';
 import '../../../core/widgets/pesquisa_cliente_lista.dart';
 import '../../../core/widgets/dialog_confirmacao.dart';
 import '../../../core/widgets/filtro_multi_status.dart';
+import '../../../core/widgets/botao_data.dart';
 import '../../../core/services/pdf_download_service.dart';
 import 'widgets/lista_orcamentos.dart';
 import 'widgets/detalhes_orcamento.dart';
@@ -38,9 +42,17 @@ class _TelaOrcamentosState extends State<TelaOrcamentos> {
 
   final Set<String> _statusFiltro = {};
 
+  // Intervalo de datas obrigatório, como na tela de pedidos: sem ele a lista
+  // carregava o histórico inteiro a cada abertura.
+  late DateTime _de;
+  late DateTime _ate;
+
   @override
   void initState() {
     super.initState();
+    final agora = DateTime.now();
+    _ate = DateTime(agora.year, agora.month, agora.day);
+    _de = _ate.subtract(const Duration(days: 30));
     _clienteFiltro = widget.clienteInicial;
     _carregarOrcamentos();
   }
@@ -51,27 +63,44 @@ class _TelaOrcamentosState extends State<TelaOrcamentos> {
       _erro = null;
     });
     try {
-      final params = <String, dynamic>{};
       final clienteNome = _clienteFiltro?['nome'] as String?;
-      if (clienteNome != null && clienteNome.isNotEmpty) {
+      final buscandoPorCliente = clienteNome != null && clienteNome.isNotEmpty;
+      final buscandoPorNumero = _numeroFiltro.isNotEmpty;
+
+      // Busca específica (número ou cliente) ignora o intervalo: senão um
+      // orçamento fora da janela padrão não apareceria na procura.
+      final params = <String, dynamic>{
+        if (!buscandoPorCliente && !buscandoPorNumero) ...{
+          'de': _de.toIso8601String(),
+          'ate': DateTime(_ate.year, _ate.month, _ate.day, 23, 59, 59)
+              .toIso8601String(),
+        },
+      };
+      if (buscandoPorCliente) {
         params['cliente'] = clienteNome;
       }
-      if (_numeroFiltro.isNotEmpty) params['numero'] = _numeroFiltro;
+      if (buscandoPorNumero) {
+        params['numero'] = _numeroFiltro;
+      }
       if (_statusFiltro.isNotEmpty) params['status'] = _statusFiltro.join(',');
 
       final response = await ApiService.dio.get('/orcamentos', queryParameters: params);
       final dados = response.data as List;
-      setState(() {
-        _orcamentos = dados
-            .map<Map<String, dynamic>>((e) => Map<String, dynamic>.from(e as Map))
-            .toList();
-        _carregando = false;
-      });
+      if (mounted) {
+        setState(() {
+          _orcamentos = dados
+              .map<Map<String, dynamic>>((e) => Map<String, dynamic>.from(e as Map))
+              .toList();
+          _carregando = false;
+        });
+      }
     } catch (_) {
-      setState(() {
-        _erro = 'Não foi possível carregar os orçamentos.';
-        _carregando = false;
-      });
+      if (mounted) {
+        setState(() {
+          _erro = 'Não foi possível carregar os orçamentos.';
+          _carregando = false;
+        });
+      }
     }
   }
 
@@ -79,11 +108,13 @@ class _TelaOrcamentosState extends State<TelaOrcamentos> {
     try {
       final response = await ApiService.dio.get('/orcamentos/$orcamentoId');
       final atualizado = Map<String, dynamic>.from(response.data as Map);
-      setState(() {
-        _orcamentoSelecionado = atualizado;
-        final idx = _orcamentos.indexWhere((o) => o['id'] == orcamentoId);
-        if (idx != -1) _orcamentos[idx] = atualizado;
-      });
+      if (mounted) {
+        setState(() {
+          _orcamentoSelecionado = atualizado;
+          final idx = _orcamentos.indexWhere((o) => o['id'] == orcamentoId);
+          if (idx != -1) _orcamentos[idx] = atualizado;
+        });
+      }
     } catch (_) {
       // Falha silenciosa — mantém dados antigos
     }
@@ -150,7 +181,7 @@ class _TelaOrcamentosState extends State<TelaOrcamentos> {
     );
     if (!confirmado) return;
 
-    setState(() => _salvando = true);
+    if (mounted) setState(() => _salvando = true);
     try {
       await ApiService.dio.delete('/orcamentos/$orcamentoId');
       if (!mounted) return;
@@ -185,11 +216,16 @@ class _TelaOrcamentosState extends State<TelaOrcamentos> {
     );
     if (!confirmado) return;
 
-    setState(() => _salvando = true);
+    if (mounted) setState(() => _salvando = true);
+    int? pedidoId;
+    double totalPedido = 0;
     try {
-      await ApiService.dio.post('/orcamentos/${orcamento['id']}/aprovar');
+      final resposta =
+          await ApiService.dio.post('/orcamentos/${orcamento['id']}/aprovar');
+      pedidoId = resposta.data['pedido_id'] as int?;
+      totalPedido = double.tryParse('${resposta.data['valor_total']}') ?? 0;
       await _recarregarSilencioso(orcamento['id'] as int);
-      setState(() => _salvando = false);
+      if (mounted) setState(() => _salvando = false);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
@@ -201,6 +237,137 @@ class _TelaOrcamentosState extends State<TelaOrcamentos> {
     } catch (e) {
       setState(() => _salvando = false);
       if (mounted) mostrarErro(context, extrairErroApi(e, 'Erro ao aprovar o orçamento.'));
+      return;
+    }
+
+    // Entrada é opcional: se o cliente for pagar algo agora, abre o mesmo modal
+    // de pagamento do PDV (exige cobrir o valor todo — o que não for entrada
+    // entra como crediário).
+    if (pedidoId == null || totalPedido <= 0 || !mounted) return;
+
+    final vaiDarEntrada = await mostrarDialogConfirmacao(
+      context: context,
+      titulo: 'Entrada',
+      mensagem: 'O cliente vai dar entrada neste pedido?',
+      textoCancelar: 'Não',
+      textoConfirmar: 'Sim',
+    );
+    if (!mounted) return;
+
+    final idPedido = pedidoId;
+    final total = totalPedido;
+
+    // Sem entrada, o pedido nasce inteiro no crediário — nenhum pedido fica
+    // sem pagamento registrado.
+    if (!vaiDarEntrada) {
+      await _lancarCrediario(idPedido, total);
+      return;
+    }
+
+    showDialog<void>(
+      context: context,
+      builder: (_) => ModalPagamento(
+        totalPedido: total,
+        onConfirmar: (pagamentos) => _registrarEntrada(idPedido, total, pagamentos),
+      ),
+    );
+  }
+
+  /// Lança o valor todo como crediário no pedido recém-criado pela aprovação.
+  Future<void> _lancarCrediario(int pedidoId, double total) async {
+    setState(() => _salvando = true);
+    try {
+      final formas = await FormaPagamentoService().listar();
+      final crediario =
+          formas.where((f) => f['pagamentoPosterior'] == true).toList();
+
+      if (crediario.isEmpty) {
+        if (mounted) setState(() => _salvando = false);
+        if (mounted) {
+          mostrarErro(
+            context,
+            'Nenhuma forma de crediário cadastrada. Registre o pagamento manualmente no pedido.',
+          );
+        }
+        return;
+      }
+
+      await ApiService.dio.post('/pagamentos', data: {
+        'pedido_id': pedidoId,
+        'valor_pago': total,
+        'forma_pagamento': crediario.first['nome'],
+        'data_pagamento': DateTime.now().toUtc().toIso8601String(),
+      });
+
+      setState(() => _salvando = false);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              '${crediario.first['nome']} de ${formatarMoeda(total)} lançado no pedido.',
+            ),
+            backgroundColor: CoresSemanticas.sucesso,
+          ),
+        );
+      }
+    } catch (e) {
+      setState(() => _salvando = false);
+      if (mounted) {
+        mostrarErro(context, extrairErroApi(e, 'Erro ao lançar o crediário.'));
+      }
+    }
+  }
+
+  Future<void> _registrarEntrada(
+    int pedidoId,
+    double total,
+    List<Map<String, dynamic>> pagamentos,
+  ) async {
+    setState(() => _salvando = true);
+    try {
+      double restante = total;
+      for (final p in pagamentos) {
+        if (restante <= 0.005) break;
+        final valorPago = (p['valor'] as double).clamp(0.0, restante);
+        await ApiService.dio.post('/pagamentos', data: {
+          'pedido_id': pedidoId,
+          'valor_pago': valorPago,
+          'forma_pagamento': p['forma'],
+          // Cheque (depósito posterior): data fica nula até o depósito.
+          if (p['depositoPosterior'] != true)
+            'data_pagamento': DateTime.now().toUtc().toIso8601String(),
+          if (p['parcelas'] != null) 'parcelas': p['parcelas'],
+          if (p['escamboQuantidade'] != null)
+            'escambo_quantidade': p['escamboQuantidade'],
+          if (p['conta'] != null) 'conta': p['conta'],
+          if (p['nomePagador'] != null) 'nome_pagador': p['nomePagador'],
+          if (p['cpfPagador'] != null) 'cpf_cnpj_pagador': p['cpfPagador'],
+          if (p['cheques'] != null) 'cheques': p['cheques'],
+        });
+        restante -= valorPago;
+      }
+
+      if (mounted) setState(() => _salvando = false);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Entrada registrada com sucesso!'),
+            backgroundColor: CoresSemanticas.sucesso,
+          ),
+        );
+        if (haPagamentosDescartados(pagamentos, total)) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Valor de troco não registrado como pagamento.'),
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      setState(() => _salvando = false);
+      if (mounted) {
+        mostrarErro(context, extrairErroApi(e, 'Erro ao registrar a entrada.'));
+      }
     }
   }
 
@@ -216,11 +383,11 @@ class _TelaOrcamentosState extends State<TelaOrcamentos> {
     );
     if (!confirmado) return;
 
-    setState(() => _salvando = true);
+    if (mounted) setState(() => _salvando = true);
     try {
       await ApiService.dio.post('/orcamentos/${orcamento['id']}/recusar');
       await _recarregarSilencioso(orcamento['id'] as int);
-      setState(() => _salvando = false);
+      if (mounted) setState(() => _salvando = false);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
@@ -246,6 +413,16 @@ class _TelaOrcamentosState extends State<TelaOrcamentos> {
       caminho: '/orcamentos/${orcamento['id']}/enviar-email',
       nomeDocumento: 'Orçamento ${formatarNumeroOrcamento(orcamento)}',
       email: email,
+    );
+    if (mounted) setState(() => _salvando = false);
+  }
+
+  Future<void> _emitirPdfOrcamento() async {
+    setState(() => _salvando = true);
+    await PdfDownloadService.baixarESalvarOrcamento(
+      context,
+      _orcamentoSelecionado!['id'] as int,
+      clienteEmail: _orcamentoSelecionado!['clientes']?['email'] as String?,
     );
     if (mounted) setState(() => _salvando = false);
   }
@@ -284,11 +461,7 @@ class _TelaOrcamentosState extends State<TelaOrcamentos> {
                     orcamento: _orcamentoSelecionado!,
                     salvando: _salvando,
                     onVoltar: () => setState(() => _orcamentoSelecionado = null),
-                    onEmitirPdf: () => PdfDownloadService.baixarESalvarOrcamento(
-                      context,
-                      _orcamentoSelecionado!['id'] as int,
-                      clienteEmail: _orcamentoSelecionado!['clientes']?['email'] as String?,
-                    ),
+                    onEmitirPdf: _emitirPdfOrcamento,
                     onEnviarEmail: _enviarEmailOrcamento,
                     onEditar: () => _abrirEdicaoOrcamento(_orcamentoSelecionado!),
                     onExcluir: _excluirOrcamento,
@@ -308,6 +481,32 @@ class _TelaOrcamentosState extends State<TelaOrcamentos> {
     );
   }
 
+  Future<void> _selecionarData(bool isDe) async {
+    final data = await showDatePicker(
+      context: context,
+      initialDate: isDe ? _de : _ate,
+      firstDate: DateTime(2020),
+      lastDate: DateTime(2100),
+    );
+    if (data == null) return;
+    if (mounted) {
+      setState(() {
+        if (isDe) {
+          _de = data;
+          if (_ate.isBefore(_de)) _ate = _de;
+        } else {
+          _ate = data;
+          if (_de.isAfter(_ate)) _de = _ate;
+        }
+      });
+    }
+    _carregarOrcamentos();
+  }
+
+  String _formatarData(DateTime dt) =>
+      '${dt.day.toString().padLeft(2, '0')}/'
+      '${dt.month.toString().padLeft(2, '0')}/${dt.year}';
+
   Widget _buildListagem() {
     return Column(
       children: [
@@ -318,6 +517,30 @@ class _TelaOrcamentosState extends State<TelaOrcamentos> {
           labelText: 'Pesquisar',
           hintText: 'Nome do cliente ou número do orçamento',
           onTextoNumerico: _filtrarPorNumero,
+        ),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+          child: Row(
+            children: [
+              Expanded(
+                child: BotaoData(
+                  label: 'De',
+                  valor: _formatarData(_de),
+                  selecionado: true,
+                  onTap: () => _selecionarData(true),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: BotaoData(
+                  label: 'Até',
+                  valor: _formatarData(_ate),
+                  selecionado: true,
+                  onTap: () => _selecionarData(false),
+                ),
+              ),
+            ],
+          ),
         ),
         Padding(
           padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),

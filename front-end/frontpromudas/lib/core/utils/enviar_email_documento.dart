@@ -1,3 +1,4 @@
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import '../services/api_service.dart';
 import '../widgets/dialog_confirmacao.dart';
@@ -23,7 +24,12 @@ Future<bool> enviarDocumentoPorEmail({
   if (!confirmado || !context.mounted) return false;
 
   try {
-    await ApiService.dio.post(caminho);
+    // O backend gera o PDF e chama a Resend de forma síncrona: com o timeout
+    // padrão de 10s o app mostrava erro embora o e-mail tivesse sido enviado.
+    await ApiService.dio.post(
+      caminho,
+      options: Options(receiveTimeout: const Duration(seconds: 60)),
+    );
     if (context.mounted) mostrarSucesso(context, 'E-mail enviado com sucesso!');
     return true;
   } catch (e) {

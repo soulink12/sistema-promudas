@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import '../../../core/services/api_service.dart';
+import '../../../core/services/pendencias_service.dart';
 import '../../cheques/screens/cheques_a_depositar_screen.dart';
 import '../../pagamentos/screens/pagamentos_sem_conta_screen.dart';
 
@@ -26,14 +26,12 @@ class _TelaNotificacoesState extends State<TelaNotificacoes> {
   /// Carrega as contagens de cada pendência. Falha silenciosa por tipo — o badge
   /// apenas não aparece se aquele endpoint falhar.
   Future<void> _carregar() async {
-    try {
-      final r = await ApiService.dio.get('/cheques/a-depositar');
-      if (mounted) setState(() => _chequesADepositar = (r.data as List).length);
-    } catch (_) {}
-    try {
-      final r = await ApiService.dio.get('/pagamentos/pendentes-conta');
-      if (mounted) setState(() => _pagamentosSemConta = (r.data as List).length);
-    } catch (_) {}
+    final pendencias = await PendenciasService.contar();
+    if (!mounted) return;
+    setState(() {
+      _chequesADepositar = pendencias.chequesADepositar ?? 0;
+      _pagamentosSemConta = pendencias.pagamentosSemConta ?? 0;
+    });
   }
 
   Future<void> _abrir(Widget tela) async {

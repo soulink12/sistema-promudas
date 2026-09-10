@@ -2,8 +2,10 @@ import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../../../../core/services/api_service.dart';
+import '../../../../core/services/cep_service.dart';
 import '../../../../core/theme/cores_semanticas.dart';
 import '../../../../core/utils/cpf_cnpj.dart';
+import '../../../../core/utils/mascaras.dart';
 import '../../../../core/widgets/campo_obrigatorio.dart';
 
 class DialogCadastroCliente extends StatefulWidget {
@@ -112,6 +114,35 @@ class _DialogCadastroClienteState extends State<DialogCadastroCliente> {
     }
   }
 
+
+  // Busca o endereço no ViaCEP quando o CEP fica completo (8 dígitos), e
+  // preenche só os campos que ainda estão vazios — para não sobrescrever algo
+  // que o operador já ajustou na mão. Falha silenciosa: é conveniência.
+  bool _buscandoCep = false;
+
+  Future<void> _buscarEnderecoPorCep() async {
+    final digitos = _cep.text.replaceAll(RegExp(r'\D'), '');
+    if (digitos.length != 8 || _buscandoCep) return;
+
+    setState(() => _buscandoCep = true);
+    final endereco = await CepService.buscar(digitos);
+    if (!mounted) return;
+    setState(() => _buscandoCep = false);
+    if (endereco == null) return;
+
+    void preencher(TextEditingController controller, String valor) {
+      if (valor.isNotEmpty && controller.text.trim().isEmpty) {
+        controller.text = valor;
+      }
+    }
+
+    preencher(_logradouro, endereco.logradouro);
+    preencher(_bairro, endereco.bairro);
+    preencher(_cidade, endereco.cidade);
+    if (endereco.estado.isNotEmpty) _estado.text = endereco.estado;
+    setState(() {});
+  }
+
   @override
   Widget build(BuildContext context) {
     return Dialog(
@@ -155,6 +186,7 @@ class _DialogCadastroClienteState extends State<DialogCadastroCliente> {
                         controller: _nome,
                         label: 'Nome',
                         mostrarErroForcado: _tentouSalvar,
+                        limite: 100,
                       ),
                     ),
                     _subtitulo(context, 'Identificação'),
@@ -165,33 +197,49 @@ class _DialogCadastroClienteState extends State<DialogCadastroCliente> {
                       inputFormatters: [CpfCnpjInputFormatter()],
                       errorText: _cpfInvalido ? 'CPF/CNPJ inválido.' : null,
                     ),
-                    _campo(_inscricao, 'Inscrição Estadual'),
+                    _campo(_inscricao, 'Inscrição Estadual', limite: 30),
                     _subtitulo(context, 'Contato'),
-                    _campo(_tel1, 'Telefone'),
-                    _campo(_tel2, 'Telefone 2'),
+                    _campo(_tel1, 'Telefone',
+                        keyboardType: TextInputType.phone,
+                        inputFormatters: [TelefoneInputFormatter()]),
+                    _campo(_tel2, 'Telefone 2',
+                        keyboardType: TextInputType.phone,
+                        inputFormatters: [TelefoneInputFormatter()]),
                     _campo(
                       _email,
                       'E-mail',
                       keyboardType: TextInputType.emailAddress,
                       errorText: _emailInvalido ? 'E-mail inválido.' : null,
+                      limite: 150,
                     ),
                     _subtitulo(context, 'Endereço'),
                     Row(
                       children: [
-                        Expanded(flex: 2, child: _campo(_cep, 'CEP')),
+                        Expanded(
+                            flex: 2,
+                            child: _campo(_cep, 'CEP',
+                                keyboardType: TextInputType.number,
+                                inputFormatters: [CepInputFormatter()],
+                                onChanged: (_) => _buscarEnderecoPorCep())),
                         const SizedBox(width: 12),
-                        Expanded(flex: 3, child: _campo(_estado, 'Estado')),
+                        Expanded(
+                            flex: 3,
+                            child: _campo(_estado, 'Estado', limite: 2)),
                       ],
                     ),
-                    _campo(_logradouro, 'Logradouro'),
+                    _campo(_logradouro, 'Logradouro', limite: 150),
                     Row(
                       children: [
-                        Expanded(flex: 3, child: _campo(_bairro, 'Bairro')),
+                        Expanded(
+                            flex: 3,
+                            child: _campo(_bairro, 'Bairro', limite: 100)),
                         const SizedBox(width: 12),
-                        Expanded(flex: 1, child: _campo(_numero, 'Número')),
+                        Expanded(
+                            flex: 1,
+                            child: _campo(_numero, 'Número', limite: 20)),
                       ],
                     ),
-                    _campo(_cidade, 'Cidade'),
+                    _campo(_cidade, 'Cidade', limite: 100),
                     if (_erro != null)
                       Padding(
                         padding: const EdgeInsets.only(top: 8),
@@ -257,19 +305,27 @@ Widget _subtitulo(BuildContext context, String texto) {
   );
 }
 
+// `limite` espelha o tamanho da coluna no banco. Sem isso, digitar algo maior
+// (ex.: "Pará" num Estado VarChar(2)) só falhava no servidor, com erro genérico.
 Widget _campo(
   TextEditingController controller,
   String label, {
   TextInputType? keyboardType,
   List<TextInputFormatter>? inputFormatters,
   String? errorText,
+  int? limite,
+  ValueChanged<String>? onChanged,
 }) {
   return Padding(
     padding: const EdgeInsets.only(bottom: 12),
     child: TextField(
       controller: controller,
       keyboardType: keyboardType,
-      inputFormatters: inputFormatters,
+      inputFormatters: [
+        ...?inputFormatters,
+        if (limite != null) LengthLimitingTextInputFormatter(limite),
+      ],
+      onChanged: onChanged,
       decoration: InputDecoration(
         labelText: label,
         border: const OutlineInputBorder(),

@@ -1,5 +1,6 @@
 const { Resend } = require('resend');
 const BusinessError = require('../utils/BusinessError');
+const { nomeArquivoAscii } = require('../utils/contentDisposition');
 
 let resend = null;
 const getResend = () => {
@@ -12,6 +13,66 @@ const getResend = () => {
     return resend;
 };
 
+// Aviso no fim de todo e-mail enviado ao cliente. A caixa de envio hoje é só
+// de saída; quando passar a receber respostas, este texto sai.
+const AVISO_AUTOMATICO =
+    'Este é um e-mail automático e esta caixa não recebe respostas. '
+    + 'Para falar com a gente, procure o Viveiro Promudas pelos canais de atendimento.';
+
+// Catálogo dos eventos que disparam e-mail.
+//   `titulo`  — assunto da mensagem (o número do documento é acrescentado).
+//   `cliente` — quando true, o cliente do documento recebe além da
+//               administração (EMAIL_NOTIFICACAO_PEDIDOS).
+//   `frase`   — texto para o cliente; recebe o número do documento.
+const EVENTOS = {
+    pedidoCriado: {
+        titulo: 'Confirmação de pedido',
+        cliente: false,
+        frase: (numero) => `Seu pedido ${numero} foi registrado.`,
+    },
+    pedidoAlterado: {
+        titulo: 'Atualização de pedido',
+        cliente: true,
+        frase: (numero) => `Seu pedido ${numero} foi atualizado.`,
+    },
+    pedidoPagamento: {
+        titulo: 'Pagamento de pedido realizado',
+        cliente: true,
+        frase: (numero) => `Registramos um pagamento no seu pedido ${numero}.`,
+    },
+    orcamentoAprovado: {
+        titulo: 'Aprovação de orçamento',
+        cliente: true,
+        frase: (numero) => `Seu orçamento foi aprovado e gerou o pedido ${numero}.`,
+    },
+    orcamentoCriado: {
+        titulo: 'Pedido de orçamento',
+        cliente: false,
+        frase: (numero) => `Seu orçamento ${numero} foi registrado.`,
+    },
+    orcamentoAlterado: {
+        titulo: 'Alteração de orçamento',
+        cliente: false,
+        frase: (numero) => `Seu orçamento ${numero} foi atualizado.`,
+    },
+    orcamentoRecusado: {
+        titulo: 'Recusa de orçamento',
+        cliente: false,
+        frase: (numero) => `Seu orçamento ${numero} foi recusado.`,
+    },
+    // Envio manual, pelo botão "Enviar por e-mail" — só vai para o cliente.
+    pedidoManual: {
+        titulo: 'Confirmação de pedido',
+        cliente: true,
+        frase: (numero) => `Segue o recibo do seu pedido ${numero}.`,
+    },
+    orcamentoManual: {
+        titulo: 'Pedido de orçamento',
+        cliente: true,
+        frase: (numero) => `Segue o seu orçamento ${numero}.`,
+    },
+};
+
 // Envia um PDF (buffer) por e-mail como anexo. Lança BusinessError se a
 // Resend recusar o envio (ex.: domínio do remetente não verificado).
 const enviarPdfPorEmail = async ({ destinatario, assunto, corpo, anexoBuffer, nomeArquivo }) => {
@@ -22,10 +83,18 @@ const enviarPdfPorEmail = async ({ destinatario, assunto, corpo, anexoBuffer, no
         text: corpo,
         attachments: [
             {
-                filename: nomeArquivo,
+                // Nome de anexo com acento chega corrompido no cliente de
+                // e-mail (MIME exige codificação própria para não-ASCII), então
+                // vai sem acento: "Orçamento #12.pdf" → "Orcamento #12.pdf".
+                filename: nomeArquivoAscii(nomeArquivo),
                 content: anexoBuffer,
             },
         ],
+    }, {
+        // O SDK da Resend manda `Content-Type: application/json` sem charset.
+        // Sem essa declaração, os bytes UTF-8 do assunto e do corpo podem ser
+        // reinterpretados como Latin-1 e "João" chega como "JoÃ£o".
+        headers: { 'Content-Type': 'application/json; charset=utf-8' },
     });
 
     if (error) {
@@ -33,28 +102,23 @@ const enviarPdfPorEmail = async ({ destinatario, assunto, corpo, anexoBuffer, no
     }
 };
 
-// Notifica o e-mail interno (EMAIL_NOTIFICACAO_PEDIDOS) de um pedido/orçamento
-// novo ou alterado, anexando o PDF. Não lança erro — é uma notificação
-// interna best-effort, uma falha nela não pode derrubar a criação/edição do
-// pedido/orçamento em si. No-op se a variável não estiver configurada.
-const notificarPedidoOuOrcamento = async ({ assunto, corpo, anexoBuffer, nomeArquivo }) => {
-    const destinatario = process.env.EMAIL_NOTIFICACAO_PEDIDOS;
-    if (!destinatario) return;
+const corpoParaCliente = (nomeCliente, frase) =>
+    `Olá, ${nomeCliente}!\n\n${frase}\n\nO documento segue em anexo.\n\n${AVISO_AUTOMATICO}`;
 
-    try {
-        await enviarPdfPorEmail({ destinatario, assunto, corpo, anexoBuffer, nomeArquivo });
-    } catch (erro) {
-        console.error('Falha ao enviar notificação interna de pedido/orçamento:', erro);
-    }
-};
+// Dispara os e-mails de um evento: sempre para a administração
+// (EMAIL_NOTIFICACAO_PEDIDOS, quando configurada) e, nos eventos marcados com
+// `cliente: true`, também para o cliente do documento.
+//
+// O PDF é gerado uma vez e reaproveitado nos dois envios. Cada destinatário
+// falha de forma independente e sem derrubar o outro — e-mail é best-effort,
+// nunca pode quebrar o registro do pedido/pagamento em si. Silencioso quando o
+// documento não existe mais (ex.: apagado logo depois).
+const notificarEvento = async ({ id, evento, gerarPDF, formatarNumero }) => {
+    const config = EVENTOS[evento];
+    if (!config) throw new Error(`Evento de e-mail desconhecido: ${evento}`);
 
-// Sequência comum a pedido e orçamento: gera o PDF (`gerarPDF`, que resolve
-// com { buffer, nomeArquivo, entidade }) e dispara a notificação interna
-// best-effort. `rotulo` é "Pedido"/"Orçamento". Silencioso quando o
-// documento não é mais encontrado (ex.: apagado logo após); outros erros
-// (falha ao gerar o PDF, etc.) sobem para o `.catch` do chamador.
-const notificarDocumentoPorEmail = async ({ id, tipo, gerarPDF, formatarNumero, rotulo }) => {
-    if (!process.env.EMAIL_NOTIFICACAO_PEDIDOS) return;
+    const emailAdmin = process.env.EMAIL_NOTIFICACAO_PEDIDOS;
+    if (!emailAdmin && !config.cliente) return;
 
     let resultado;
     try {
@@ -67,28 +131,57 @@ const notificarDocumentoPorEmail = async ({ id, tipo, gerarPDF, formatarNumero, 
     const { entidade, buffer, nomeArquivo } = resultado;
     const numero = formatarNumero(entidade);
     const nomeCliente = entidade.clientes?.nome ?? 'cliente';
+    const assunto = `${config.titulo} ${numero}`;
 
-    await notificarPedidoOuOrcamento({
-        assunto: `${rotulo} ${numero} ${tipo} — ${nomeCliente}`,
-        corpo: `O ${rotulo.toLowerCase()} ${numero} (${nomeCliente}) foi ${tipo} no sistema.`,
-        anexoBuffer: buffer,
-        nomeArquivo,
-    });
+    if (emailAdmin) {
+        try {
+            await enviarPdfPorEmail({
+                destinatario: emailAdmin,
+                assunto: `${assunto} — ${nomeCliente}`,
+                // Texto neutro: `frase` é escrita para o cliente ("seu pedido"),
+                // o que soa errado numa notificação interna.
+                corpo: `${config.titulo}.\n\nDocumento: ${numero}\nCliente: ${nomeCliente}`,
+                anexoBuffer: buffer,
+                nomeArquivo,
+            });
+        } catch (erro) {
+            console.error('Falha ao enviar notificação interna:', erro);
+        }
+    }
+
+    const emailCliente = entidade.clientes?.email;
+    if (config.cliente && emailCliente) {
+        try {
+            await enviarPdfPorEmail({
+                destinatario: emailCliente,
+                assunto,
+                corpo: corpoParaCliente(nomeCliente, config.frase(numero)),
+                anexoBuffer: buffer,
+                nomeArquivo,
+            });
+        } catch (erro) {
+            console.error('Falha ao enviar e-mail ao cliente:', erro);
+        }
+    }
 };
 
-// Sequência comum a pedido e orçamento: gera o PDF, exige que o cliente
-// tenha e-mail cadastrado e envia. `descricaoDocumento` completa a frase
-// "Segue em anexo <descricaoDocumento> na Viveiro Promudas.".
-const enviarDocumentoPorEmail = async ({ id, gerarPDF, formatarNumero, rotulo, descricaoDocumento }) => {
+// Envio manual pelo botão "Enviar por e-mail": ao contrário do automático,
+// aqui a ausência de e-mail no cadastro é erro visível para o operador, e uma
+// falha no envio precisa aparecer na tela.
+const enviarDocumentoPorEmail = async ({ id, evento, gerarPDF, formatarNumero }) => {
+    const config = EVENTOS[evento];
+    if (!config) throw new Error(`Evento de e-mail desconhecido: ${evento}`);
+
     const { entidade, buffer, nomeArquivo } = await gerarPDF(id);
     if (!entidade.clientes?.email) {
         throw new BusinessError('Este cliente não tem e-mail cadastrado.');
     }
 
+    const numero = formatarNumero(entidade);
     await enviarPdfPorEmail({
         destinatario: entidade.clientes.email,
-        assunto: `${rotulo} ${formatarNumero(entidade)} — Viveiro Promudas`,
-        corpo: `Olá, ${entidade.clientes.nome}!\n\nSegue em anexo ${descricaoDocumento} na Viveiro Promudas.\n\nQualquer dúvida, estamos à disposição.`,
+        assunto: `${config.titulo} ${numero}`,
+        corpo: corpoParaCliente(entidade.clientes.nome, config.frase(numero)),
         anexoBuffer: buffer,
         nomeArquivo,
     });
@@ -96,7 +189,7 @@ const enviarDocumentoPorEmail = async ({ id, gerarPDF, formatarNumero, rotulo, d
 
 module.exports = {
     enviarPdfPorEmail,
-    notificarPedidoOuOrcamento,
-    notificarDocumentoPorEmail,
+    notificarEvento,
     enviarDocumentoPorEmail,
+    EVENTOS,
 };

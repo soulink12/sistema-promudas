@@ -107,6 +107,54 @@ test('reduzir um pedido já pago gera crédito para o cliente e status Crédito'
         `saldo_credito não subiu 50 (de ${saldoInicial} para ${saldoFinal})`);
 });
 
+test('reeditar pedido já creditado não credita de novo, e voltar a subir estorna', async () => {
+    const cliente = await amb.criarCliente();
+    const saldo = async () => Number(
+        (await amb.api('GET', `/api/clientes/${cliente.id}`)).body.saldo_credito ?? 0,
+    );
+
+    const saldoInicial = await saldo();
+
+    const pedidoId = await amb.criarPedido({
+        cliente_id: cliente.id,
+        itens: [{ produto_id: produtoId, quantidade: 2, valor_unitario: 50 }], // total 100
+    });
+    await amb.api('POST', '/api/pagamentos', {
+        body: {
+            pedido_id: pedidoId,
+            valor_pago: 100,
+            forma_pagamento: 'PIX',
+            data_pagamento: new Date().toISOString(),
+        },
+    });
+
+    // 1ª edição: 100 → 50. A sobra de 50 vira crédito.
+    const primeira = await amb.api('PUT', `/api/pedidos/${pedidoId}`, {
+        body: { itens: [{ produto_id: produtoId, quantidade: 1, valor_unitario: 50 }] },
+    });
+    assert.equal(primeira.status, 200, JSON.stringify(primeira.body));
+    assert.ok(Math.abs((await saldo()) - saldoInicial - 50) < 0.01, 'primeira edição não creditou 50');
+
+    // 2ª edição sem mudar o total: a sobra continua a mesma, então nada é
+    // creditado de novo (antes, cada reedição creditava outros 50).
+    const segunda = await amb.api('PUT', `/api/pedidos/${pedidoId}`, {
+        body: { itens: [{ produto_id: produtoId, quantidade: 1, valor_unitario: 50 }] },
+    });
+    assert.equal(segunda.status, 200, JSON.stringify(segunda.body));
+    assert.ok(Math.abs(Number(segunda.body.creditoGerado)) < 0.01,
+        `reedição creditou de novo: ${segunda.body.creditoGerado}`);
+    assert.ok(Math.abs((await saldo()) - saldoInicial - 50) < 0.01,
+        'saldo mudou numa reedição que não alterou o total');
+
+    // 3ª edição: volta para 100. A sobra some, então o crédito é estornado.
+    const terceira = await amb.api('PUT', `/api/pedidos/${pedidoId}`, {
+        body: { itens: [{ produto_id: produtoId, quantidade: 2, valor_unitario: 50 }] },
+    });
+    assert.equal(terceira.status, 200, JSON.stringify(terceira.body));
+    assert.ok(Math.abs((await saldo()) - saldoInicial) < 0.01,
+        'crédito não foi estornado ao pedido voltar ao valor original');
+});
+
 test('soft-delete some da consulta e bloqueia novo pagamento', async () => {
     const pedidoId = await amb.criarPedido({
         cliente_id: 1,
@@ -223,4 +271,30 @@ test('filtros de temporada e forma de pagamento', async () => {
 
     const outraForma = await amb.api('GET', '/api/pedidos?formaPagamento=Dinheiro');
     assert.ok(!outraForma.body.some((p) => p.id === pedidoId), 'forma errada não deveria trazer o pedido');
+});
+
+test('filtro por clienteId não mistura pedidos de clientes com nome parecido', async () => {
+    const ana = await amb.criarCliente({ nome: 'Ana Teste Filtro' });
+    const anaMaria = await amb.criarCliente({ nome: 'Ana Teste Filtro Maria' });
+    amb.registrar.cliente(ana.id);
+    amb.registrar.cliente(anaMaria.id);
+
+    const pedidoAna = await amb.criarPedido({
+        cliente_id: ana.id,
+        itens: [{ produto_id: produtoId, quantidade: 1, valor_unitario: 50 }],
+    });
+    await amb.criarPedido({
+        cliente_id: anaMaria.id,
+        itens: [{ produto_id: produtoId, quantidade: 1, valor_unitario: 50 }],
+    });
+
+    // Por nome, o `contains` do backend traz os dois.
+    const porNome = await amb.api('GET', '/api/pedidos?cliente=Ana Teste Filtro');
+    assert.ok(porNome.body.length >= 2, 'o filtro por nome deveria trazer os homônimos');
+
+    // Por id, só o pedido do cliente certo.
+    const porId = await amb.api('GET', `/api/pedidos?clienteId=${ana.id}`);
+    assert.equal(porId.status, 200, JSON.stringify(porId.body));
+    assert.equal(porId.body.length, 1, 'filtro por id trouxe pedido de outro cliente');
+    assert.equal(porId.body[0].id, pedidoAna);
 });

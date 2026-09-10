@@ -6,6 +6,7 @@ router.post('/', pedidoController.criarPedido);
 router.get('/', pedidoController.listarPedidos);
 router.get('/:id/pdf', pedidoController.gerarPDF);
 router.post('/:id/enviar-email', pedidoController.enviarEmail);
+router.post('/:id/pagamentos', pedidoController.registrarPagamentos);
 router.get('/:id', pedidoController.buscarPedido);
 router.put('/:id', pedidoController.atualizarPedido);
 router.delete('/:id', pedidoController.eliminarPedido);

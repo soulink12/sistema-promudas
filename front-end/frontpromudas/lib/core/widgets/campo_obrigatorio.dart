@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 /// Campo de texto obrigatório reutilizável.
 ///
@@ -28,6 +29,10 @@ class CampoObrigatorio extends StatefulWidget {
   // tentar salvar o formulário (revela o que falta preencher).
   final bool mostrarErroForcado;
 
+  /// Tamanho máximo, espelhando a coluna no banco — evita que o valor só seja
+  /// recusado no servidor, com erro genérico.
+  final int? limite;
+
   const CampoObrigatorio({
     super.key,
     required this.controller,
@@ -42,6 +47,7 @@ class CampoObrigatorio extends StatefulWidget {
     this.mensagemErro = 'Obrigatório',
     this.validar = true,
     this.mostrarErroForcado = false,
+    this.limite,
   });
 
   @override
@@ -95,6 +101,9 @@ class _CampoObrigatorioState extends State<CampoObrigatorio> {
       focusNode: _focusNode,
       autofocus: widget.autofocus,
       keyboardType: widget.keyboardType,
+      inputFormatters: [
+        if (widget.limite != null) LengthLimitingTextInputFormatter(widget.limite!),
+      ],
       onSubmitted: widget.onSubmitted,
       onChanged: widget.onChanged,
       decoration: InputDecoration(

@@ -78,3 +78,8 @@ test('rota protegida com token inválido retorna 401', async () => {
     const res = await amb.api('GET', '/api/clientes', { token: 'token-invalido' });
     assert.equal(res.status, 401);
 });
+
+test('login sem corpo retorna 400 (não 500)', async () => {
+    const res = await amb.api('POST', '/api/auth/login', { semToken: true, body: {} });
+    assert.equal(res.status, 400, JSON.stringify(res.body));
+});

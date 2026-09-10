@@ -2,6 +2,7 @@ import 'package:desktop_updater/desktop_updater.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
+import 'core/services/api_service.dart';
 import 'core/services/app_config.dart';
 import 'core/services/atualizador_service.dart';
 import 'core/services/pdf_config_service.dart';
@@ -17,6 +18,24 @@ void main() async {
   await AppConfig.carregar();
   await ThemeService.carregar();
   await PdfConfigService.carregar();
+
+  // Sessão expirada (401): volta para o login em vez de deixar o operador
+  // preso numa tela que só devolve erro genérico.
+  ApiService.aoExpirarSessao = () {
+    final nav = _navigatorKey.currentState;
+    if (nav == null) return;
+    nav.pushAndRemoveUntil(
+      MaterialPageRoute(builder: (_) => const TelaLogin()),
+      (rota) => false,
+    );
+    final contexto = _navigatorKey.currentContext;
+    if (contexto != null) {
+      ScaffoldMessenger.of(contexto).showSnackBar(
+        const SnackBar(content: Text('Sua sessão expirou. Entre novamente.')),
+      );
+    }
+  };
+
   runApp(const MeuViveiroApp());
 }
 

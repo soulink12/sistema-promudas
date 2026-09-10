@@ -62,19 +62,32 @@ class PdfDownloadService {
       return;
     }
 
+    Uint8List bytes;
+    String nomeArquivo;
     try {
       final response = await ApiService.dio.get(
         '$caminhoBase/$id/pdf',
         options: Options(responseType: ResponseType.bytes),
       );
 
-      final bytes = Uint8List.fromList(response.data as List<int>);
+      bytes = Uint8List.fromList(response.data as List<int>);
 
-      final nomeArquivo = _nomeArquivo(
+      nomeArquivo = _nomeArquivo(
         response.headers.value('content-disposition'),
         id,
       );
+    } catch (_) {
+      if (context.mounted) {
+        _avisar(
+          context,
+          'Não foi possível gerar o PDF.',
+          CoresSemanticas.erro,
+        );
+      }
+      return;
+    }
 
+    try {
       // Dentro da pasta do usuário, organiza por temporada: subpasta "26" para
       // pedidos da safra 2026 (ex.: "Pedido 26-1.pdf"). Cria a subpasta se ainda
       // não existir. Pedidos sem temporada (e orçamentos) vão direto na raiz.
@@ -86,29 +99,30 @@ class PdfDownloadService {
 
       final caminho = '$destino${Platform.pathSeparator}$nomeArquivo';
       await File(caminho).writeAsBytes(bytes);
-
-      if (context.mounted) {
-        await Navigator.of(context).push(
-          MaterialPageRoute(
-            builder: (_) => PdfPreviewScreen(
-              bytes: bytes,
-              nomeArquivo: nomeArquivo,
-              pedidoId: id,
-              mostrarImprimir3Vias: mostrarImprimir3Vias,
-              caminhoEnviarEmail: '$caminhoBase/$id/enviar-email',
-              clienteEmail: clienteEmail,
-            ),
-          ),
-        );
-      }
     } catch (_) {
       if (context.mounted) {
         _avisar(
           context,
-          'Não foi possível gerar o PDF.',
+          'PDF gerado, mas não foi possível salvar na pasta configurada. Verifique o caminho em Configurações.',
           CoresSemanticas.erro,
         );
       }
+      return;
+    }
+
+    if (context.mounted) {
+      await Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) => PdfPreviewScreen(
+            bytes: bytes,
+            nomeArquivo: nomeArquivo,
+            pedidoId: id,
+            mostrarImprimir3Vias: mostrarImprimir3Vias,
+            caminhoEnviarEmail: '$caminhoBase/$id/enviar-email',
+            clienteEmail: clienteEmail,
+          ),
+        ),
+      );
     }
   }
 

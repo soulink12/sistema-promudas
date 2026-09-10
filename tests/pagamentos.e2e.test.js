@@ -73,6 +73,131 @@ test('crediário (pagamento posterior) não conta como recebido', async () => {
     assert.equal(await statusPagamento(pedidoId), 'Pendente');
 });
 
+test('pagar parte do crediário abate o "a receber" numa transação só', async () => {
+    const pedidoId = await novoPedido(); // total 100
+
+    // Pedido nasce inteiro no crediário (nada pago ainda).
+    assert.equal((await pagar(pedidoId, 100, 'Crediário')).status, 201);
+    assert.equal(await statusPagamento(pedidoId), 'Pendente');
+
+    // Cliente paga 40 em dinheiro: o crediário tem que cair para 60.
+    const res = await amb.api('POST', `/api/pedidos/${pedidoId}/pagamentos`, {
+        body: {
+            pagamentos: [
+                { valor_pago: 40, forma_pagamento: 'PIX', data_pagamento: new Date().toISOString() },
+            ],
+        },
+    });
+    assert.equal(res.status, 201, JSON.stringify(res.body));
+
+    const ped = await amb.api('GET', `/api/pedidos/${pedidoId}`);
+    const reais = ped.body.pagamentos.filter((p) => p.pagamento_posterior !== true);
+    const crediarios = ped.body.pagamentos.filter((p) => p.pagamento_posterior === true);
+
+    const totalReal = reais.reduce((s, p) => s + Number(p.valor_pago), 0);
+    const totalCredito = crediarios.reduce((s, p) => s + Number(p.valor_pago), 0);
+
+    assert.ok(Math.abs(totalReal - 40) < 0.01, `pago real deveria ser 40, veio ${totalReal}`);
+    assert.ok(Math.abs(totalCredito - 60) < 0.01, `crediário deveria cair para 60, veio ${totalCredito}`);
+    assert.ok(Math.abs(totalReal + totalCredito - 100) < 0.01, 'total coberto deixou de fechar em 100');
+    assert.equal(ped.body.status_pagamento, 'Parcial');
+});
+
+test('quitar o crediário inteiro remove o "a receber" e fecha o pedido', async () => {
+    const pedidoId = await novoPedido(); // total 100
+    assert.equal((await pagar(pedidoId, 100, 'Crediário')).status, 201);
+
+    const res = await amb.api('POST', `/api/pedidos/${pedidoId}/pagamentos`, {
+        body: {
+            pagamentos: [
+                { valor_pago: 100, forma_pagamento: 'PIX', data_pagamento: new Date().toISOString() },
+            ],
+        },
+    });
+    assert.equal(res.status, 201, JSON.stringify(res.body));
+
+    const ped = await amb.api('GET', `/api/pedidos/${pedidoId}`);
+    const crediarios = ped.body.pagamentos.filter((p) => p.pagamento_posterior === true);
+    assert.equal(crediarios.length, 0, 'crediário deveria ter sumido após a quitação');
+    assert.equal(ped.body.status_pagamento, 'Pago');
+});
+
+test('lote de pagamentos inválido não deixa o pedido em estado parcial', async () => {
+    const pedidoId = await novoPedido(); // total 100
+    assert.equal((await pagar(pedidoId, 100, 'Crediário')).status, 201);
+
+    // O segundo pagamento estoura o total: a transação inteira precisa voltar
+    // atrás — nem o primeiro pagamento entra, nem o crediário é apagado.
+    const res = await amb.api('POST', `/api/pedidos/${pedidoId}/pagamentos`, {
+        body: {
+            pagamentos: [
+                { valor_pago: 40, forma_pagamento: 'PIX', data_pagamento: new Date().toISOString() },
+                { valor_pago: 500, forma_pagamento: 'PIX', data_pagamento: new Date().toISOString() },
+            ],
+        },
+    });
+    assert.equal(res.status, 400, `esperava 400: ${JSON.stringify(res.body)}`);
+
+    const ped = await amb.api('GET', `/api/pedidos/${pedidoId}`);
+    const reais = ped.body.pagamentos.filter((p) => p.pagamento_posterior !== true);
+    const crediarios = ped.body.pagamentos.filter((p) => p.pagamento_posterior === true);
+    const totalCredito = crediarios.reduce((s, p) => s + Number(p.valor_pago), 0);
+
+    assert.equal(reais.length, 0, 'pagamento parcial da transação falha ficou gravado');
+    assert.ok(Math.abs(totalCredito - 100) < 0.01, `crediário foi perdido: ${totalCredito}`);
+    assert.equal(ped.body.status_pagamento, 'Pendente');
+});
+
+test('criar pagamento sem corpo retorna 400 (não 500)', async () => {
+    const res = await amb.api('POST', '/api/pagamentos', { body: {} });
+    assert.equal(res.status, 400, JSON.stringify(res.body));
+});
+
+test('valor de pagamento negativo ou não numérico é rejeitado', async () => {
+    const pedidoId = await novoPedido();
+
+    const negativo = await pagar(pedidoId, -50);
+    assert.equal(negativo.status, 400, JSON.stringify(negativo.body));
+    assert.match(negativo.body.erro, /maior que zero/i);
+
+    const texto = await pagar(pedidoId, 'abc');
+    assert.equal(texto.status, 400, JSON.stringify(texto.body));
+
+    assert.equal(await statusPagamento(pedidoId), 'Pendente');
+});
+
+test('editar pagamento não permite trocá-lo de pedido', async () => {
+    const pedidoA = await novoPedido();
+    const pedidoB = await novoPedido();
+
+    const criado = await pagar(pedidoA, 100);
+    assert.equal(criado.status, 201);
+    assert.equal(await statusPagamento(pedidoA), 'Pago');
+
+    // Tenta mover o pagamento para o pedido B: o campo tem que ser ignorado,
+    // senão o pedido A ficaria "Pago" sem ter o dinheiro.
+    const upd = await amb.api('PUT', `/api/pagamentos/${criado.body.id}`, {
+        body: { pedido_id: pedidoB, valor_pago: 100 },
+    });
+    assert.equal(upd.status, 200, JSON.stringify(upd.body));
+
+    assert.equal(await statusPagamento(pedidoA), 'Pago');
+    assert.equal(await statusPagamento(pedidoB), 'Pendente');
+});
+
+test('excluir pagamento inexistente retorna 404 (não 500)', async () => {
+    const res = await amb.api('DELETE', '/api/pagamentos/2000000000');
+    assert.equal(res.status, 404, JSON.stringify(res.body));
+});
+
+test('lote vazio é rejeitado com 400', async () => {
+    const pedidoId = await novoPedido();
+    const res = await amb.api('POST', `/api/pedidos/${pedidoId}/pagamentos`, {
+        body: { pagamentos: [] },
+    });
+    assert.equal(res.status, 400, JSON.stringify(res.body));
+});
+
 test('data de pagamento realmente inválida retorna 400 (não 500)', async () => {
     const pedidoId = await novoPedido();
     const pg = await pagar(pedidoId, 50, 'PIX', { data_pagamento: 'data-ruim' });
