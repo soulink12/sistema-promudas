@@ -151,6 +151,58 @@ const criarPagamentoTx = async (tx, dadosPagamento, formasPosteriores) => {
     return await tx.pagamentos.create({ data: dados });
 };
 
+// Registra os pagamentos de entrada informados (se houver) e cobre o que
+// faltar de `valorAlvo` com a primeira forma de crediário cadastrada — tudo
+// dentro da MESMA transação do chamador. `valorAlvo` é o valor total do
+// pedido (pedido novo, aprovação de orçamento) ou só o aumento de um pedido
+// já existente sendo editado (o resto do total já está coberto por
+// pagamentos anteriores, que esta função não mexe). Se qualquer pagamento
+// falhar a validação, ou faltar forma de crediário para cobrir o restante, a
+// transação inteira desfaz — o registro (pedido, orçamento aprovado, edição)
+// não chega a existir, em vez de ficar com cobertura incompleta e sem
+// nenhum aviso. Único lugar que sabe fazer "cobrir um valor com entrada +
+// crediário automático" — reusado por criarPedidoTx (POST /pedidos),
+// atualizarPedido (aumento no PUT /pedidos/:id) e aprovarOrcamento.
+const cobrirValorTx = async (tx, { pedidoId, valorAlvo }, pagamentosEntrada, formasPosteriores) => {
+    const alvo = parseFloat(valorAlvo);
+    let totalCoberto = 0;
+    for (const pagamento of pagamentosEntrada) {
+        const criado = await criarPagamentoTx(
+            tx,
+            { ...pagamento, pedido_id: pedidoId },
+            formasPosteriores
+        );
+        totalCoberto += parseFloat(criado.valor_pago);
+    }
+
+    const restante = alvo - totalCoberto;
+    if (restante <= 0.005) return;
+
+    // Só uma forma ATIVA pode ser escolhida pra lançar um crediário NOVO —
+    // `formasPosteriores` inclui formas desativadas de propósito (usado em
+    // outros lugares pra classificar pagamentos antigos), mas usar uma
+    // desativada aqui criaria um pagamento novo apontando pra uma forma que
+    // não deveria mais estar em uso (mesmo comportamento que o front antigo
+    // já tinha, via FormaPagamentoService.listar() filtrando ativo).
+    const crediario = formasPosteriores.find((f) => f.ativo !== false);
+    if (!crediario) {
+        throw new BusinessError(
+            'Nenhuma forma de crediário cadastrada — cadastre uma para poder finalizar sem cobrir o valor total.'
+        );
+    }
+
+    await criarPagamentoTx(
+        tx,
+        {
+            pedido_id: pedidoId,
+            valor_pago: restante,
+            forma_pagamento: crediario.nome,
+            data_pagamento: new Date().toISOString(),
+        },
+        formasPosteriores
+    );
+};
+
 const criarPagamento = async (dadosPagamento) => {
     const formasPosteriores = await formaPagamentoService.listarPosteriores();
 
@@ -402,6 +454,7 @@ const eliminarPagamento = async (id) => {
 module.exports = {
     criarPagamento,
     registrarPagamentosDoPedido,
+    cobrirValorTx,
     listarPagamentos,
     listarPagamentosPendentesDeConta,
     atualizarPagamento,

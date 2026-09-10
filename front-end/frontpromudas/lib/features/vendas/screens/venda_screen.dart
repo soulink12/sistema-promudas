@@ -6,6 +6,7 @@ import '../../../core/theme/cores_semanticas.dart';
 import '../../../core/utils/api_feedback.dart';
 import '../../../core/utils/formatadores.dart';
 import '../../../core/utils/pagamentos_descartados.dart';
+import '../../../core/utils/pagamentos_payload.dart';
 import '../../clientes/screens/widgets/dialog_cadastro_cliente.dart';
 import 'widgets/detalhes_app_bar.dart';
 import 'widgets/modal_busca_cliente.dart';
@@ -482,37 +483,22 @@ class _TelaVendaState extends State<TelaVenda> {
     final ajuste = _carrinhoService.ajuste;
 
     try {
+      // Itens e o pagamento do aumento (entrada real e/ou crediário) vão numa
+      // única chamada atômica — o backend cobre o que faltar do aumento
+      // automaticamente com crediário, dentro da mesma transação do PUT.
+      // Antes eram duas chamadas soltas (PUT do pedido, depois um
+      // POST /pagamentos por parcela); se a rede caísse entre elas, o
+      // aumento ficava sem nenhum pagamento registrado.
       final response = await ApiService.dio.put('/pedidos/$pedidoId', data: {
         'itens': _itensParaPayload(itens),
         'ajuste': ajuste != 0.0 ? ajuste : null,
         'observacoes': _observacoes.isNotEmpty ? _observacoes : null,
+        if (pagamentosAdicionais != null && pagamentosAdicionais.isNotEmpty)
+          'pagamentos': pagamentosParaPayload(
+            pagamentosAdicionais,
+            valorACobrir ?? 0.0,
+          ),
       });
-
-      // Registra os pagamentos do aumento (pagamento real e/ou crediário),
-      // capando pelo valor do aumento — mesmo padrão de _registrarPedido.
-      if (pagamentosAdicionais != null && pagamentosAdicionais.isNotEmpty) {
-        double restante = valorACobrir ?? 0.0;
-        for (final p in pagamentosAdicionais) {
-          if (restante <= 0.005) break;
-          final valorPago = (p['valor'] as double).clamp(0.0, restante);
-          await ApiService.dio.post('/pagamentos', data: {
-            'pedido_id': pedidoId,
-            'valor_pago': valorPago,
-            'forma_pagamento': p['forma'],
-            // Cheque (depósito posterior): data fica nula até o depósito.
-            if (p['depositoPosterior'] != true)
-              'data_pagamento': DateTime.now().toUtc().toIso8601String(),
-            if (p['parcelas'] != null) 'parcelas': p['parcelas'],
-            if (p['escamboQuantidade'] != null)
-              'escambo_quantidade': p['escamboQuantidade'],
-            if (p['conta'] != null) 'conta': p['conta'],
-            if (p['nomePagador'] != null) 'nome_pagador': p['nomePagador'],
-            if (p['cpfPagador'] != null) 'cpf_cnpj_pagador': p['cpfPagador'],
-            if (p['cheques'] != null) 'cheques': p['cheques'],
-          });
-          restante -= valorPago;
-        }
-      }
 
       final creditoGerado = paraDouble(response.data['creditoGerado']);
       if (mounted) setState(() => _salvando = false);
@@ -554,8 +540,13 @@ class _TelaVendaState extends State<TelaVenda> {
     }
   }
 
-  /// Envia o pedido à API: cria o pedido com os itens e registra cada pagamento.
-  /// Troco é ignorado — o valor de cada parcela é capeado pelo saldo restante.
+  /// Envia o pedido à API: cria o pedido com os itens e registra o pagamento
+  /// numa única chamada atômica — o backend cobre o total automaticamente
+  /// (entrada + crediário do que faltar) dentro da mesma transação. Antes
+  /// eram duas chamadas soltas (criar o pedido, depois um POST /pagamentos
+  /// por parcela); se a rede caísse entre elas, o pedido ficava criado sem
+  /// nenhum pagamento registrado. Troco é ignorado — o valor de cada parcela
+  /// é capeado pelo saldo restante (ver pagamentosParaPayload).
   Future<void> _registrarPedido(
       List<Map<String, dynamic>> pagamentos) async {
     setState(() => _salvando = true);
@@ -563,44 +554,20 @@ class _TelaVendaState extends State<TelaVenda> {
     final itens = _carrinhoService.itens;
     final cliente = _clienteSelecionado!;
     final ajuste = _carrinhoService.ajuste;
+    final totalPedido = _carrinhoService.totalComAjuste;
 
     try {
-      // 1. Cria o pedido com os itens
       final respostaPedido = await ApiService.dio.post('/pedidos', data: {
         'cliente_id': cliente['id'],
         if (ajuste != 0.0) 'ajuste': ajuste,
         if (_observacoes.isNotEmpty) 'observacoes': _observacoes,
         'itens': _itensParaPayload(itens),
+        'pagamentos': pagamentosParaPayload(pagamentos, totalPedido),
       });
 
       final pedidoId = respostaPedido.data['data']['id'] as int;
 
-      // 2. Registra cada forma de pagamento, capeando pelo saldo restante (descarta troco)
-      final totalPedido = _carrinhoService.totalComAjuste;
-      double restante = totalPedido;
-      for (final p in pagamentos) {
-        if (restante <= 0.005) break;
-        final valorPago =
-            (p['valor'] as double).clamp(0.0, restante);
-        await ApiService.dio.post('/pagamentos', data: {
-          'pedido_id': pedidoId,
-          'valor_pago': valorPago,
-          'forma_pagamento': p['forma'],
-          // Cheque (depósito posterior): data fica nula até o depósito.
-          if (p['depositoPosterior'] != true)
-            'data_pagamento': DateTime.now().toUtc().toIso8601String(),
-          if (p['parcelas'] != null) 'parcelas': p['parcelas'],
-          if (p['escamboQuantidade'] != null)
-            'escambo_quantidade': p['escamboQuantidade'],
-          if (p['conta'] != null) 'conta': p['conta'],
-          if (p['nomePagador'] != null) 'nome_pagador': p['nomePagador'],
-          if (p['cpfPagador'] != null) 'cpf_cnpj_pagador': p['cpfPagador'],
-          if (p['cheques'] != null) 'cheques': p['cheques'],
-        });
-        restante -= valorPago;
-      }
-
-      // 3. Reinicia o estado da tela
+      // Reinicia o estado da tela
       if (mounted) {
         setState(() {
           _carrinhoService.limpar();

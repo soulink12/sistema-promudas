@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
 import '../../../core/services/api_service.dart';
-import '../../../core/services/forma_pagamento_service.dart';
 import '../../../core/theme/cores_semanticas.dart';
 import '../../../core/utils/api_feedback.dart';
 import '../../../core/utils/enviar_email_documento.dart';
 import '../../../core/utils/formatadores.dart';
 import '../../../core/utils/pagamentos_descartados.dart';
+import '../../../core/utils/pagamentos_payload.dart';
 import '../../vendas/screens/widgets/modal_pagamento.dart';
 import '../../../core/widgets/pesquisa_cliente_lista.dart';
 import '../../../core/widgets/dialog_confirmacao.dart';
@@ -214,36 +214,20 @@ class _TelaOrcamentosState extends State<TelaOrcamentos> {
           'Um pedido será criado com os mesmos itens.',
       textoConfirmar: 'Aprovar',
     );
-    if (!confirmado) return;
+    if (!confirmado || !mounted) return;
 
-    if (mounted) setState(() => _salvando = true);
-    int? pedidoId;
-    double totalPedido = 0;
-    try {
-      final resposta =
-          await ApiService.dio.post('/orcamentos/${orcamento['id']}/aprovar');
-      pedidoId = resposta.data['pedido_id'] as int?;
-      totalPedido = double.tryParse('${resposta.data['valor_total']}') ?? 0;
-      await _recarregarSilencioso(orcamento['id'] as int);
-      if (mounted) setState(() => _salvando = false);
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Orçamento aprovado! Um pedido foi criado.'),
-            backgroundColor: CoresSemanticas.sucesso,
-          ),
-        );
-      }
-    } catch (e) {
-      setState(() => _salvando = false);
-      if (mounted) mostrarErro(context, extrairErroApi(e, 'Erro ao aprovar o orçamento.'));
+    final total = paraDouble(orcamento['valor_total']);
+
+    // Entrada é opcional, mas é perguntada ANTES de aprovar: a aprovação e o
+    // pagamento (entrada + crediário do restante) são uma única chamada
+    // atômica ao backend agora — se o operador cancelar o modal de pagamento
+    // ou a rede falhar no meio do caminho, nada é criado (o orçamento
+    // continua Pendente), em vez de deixar um pedido aprovado sem nenhum
+    // pagamento registrado.
+    if (total <= 0) {
+      await _confirmarAprovacao(orcamento, total, const []);
       return;
     }
-
-    // Entrada é opcional: se o cliente for pagar algo agora, abre o mesmo modal
-    // de pagamento do PDV (exige cobrir o valor todo — o que não for entrada
-    // entra como crediário).
-    if (pedidoId == null || totalPedido <= 0 || !mounted) return;
 
     final vaiDarEntrada = await mostrarDialogConfirmacao(
       context: context,
@@ -254,13 +238,10 @@ class _TelaOrcamentosState extends State<TelaOrcamentos> {
     );
     if (!mounted) return;
 
-    final idPedido = pedidoId;
-    final total = totalPedido;
-
-    // Sem entrada, o pedido nasce inteiro no crediário — nenhum pedido fica
-    // sem pagamento registrado.
+    // Sem entrada, o pedido nasce inteiro no crediário (lançado pelo backend)
+    // — nenhum pedido fica sem pagamento registrado.
     if (!vaiDarEntrada) {
-      await _lancarCrediario(idPedido, total);
+      await _confirmarAprovacao(orcamento, total, const []);
       return;
     }
 
@@ -268,94 +249,43 @@ class _TelaOrcamentosState extends State<TelaOrcamentos> {
       context: context,
       builder: (_) => ModalPagamento(
         totalPedido: total,
-        onConfirmar: (pagamentos) => _registrarEntrada(idPedido, total, pagamentos),
+        onConfirmar: (pagamentos) =>
+            _confirmarAprovacao(orcamento, total, pagamentos),
       ),
     );
   }
 
-  /// Lança o valor todo como crediário no pedido recém-criado pela aprovação.
-  Future<void> _lancarCrediario(int pedidoId, double total) async {
-    setState(() => _salvando = true);
-    try {
-      final formas = await FormaPagamentoService().listar();
-      final crediario =
-          formas.where((f) => f['pagamentoPosterior'] == true).toList();
-
-      if (crediario.isEmpty) {
-        if (mounted) setState(() => _salvando = false);
-        if (mounted) {
-          mostrarErro(
-            context,
-            'Nenhuma forma de crediário cadastrada. Registre o pagamento manualmente no pedido.',
-          );
-        }
-        return;
-      }
-
-      await ApiService.dio.post('/pagamentos', data: {
-        'pedido_id': pedidoId,
-        'valor_pago': total,
-        'forma_pagamento': crediario.first['nome'],
-        'data_pagamento': DateTime.now().toUtc().toIso8601String(),
-      });
-
-      setState(() => _salvando = false);
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              '${crediario.first['nome']} de ${formatarMoeda(total)} lançado no pedido.',
-            ),
-            backgroundColor: CoresSemanticas.sucesso,
-          ),
-        );
-      }
-    } catch (e) {
-      setState(() => _salvando = false);
-      if (mounted) {
-        mostrarErro(context, extrairErroApi(e, 'Erro ao lançar o crediário.'));
-      }
-    }
-  }
-
-  Future<void> _registrarEntrada(
-    int pedidoId,
+  /// Aprova o orçamento e registra a entrada informada (se houver) numa única
+  /// chamada atômica — o backend cobre o que faltar automaticamente com
+  /// crediário (ver pagamentoService.cobrirValorTx, reusado por
+  /// criarPedidoTx/atualizarPedido/aprovarOrcamento). Se falhar (rede,
+  /// validação, sem forma de crediário cadastrada), nada é criado: o
+  /// orçamento continua Pendente.
+  Future<void> _confirmarAprovacao(
+    Map<String, dynamic> orcamento,
     double total,
     List<Map<String, dynamic>> pagamentos,
   ) async {
     setState(() => _salvando = true);
     try {
-      double restante = total;
-      for (final p in pagamentos) {
-        if (restante <= 0.005) break;
-        final valorPago = (p['valor'] as double).clamp(0.0, restante);
-        await ApiService.dio.post('/pagamentos', data: {
-          'pedido_id': pedidoId,
-          'valor_pago': valorPago,
-          'forma_pagamento': p['forma'],
-          // Cheque (depósito posterior): data fica nula até o depósito.
-          if (p['depositoPosterior'] != true)
-            'data_pagamento': DateTime.now().toUtc().toIso8601String(),
-          if (p['parcelas'] != null) 'parcelas': p['parcelas'],
-          if (p['escamboQuantidade'] != null)
-            'escambo_quantidade': p['escamboQuantidade'],
-          if (p['conta'] != null) 'conta': p['conta'],
-          if (p['nomePagador'] != null) 'nome_pagador': p['nomePagador'],
-          if (p['cpfPagador'] != null) 'cpf_cnpj_pagador': p['cpfPagador'],
-          if (p['cheques'] != null) 'cheques': p['cheques'],
-        });
-        restante -= valorPago;
-      }
-
+      await ApiService.dio.post(
+        '/orcamentos/${orcamento['id']}/aprovar',
+        data: {'pagamentos': pagamentosParaPayload(pagamentos, total)},
+      );
+      await _recarregarSilencioso(orcamento['id'] as int);
       if (mounted) setState(() => _salvando = false);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Entrada registrada com sucesso!'),
+          SnackBar(
+            content: Text(
+              pagamentos.isEmpty
+                  ? 'Orçamento aprovado! Um pedido foi criado.'
+                  : 'Orçamento aprovado e entrada registrada!',
+            ),
             backgroundColor: CoresSemanticas.sucesso,
           ),
         );
-        if (haPagamentosDescartados(pagamentos, total)) {
+        if (pagamentos.isNotEmpty && haPagamentosDescartados(pagamentos, total)) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
               content: Text('Valor de troco não registrado como pagamento.'),
@@ -365,9 +295,7 @@ class _TelaOrcamentosState extends State<TelaOrcamentos> {
       }
     } catch (e) {
       setState(() => _salvando = false);
-      if (mounted) {
-        mostrarErro(context, extrairErroApi(e, 'Erro ao registrar a entrada.'));
-      }
+      if (mounted) mostrarErro(context, extrairErroApi(e, 'Erro ao aprovar o orçamento.'));
     }
   }
 

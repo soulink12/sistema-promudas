@@ -3,6 +3,7 @@ const { normalizarDatas } = require('../utils/parseData');
 const pdfService = require('./pdfService');
 const emailService = require('./emailService');
 const pedidoService = require('./pedidoService');
+const pagamentoService = require('./pagamentoService');
 const { formatarNumeroOrcamento } = require('../utils/numeroOrcamento');
 const { retryColisao } = require('../utils/retryColisao');
 const BusinessError = require('../utils/BusinessError');
@@ -147,13 +148,21 @@ const eliminarOrcamento = async (id) => {
 };
 
 // Aprova o orçamento: cria um Pedido de verdade com os mesmos dados (cliente,
-// itens, ajuste, observações) — nasce sem pagamento/entrega, como um pedido
-// novo qualquer — e marca o orçamento como Aprovado, vinculado ao pedido criado.
+// itens, ajuste, observações) e marca o orçamento como Aprovado, vinculado ao
+// pedido criado. `dados.pagamentos` (opcional) é a entrada dada pelo cliente
+// — mesmo formato aceito por POST /pagamentos — repassada direto pra
+// criarPedidoTx, que cobre o que faltar automaticamente com crediário dentro
+// da MESMA transação (ver pagamentoService.cobrirValorTx): nenhum pedido
+// nasce sem pagamento, e se faltar forma de crediário cadastrada ou algum
+// pagamento falhar a validação, a aprovação inteira desfaz — o orçamento
+// continua Pendente, em vez de ficar aprovado com um pedido órfão.
 // Mesma corrida de numero_temporada de pedidoService.criarPedido (a aprovação
 // cria um pedido de verdade via criarPedidoTx) — retryColisao tenta de novo
 // em vez de propagar um 500 por uma colisão que se resolve sozinha na repetição.
-const aprovarOrcamento = async (id) => {
-    return await retryColisao(() => prisma.$transaction(async (tx) => {
+const aprovarOrcamento = async (id, dados = {}) => {
+    const pagamentos = Array.isArray(dados.pagamentos) ? dados.pagamentos : [];
+
+    const resultado = await retryColisao(() => prisma.$transaction(async (tx) => {
         const orcamento = await tx.orcamentos.findUnique({
             where: { id: parseInt(id) },
             include: { itens_orcamento: true },
@@ -175,6 +184,7 @@ const aprovarOrcamento = async (id) => {
                 quantidade: item.quantidade,
                 valor_unitario: item.valor_unitario,
             })),
+            pagamentos,
         });
 
         return await tx.orcamentos.update({
@@ -183,6 +193,26 @@ const aprovarOrcamento = async (id) => {
             include: ORCAMENTO_INCLUDE,
         });
     }));
+
+    // recalcularStatusPedido lê pelo client Prisma "de fora" (não pelo `tx`),
+    // então só pode rodar depois que a transação já commitou — mesmo padrão
+    // de atualizarPedido/registrarPagamentosDoPedido. Sem isso, uma entrada em
+    // dinheiro registrada aqui nunca marcaria o pedido como Pago/Parcial (o
+    // valor padrão do banco para status_pagamento é Pendente).
+    // Em try/catch de propósito: o orçamento JÁ FOI aprovado e o pedido JÁ
+    // FOI criado nesse ponto — se essa chamada falhar, propagar o erro
+    // devolveria um 500 pra uma aprovação que já teve sucesso, e como o
+    // orçamento não está mais 'Pendente', uma nova tentativa falharia pra
+    // sempre com "já foi aprovado ou recusado", sem nenhum jeito de corrigir
+    // pela API. Pior consequência de só logar: status_pagamento fica
+    // desatualizado até a próxima edição/pagamento recalcular.
+    try {
+        await pagamentoService.recalcularStatusPedido(resultado.pedido_id);
+    } catch (erro) {
+        console.error(`Falha ao recalcular status do pedido ${resultado.pedido_id} (orçamento já aprovado com sucesso):`, erro);
+    }
+
+    return resultado;
 };
 
 const recusarOrcamento = async (id) => {

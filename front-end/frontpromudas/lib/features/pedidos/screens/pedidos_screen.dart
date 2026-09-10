@@ -7,6 +7,7 @@ import '../../../core/utils/api_feedback.dart';
 import '../../../core/utils/formatadores.dart';
 import '../../../core/utils/enviar_email_documento.dart';
 import '../../../core/utils/pagamentos_descartados.dart';
+import '../../../core/utils/pagamentos_payload.dart';
 import '../../../core/widgets/pesquisa_cliente_lista.dart';
 import '../../../core/widgets/dialog_confirmacao.dart';
 import '../../../core/widgets/filtro_multi_status.dart';
@@ -303,31 +304,13 @@ class _TelaPedidosState extends State<TelaPedidos> {
       // crediário do pedido dentro de uma transação. Antes isso era feito aqui
       // em várias chamadas (apagar os crediários, depois recriar o saldo), e uma
       // falha no meio apagava o crediário do cliente sem deixar rastro.
+      // Crediário não entra aqui — esse endpoint abate o que já existe, não
+      // lança um novo (diferente de pagamentosParaPayload usado na criação/
+      // aumento de pedido, onde o crediário faz parte da entrada).
       final pagamentosReais = pagamentos
           .where((p) => p['pagamentoPosterior'] != true)
           .toList();
-
-      double restante = saldoParaPagar;
-      final corpo = <Map<String, dynamic>>[];
-      for (final p in pagamentosReais) {
-        if (restante <= 0.005) break;
-        final valorPago = (p['valor'] as double).clamp(0.0, restante);
-        corpo.add({
-          'valor_pago': valorPago,
-          'forma_pagamento': p['forma'],
-          // Cheque (depósito posterior): data fica nula até o depósito.
-          if (p['depositoPosterior'] != true)
-            'data_pagamento': DateTime.now().toUtc().toIso8601String(),
-          if (p['parcelas'] != null) 'parcelas': p['parcelas'],
-          if (p['escamboQuantidade'] != null)
-            'escambo_quantidade': p['escamboQuantidade'],
-          if (p['conta'] != null) 'conta': p['conta'],
-          if (p['nomePagador'] != null) 'nome_pagador': p['nomePagador'],
-          if (p['cpfPagador'] != null) 'cpf_cnpj_pagador': p['cpfPagador'],
-          if (p['cheques'] != null) 'cheques': p['cheques'],
-        });
-        restante -= valorPago;
-      }
+      final corpo = pagamentosParaPayload(pagamentosReais, saldoParaPagar);
 
       if (corpo.isNotEmpty) {
         await ApiService.dio.post('/pedidos/$pedidoId/pagamentos',

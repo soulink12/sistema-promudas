@@ -94,7 +94,7 @@ const enviarEmail = async (req, res, next) => {
 
 const aprovarOrcamento = async (req, res, next) => {
     try {
-        const orcamento = await orcamentoService.aprovarOrcamento(req.params.id);
+        const orcamento = await orcamentoService.aprovarOrcamento(req.params.id, req.body);
         pedidoService.notificarPedidoPorEmail(orcamento.pedido_id, 'orcamentoAprovado')
             .catch((erro) => console.error('Falha ao enviar notificação de e-mail do pedido:', erro));
         res.json(orcamento);

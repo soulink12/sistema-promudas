@@ -1,5 +1,5 @@
 const prisma = require('../config/database');
-const { recalcularStatusPedido } = require('./pagamentoService');
+const { recalcularStatusPedido, cobrirValorTx } = require('./pagamentoService');
 const { parseData, normalizarDatas } = require('../utils/parseData');
 const formaPagamentoService = require('./formaPagamentoService');
 const pdfService = require('./pdfService');
@@ -88,6 +88,12 @@ const aplicarTrocaTemporada = async (client, id, campos) => {
 // Cria o pedido dentro de uma transação já aberta pelo chamador (`tx`) — usado
 // tanto por `criarPedido` (abre sua própria transação) quanto por
 // `orcamentoService.aprovarOrcamento` (reaproveita a transação da aprovação).
+// `dados.pagamentos` (opcional) é a entrada — mesmo formato aceito por
+// POST /pagamentos. Quando informado (mesmo que `[]`), o que não for coberto
+// pela entrada é lançado automaticamente como crediário, na MESMA transação
+// (ver pagamentoService.cobrirValorTx): nenhum pedido nasce sem pagamento.
+// Omitir o campo (undefined) mantém o comportamento antigo — pedido sem
+// nenhum pagamento — para quem não usa esse fluxo (ex.: fábricas de teste).
 const criarPedidoTx = async (tx, dados) => {
     // O número de temporada vem da temporada ativa (configurada no Admin).
     // Sem temporada ativa, o pedido fica sem número (exibe '#id' como fallback).
@@ -105,7 +111,7 @@ const criarPedidoTx = async (tx, dados) => {
     );
     const ajuste = Number(dados.ajuste ?? 0);
 
-    return await tx.pedidos.create({
+    const pedido = await tx.pedidos.create({
         data: {
             clientes: {
                 connect: { id: parseInt(dados.cliente_id) }
@@ -133,6 +139,18 @@ const criarPedidoTx = async (tx, dados) => {
             itens_pedido: true
         }
     });
+
+    if (Array.isArray(dados.pagamentos)) {
+        const formasPosteriores = await formaPagamentoService.listarPosteriores(tx);
+        await cobrirValorTx(
+            tx,
+            { pedidoId: pedido.id, valorAlvo: pedido.valor_total },
+            dados.pagamentos,
+            formasPosteriores
+        );
+    }
+
+    return pedido;
 };
 
 // Duas criações concorrentes na mesma temporada podem calcular o mesmo
@@ -141,7 +159,28 @@ const criarPedidoTx = async (tx, dados) => {
 // (recalculando o número dentro de uma nova transação) em vez de propagar
 // um 500 por uma corrida que se resolve sozinha na repetição.
 const criarPedido = async (dados) => {
-    return await retryColisao(() => prisma.$transaction((tx) => criarPedidoTx(tx, dados)));
+    const pedido = await retryColisao(() => prisma.$transaction((tx) => criarPedidoTx(tx, dados)));
+
+    // recalcularStatusPedido lê via `prisma` direto (não `tx`), então só pode
+    // rodar depois que a transação já commitou. Sem isso, um pagamento real
+    // registrado na criação nunca marcaria o pedido como Pago/Parcial (o
+    // valor padrão do banco para status_pagamento é Pendente).
+    // Em try/catch de propósito: o pedido JÁ FOI criado (com itens e
+    // pagamentos) nesse ponto — se essa chamada falhar (ex.: instabilidade
+    // transitória de conexão), propagar o erro devolveria um 500 pra uma
+    // operação que já teve sucesso, e o operador tentando de novo criaria um
+    // pedido duplicado (POST /pedidos não tem trava de idempotência). Pior
+    // consequência de só logar: status_pagamento fica desatualizado até a
+    // próxima edição/pagamento recalcular — não perde dinheiro nem duplica.
+    if (Array.isArray(dados.pagamentos)) {
+        try {
+            await recalcularStatusPedido(pedido.id);
+        } catch (erro) {
+            console.error(`Falha ao recalcular status do pedido ${pedido.id} (já criado com sucesso):`, erro);
+        }
+    }
+
+    return pedido;
 };
 
 // Status da nota fiscal do pedido, agregado a partir dos pagamentos reais
@@ -252,7 +291,7 @@ const listarPedidos = async (filtros = {}) => {
 const CAMPOS_PEDIDO_SEM_ITENS = ['data_pedido', 'temporada_ano', 'observacoes'];
 
 const atualizarPedido = async (id, dados) => {
-    const { itens, ...camposBrutos } = dados;
+    const { itens, pagamentos, ...camposBrutos } = dados;
     const camposPedido = normalizarDatas(camposBrutos, ['data_pedido']);
 
     if (!itens) {
@@ -309,8 +348,15 @@ const atualizarPedido = async (id, dados) => {
     const totalPagoReal = (pedidoAtual?.pagamentos ?? [])
         .filter(p => !nomesPosteriores.has(p.forma_pagamento))
         .reduce((s, p) => s + parseFloat(p.valor_pago), 0);
+    // Real + crediário — usado só para medir o aumento (abaixo), diferente de
+    // totalPagoReal (só real), usado no cálculo de crédito/estorno.
+    const totalCobertoTudo = (pedidoAtual?.pagamentos ?? [])
+        .reduce((s, p) => s + parseFloat(p.valor_pago), 0);
 
     const novoTotal = subtotal + ajuste;
+    // Quanto o aumento do pedido ainda não tem cobertura — só positivo quando
+    // o novo total supera o que já estava pago/creditariado antes da edição.
+    const aCobrir = novoTotal - totalCobertoTudo;
 
     // O crédito do cliente por causa deste pedido é sempre a sobra atual
     // (pago real - total), não um incremento por edição. Creditar
@@ -364,6 +410,21 @@ const atualizarPedido = async (id, dados) => {
                 },
             },
         });
+
+        // `pagamentos` (opcional) é a entrada informada pro aumento do
+        // pedido — mesmo formato de POST /pagamentos. O que não for coberto
+        // vira crediário automático, dentro da MESMA transação da edição
+        // (ver pagamentoService.cobrirValorTx). Sem isso, o app antes fazia
+        // isto em chamadas soltas depois do PUT já ter persistido — se a
+        // rede caísse no meio, o aumento ficava sem nenhum pagamento.
+        if (Array.isArray(pagamentos) && aCobrir > 0.005) {
+            await cobrirValorTx(
+                tx,
+                { pedidoId: parseInt(id), valorAlvo: aCobrir },
+                pagamentos,
+                formasPosteriores
+            );
+        }
     });
 
     await recalcularStatusPedido(id);

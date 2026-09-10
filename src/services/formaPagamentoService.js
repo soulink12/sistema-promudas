@@ -67,12 +67,23 @@ const deletarForma = async (id) => {
     await prisma.formas_pagamento.update({ where: { id }, data: { ativo: false } });
 };
 
-// Lista as formas marcadas como pagamento posterior (crediário). Usado para excluir
-// esses pagamentos do cálculo de valor efetivamente recebido.
-const listarPosteriores = () =>
-    prisma.formas_pagamento.findMany({
+// Lista as formas marcadas como pagamento posterior (crediário), em ordem
+// alfabética — mesma ordem de listarFormasPagamento/GET /formas-pagamento.
+// Usado para excluir esses pagamentos do cálculo de valor efetivamente
+// recebido — por isso NÃO filtra `ativo` no `where`: um pagamento antigo
+// lançado com uma forma já desativada continua precisando ser reconhecido
+// como crediário (mesmo raciocínio de `atualizarForma`, que bloqueia
+// renomear forma em uso — desativar não pode reclassificar histórico).
+// `ativo` vai no `select` pra quem precisa saber quais estão disponíveis pra
+// uso NOVO (pagamentoService.cobrirValorTx, ao escolher automaticamente qual
+// forma usar pra lançar um crediário) sem afetar a classificação acima.
+// Aceita um client opcional (ex.: `tx` de uma transação já aberta) — default
+// usa o client global.
+const listarPosteriores = (client = prisma) =>
+    client.formas_pagamento.findMany({
         where: { pagamento_posterior: true },
-        select: { nome: true }
+        select: { nome: true, ativo: true },
+        orderBy: { nome: 'asc' }
     });
 
 // Lista as formas de depósito posterior (cheque). Usado para tratar os cheques
