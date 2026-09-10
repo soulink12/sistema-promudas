@@ -2,6 +2,7 @@ const prisma = require('../config/database');
 const { normalizarDatas } = require('../utils/parseData');
 const pdfService = require('./pdfService');
 const emailService = require('./emailService');
+const telegramService = require('./telegramService');
 const pedidoService = require('./pedidoService');
 const pagamentoService = require('./pagamentoService');
 const { formatarNumeroOrcamento } = require('../utils/numeroOrcamento');
@@ -232,14 +233,25 @@ const recusarOrcamento = async (id) => {
     });
 };
 
-// Dispara os e-mails de um evento de orçamento — best-effort, veja
-// emailService.notificarEvento. `evento` é uma chave de emailService.EVENTOS.
-const notificarOrcamentoPorEmail = (id, evento) => emailService.notificarEvento({
-    id,
-    evento,
-    gerarPDF: pdfService.gerarOrcamentoPDF,
-    formatarNumero: formatarNumeroOrcamento,
-});
+// Dispara as notificações de um evento de orçamento — e-mail e Telegram, veja
+// pedidoService.notificarPedido (mesmo formato, espelhado aqui pro orçamento).
+// `evento` é uma chave de emailService.EVENTOS.
+const notificarOrcamento = async (id, evento) => {
+    let documento;
+    try {
+        documento = await pdfService.gerarOrcamentoPDF(id);
+    } catch (erro) {
+        if (erro.status === 404) return;
+        console.error(`Falha ao gerar PDF para notificar o orçamento ${id}:`, erro);
+        return;
+    }
+    const numero = formatarNumeroOrcamento(documento.entidade);
+
+    emailService.notificarEvento({ evento, documento, numero })
+        .catch((erro) => console.error('Falha ao enviar notificação de e-mail do orçamento:', erro));
+    telegramService.notificarEvento({ evento, documento, numero })
+        .catch((erro) => console.error('Falha ao enviar notificação de Telegram do orçamento:', erro));
+};
 
 const enviarOrcamentoPorEmail = (id) => emailService.enviarDocumentoPorEmail({
     id,
@@ -257,5 +269,5 @@ module.exports = {
     aprovarOrcamento,
     recusarOrcamento,
     enviarOrcamentoPorEmail,
-    notificarOrcamentoPorEmail
+    notificarOrcamento
 };

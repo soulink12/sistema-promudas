@@ -4,6 +4,7 @@ const { parseData, normalizarDatas } = require('../utils/parseData');
 const formaPagamentoService = require('./formaPagamentoService');
 const pdfService = require('./pdfService');
 const emailService = require('./emailService');
+const telegramService = require('./telegramService');
 const { formatarNumeroPedido } = require('../utils/numeroPedido');
 const { retryColisao } = require('../utils/retryColisao');
 const BusinessError = require('../utils/BusinessError');
@@ -460,18 +461,28 @@ const eliminarPedido = async (id) => {
     });
 };
 
-// Gera o PDF do pedido e envia por e-mail ao cliente. Exige que o cliente
-// tenha e-mail cadastrado — a mesma checagem existe no front (botão
-// desabilitado), mas aqui é validada de novo antes de tentar enviar.
-// Dispara os e-mails de um evento de pedido (administração e, conforme o
-// evento, o cliente) — best-effort, veja emailService.notificarEvento.
-// `evento` é uma chave de emailService.EVENTOS.
-const notificarPedidoPorEmail = (id, evento) => emailService.notificarEvento({
-    id,
-    evento,
-    gerarPDF: pdfService.gerarPedidoPDF,
-    formatarNumero: formatarNumeroPedido,
-});
+// Dispara as notificações de um evento de pedido — e-mail (administração e,
+// conforme o evento, o cliente) e Telegram (administração). `evento` é uma
+// chave de emailService.EVENTOS. O PDF é gerado uma única vez aqui e
+// reaproveitado pelos dois canais; cada canal falha de forma independente e
+// sem derrubar o outro nem o registro do pedido — notificação é best-effort.
+// Silencioso quando o pedido não existe mais (ex.: apagado logo depois).
+const notificarPedido = async (id, evento) => {
+    let documento;
+    try {
+        documento = await pdfService.gerarPedidoPDF(id);
+    } catch (erro) {
+        if (erro.status === 404) return;
+        console.error(`Falha ao gerar PDF para notificar o pedido ${id}:`, erro);
+        return;
+    }
+    const numero = formatarNumeroPedido(documento.entidade);
+
+    emailService.notificarEvento({ evento, documento, numero })
+        .catch((erro) => console.error('Falha ao enviar notificação de e-mail do pedido:', erro));
+    telegramService.notificarEvento({ evento, documento, numero })
+        .catch((erro) => console.error('Falha ao enviar notificação de Telegram do pedido:', erro));
+};
 
 const enviarPedidoPorEmail = (id) => emailService.enviarDocumentoPorEmail({
     id,
@@ -487,7 +498,7 @@ module.exports = {
     atualizarPedido,
     eliminarPedido,
     enviarPedidoPorEmail,
-    notificarPedidoPorEmail,
+    notificarPedido,
     proximoNumeroTemporada,
     criarPedidoTx
 };

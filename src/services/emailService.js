@@ -109,27 +109,19 @@ const corpoParaCliente = (nomeCliente, frase) =>
 // (EMAIL_NOTIFICACAO_PEDIDOS, quando configurada) e, nos eventos marcados com
 // `cliente: true`, também para o cliente do documento.
 //
-// O PDF é gerado uma vez e reaproveitado nos dois envios. Cada destinatário
-// falha de forma independente e sem derrubar o outro — e-mail é best-effort,
-// nunca pode quebrar o registro do pedido/pagamento em si. Silencioso quando o
-// documento não existe mais (ex.: apagado logo depois).
-const notificarEvento = async ({ id, evento, gerarPDF, formatarNumero }) => {
+// Recebe o PDF já gerado (`documento`, de gerarPedidoPDF/gerarOrcamentoPDF) —
+// quem chama gera uma vez só e reaproveita entre e-mail e outros canais (ex.:
+// telegramService.notificarEvento), em vez de cada canal gerar o seu. Cada
+// destinatário falha de forma independente e sem derrubar o outro — e-mail é
+// best-effort, nunca pode quebrar o registro do pedido/pagamento em si.
+const notificarEvento = async ({ evento, documento, numero }) => {
     const config = EVENTOS[evento];
     if (!config) throw new Error(`Evento de e-mail desconhecido: ${evento}`);
 
     const emailAdmin = process.env.EMAIL_NOTIFICACAO_PEDIDOS;
     if (!emailAdmin && !config.cliente) return;
 
-    let resultado;
-    try {
-        resultado = await gerarPDF(id);
-    } catch (erro) {
-        if (erro.status === 404) return;
-        throw erro;
-    }
-
-    const { entidade, buffer, nomeArquivo } = resultado;
-    const numero = formatarNumero(entidade);
+    const { entidade, buffer, nomeArquivo } = documento;
     const nomeCliente = entidade.clientes?.nome ?? 'cliente';
     const assunto = `${config.titulo} ${numero}`;
 

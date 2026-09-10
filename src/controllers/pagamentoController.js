@@ -12,8 +12,8 @@ const criarPagamento = async (req, res, next) => {
         }
 
         const id = await pagamentoService.criarPagamento(req.body);
-        pedidoService.notificarPedidoPorEmail(pedido_id, 'pedidoPagamento')
-            .catch((erro) => console.error('Falha ao enviar notificacao de e-mail do pedido:', erro));
+        pedidoService.notificarPedido(pedido_id, 'pedidoPagamento')
+            .catch((erro) => console.error('Falha ao notificar pagamento do pedido:', erro));
         res.status(201).json({ mensagem: 'Pagamento criado com sucesso', id });
     } catch (erro) {
         next(erro);

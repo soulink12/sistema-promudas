@@ -14,8 +14,8 @@ const criarPedido = async (req, res, next) => {
         }
 
         const novoPedido = await pedidoService.criarPedido(dados);
-        pedidoService.notificarPedidoPorEmail(novoPedido.id, 'pedidoCriado')
-            .catch((erro) => console.error('Falha ao enviar notificação de e-mail do pedido:', erro));
+        pedidoService.notificarPedido(novoPedido.id, 'pedidoCriado')
+            .catch((erro) => console.error('Falha ao notificar criação do pedido:', erro));
         return res.status(201).json({
             mensagem: 'Pedido registrado com sucesso!',
             data: novoPedido
@@ -63,8 +63,8 @@ const listarPedidos = async (req, res, next) => {
 const atualizarPedido = async (req, res, next) => {
     try {
         const pedido = await pedidoService.atualizarPedido(req.params.id, req.body);
-        pedidoService.notificarPedidoPorEmail(pedido.id, 'pedidoAlterado')
-            .catch((erro) => console.error('Falha ao enviar notificação de e-mail do pedido:', erro));
+        pedidoService.notificarPedido(pedido.id, 'pedidoAlterado')
+            .catch((erro) => console.error('Falha ao notificar alteração do pedido:', erro));
         res.json({ ...pedido, creditoGerado: pedido.creditoGerado ?? 0 });
     } catch (erro) {
         next(erro);
@@ -82,8 +82,8 @@ const registrarPagamentos = async (req, res, next) => {
         }
 
         await pagamentoService.registrarPagamentosDoPedido(req.params.id, pagamentos);
-        pedidoService.notificarPedidoPorEmail(req.params.id, 'pedidoPagamento')
-            .catch((erro) => console.error('Falha ao enviar notificacao de e-mail do pedido:', erro));
+        pedidoService.notificarPedido(req.params.id, 'pedidoPagamento')
+            .catch((erro) => console.error('Falha ao notificar pagamento do pedido:', erro));
 
         const pedido = await pedidoService.buscarPedido(req.params.id);
         return res.status(201).json(pedido);

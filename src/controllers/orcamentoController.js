@@ -14,8 +14,8 @@ const criarOrcamento = async (req, res, next) => {
         }
 
         const novoOrcamento = await orcamentoService.criarOrcamento(dados);
-        orcamentoService.notificarOrcamentoPorEmail(novoOrcamento.id, 'orcamentoCriado')
-            .catch((erro) => console.error('Falha ao enviar notificação de e-mail do orçamento:', erro));
+        orcamentoService.notificarOrcamento(novoOrcamento.id, 'orcamentoCriado')
+            .catch((erro) => console.error('Falha ao notificar criação do orçamento:', erro));
         return res.status(201).json({
             mensagem: 'Orçamento registrado com sucesso!',
             data: novoOrcamento
@@ -54,8 +54,8 @@ const listarOrcamentos = async (req, res, next) => {
 const atualizarOrcamento = async (req, res, next) => {
     try {
         const orcamento = await orcamentoService.atualizarOrcamento(req.params.id, req.body);
-        orcamentoService.notificarOrcamentoPorEmail(orcamento.id, 'orcamentoAlterado')
-            .catch((erro) => console.error('Falha ao enviar notificação de e-mail do orçamento:', erro));
+        orcamentoService.notificarOrcamento(orcamento.id, 'orcamentoAlterado')
+            .catch((erro) => console.error('Falha ao notificar alteração do orçamento:', erro));
         res.json(orcamento);
     } catch (erro) {
         next(erro);
@@ -95,8 +95,8 @@ const enviarEmail = async (req, res, next) => {
 const aprovarOrcamento = async (req, res, next) => {
     try {
         const orcamento = await orcamentoService.aprovarOrcamento(req.params.id, req.body);
-        pedidoService.notificarPedidoPorEmail(orcamento.pedido_id, 'orcamentoAprovado')
-            .catch((erro) => console.error('Falha ao enviar notificação de e-mail do pedido:', erro));
+        pedidoService.notificarPedido(orcamento.pedido_id, 'orcamentoAprovado')
+            .catch((erro) => console.error('Falha ao notificar aprovação do orçamento:', erro));
         res.json(orcamento);
     } catch (erro) {
         next(erro);
@@ -106,8 +106,8 @@ const aprovarOrcamento = async (req, res, next) => {
 const recusarOrcamento = async (req, res, next) => {
     try {
         const orcamento = await orcamentoService.recusarOrcamento(req.params.id);
-        orcamentoService.notificarOrcamentoPorEmail(orcamento.id, 'orcamentoRecusado')
-            .catch((erro) => console.error('Falha ao enviar notificação de e-mail do orçamento:', erro));
+        orcamentoService.notificarOrcamento(orcamento.id, 'orcamentoRecusado')
+            .catch((erro) => console.error('Falha ao notificar recusa do orçamento:', erro));
         res.json(orcamento);
     } catch (erro) {
         next(erro);
