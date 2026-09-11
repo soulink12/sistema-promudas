@@ -185,12 +185,49 @@ model cheques {
 }
 
 model usuarios {
-  id         Int      @id @default(autoincrement())
-  nome       String
-  email      String   @unique
-  senha_hash String
-  ativo      Boolean  @default(true)
-  criado_em  DateTime @default(now())
+  id             Int              @id @default(autoincrement())
+  nome           String
+  email          String           @unique
+  senha_hash     String
+  ativo          Boolean          @default(true)
+  criado_em      DateTime         @default(now())
+  logs_atividade logs_atividade[]
+  logs_erro      logs_erro[]
+}
+
+// Snapshot do estado do registro em cada criação/alteração/exclusão feita por
+// um usuário. `snapshot` é o JSON do registro logo após a operação (para
+// exclusão física, o estado imediatamente antes de apagar).
+model logs_atividade {
+  id          Int       @id @default(autoincrement())
+  usuario_id  Int?
+  acao        String    @db.VarChar(30) // 'criacao' | 'atualizacao' | 'exclusao' | 'aprovacao' | 'recusa' | 'atualizacao_automatica'
+  entidade    String    @db.VarChar(30) // 'pedido' | 'orcamento' | 'cliente' | 'produto' | 'pagamento' | 'entrega' | 'cheque' | 'forma_pagamento' | 'temporada'
+  entidade_id Int?
+  snapshot    Json?
+  criado_em   DateTime  @default(now()) @db.Timestamp(0)
+  usuarios    usuarios? @relation(fields: [usuario_id], references: [id], onDelete: SetNull, onUpdate: NoAction)
+
+  @@index([entidade, entidade_id])
+  @@index([criado_em])
+  @@index([usuario_id])
+}
+
+// Só erros reais/inesperados (5xx, exceptions não tratadas, crash) — nunca
+// BusinessError nem os códigos Prisma já mapeados como 4xx em errorHandler.js.
+model logs_erro {
+  id          Int       @id @default(autoincrement())
+  usuario_id  Int?
+  origem      String    @db.VarChar(20) // 'http' | 'unhandledRejection' | 'uncaughtException'
+  mensagem    String    @db.Text
+  stack       String?   @db.Text
+  rota        String?   @db.VarChar(255)
+  metodo_http String?   @db.VarChar(10)
+  status_code Int?
+  criado_em   DateTime  @default(now()) @db.Timestamp(0)
+  usuarios    usuarios? @relation(fields: [usuario_id], references: [id], onDelete: SetNull, onUpdate: NoAction)
+
+  @@index([criado_em])
 }
 
 model formas_pagamento {

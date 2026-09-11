@@ -1,4 +1,5 @@
 const BusinessError = require('../utils/BusinessError');
+const logService = require('../services/logService');
 
 // Erros conhecidos do Prisma que representam um problema do cliente, não do
 // servidor. Sem esse mapeamento, apagar um id inexistente ou mandar um id não
@@ -15,7 +16,7 @@ const ERROS_PRISMA = {
 // cliente quando vem de um BusinessError (texto escrito por nós) ou do
 // mapeamento acima — qualquer outra coisa vira 500 genérico, para não vazar
 // detalhe interno (stack, texto de parser, mensagem de driver).
-const errorHandler = (erro, req, res, next) => {
+const errorHandler = async (erro, req, res, next) => {
     console.error(erro);
 
     if (erro instanceof BusinessError) {
@@ -38,6 +39,18 @@ const errorHandler = (erro, req, res, next) => {
     if (Number.isInteger(erro?.status) && erro.status >= 400 && erro.status < 500) {
         return res.status(erro.status).json({ erro: 'Requisição inválida.' });
     }
+
+    // Só chega aqui erro real e inesperado do programa (não BusinessError, não
+    // um código Prisma conhecido, não um 4xx do Express).
+    await logService.registrarErro({
+        usuarioId: req.usuarioId ?? null,
+        mensagem: erro?.message ?? String(erro),
+        stack: erro?.stack ?? null,
+        rota: req.originalUrl,
+        metodoHttp: req.method,
+        statusCode: 500,
+        origem: 'http',
+    });
 
     res.status(500).json({ erro: 'Erro interno do servidor.' });
 };

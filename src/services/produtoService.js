@@ -1,5 +1,6 @@
 const prisma = require('../config/database');
 const BusinessError = require('../utils/BusinessError');
+const logService = require('./logService');
 
 // Campos graváveis pela API. `ativo` fica de fora: quem controla é o
 // soft-delete (eliminarProduto), não o corpo da requisição.
@@ -9,9 +10,17 @@ const filtrarCamposProduto = (dados) => Object.fromEntries(
     Object.entries(dados).filter(([chave]) => CAMPOS_PRODUTO_EDITAVEIS.includes(chave))
 );
 
-const criarProduto = async (dados) => {
-    const novoProduto = await prisma.produtos.create({
-        data: filtrarCamposProduto(dados)
+const criarProduto = async (dados, usuarioId = null) => {
+    const novoProduto = await prisma.$transaction(async (tx) => {
+        const produto = await tx.produtos.create({ data: filtrarCamposProduto(dados) });
+        await logService.registrarAtividade(tx, {
+            usuarioId,
+            acao: 'criacao',
+            entidade: 'produto',
+            entidadeId: produto.id,
+            snapshot: produto,
+        });
+        return produto;
     });
     return novoProduto.id;
 };
@@ -30,19 +39,39 @@ const garantirProduto = async (id) => {
     return produto;
 };
 
-const atualizarProduto = async (id, dados) => {
+const atualizarProduto = async (id, dados, usuarioId = null) => {
     await garantirProduto(id);
-    return await prisma.produtos.update({
-        where: { id: parseInt(id) },
-        data: filtrarCamposProduto(dados),
+    return await prisma.$transaction(async (tx) => {
+        const produto = await tx.produtos.update({
+            where: { id: parseInt(id) },
+            data: filtrarCamposProduto(dados),
+        });
+        await logService.registrarAtividade(tx, {
+            usuarioId,
+            acao: 'atualizacao',
+            entidade: 'produto',
+            entidadeId: produto.id,
+            snapshot: produto,
+        });
+        return produto;
     });
 };
 
-const eliminarProduto = async (id) => {
+const eliminarProduto = async (id, usuarioId = null) => {
     await garantirProduto(id);
-    return await prisma.produtos.update({
-        where: { id: parseInt(id) },
-        data: { ativo: false }
+    return await prisma.$transaction(async (tx) => {
+        const produto = await tx.produtos.update({
+            where: { id: parseInt(id) },
+            data: { ativo: false }
+        });
+        await logService.registrarAtividade(tx, {
+            usuarioId,
+            acao: 'exclusao',
+            entidade: 'produto',
+            entidadeId: produto.id,
+            snapshot: produto,
+        });
+        return produto;
     });
 };
 

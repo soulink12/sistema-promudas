@@ -1,9 +1,12 @@
 const prisma = require('../config/database');
 const BusinessError = require('../utils/BusinessError');
 const { parseData, normalizarDatas } = require('../utils/parseData');
+const logService = require('./logService');
 
-// Recalcula o status de entrega do pedido comparando o total pedido com o total já entregue
-const recalcularStatusEntrega = async (pedido_id) => {
+// Recalcula o status de entrega do pedido comparando o total pedido com o total já entregue.
+// `usuarioId` é repassado de quem disparou o recálculo — só gera uma entrada de log quando o
+// status realmente muda, mesmo padrão de pagamentoService.recalcularStatusPedido.
+const recalcularStatusEntrega = async (pedido_id, usuarioId = null) => {
     const pedido = await prisma.pedidos.findUnique({
         where: { id: parseInt(pedido_id) },
         include: {
@@ -32,15 +35,33 @@ const recalcularStatusEntrega = async (pedido_id) => {
         novoStatus = 'Parcial';
     }
 
-    await prisma.pedidos.update({
-        where: { id: parseInt(pedido_id) },
-        data: { status_entrega: novoStatus }
+    const statusAnterior = pedido.status_entrega;
+
+    await prisma.$transaction(async (tx) => {
+        // Mesmo formato de itens usado nas demais snapshots de pedido — sem
+        // isso, o diff de histórico não teria como comparar itens_pedido
+        // contra este evento (campo ausente aqui = comparação pulada).
+        const atualizado = await tx.pedidos.update({
+            where: { id: parseInt(pedido_id) },
+            data: { status_entrega: novoStatus },
+            include: { itens_pedido: { include: { produtos: { select: { nome: true } } } } },
+        });
+
+        if (novoStatus !== statusAnterior) {
+            await logService.registrarAtividade(tx, {
+                usuarioId,
+                acao: 'atualizacao_automatica',
+                entidade: 'pedido',
+                entidadeId: atualizado.id,
+                snapshot: atualizado,
+            });
+        }
     });
 };
 
 // ============================================================
 
-const criarEntrega = async (dadosEntrega) => {
+const criarEntrega = async (dadosEntrega, usuarioId = null) => {
     const { itens, pedido_id, ...dadosPrincipais } = dadosEntrega;
 
     const novaEntrega = await prisma.$transaction(async (tx) => {
@@ -85,7 +106,7 @@ const criarEntrega = async (dadosEntrega) => {
             }
         }
 
-        return await tx.entregas.create({
+        const entrega = await tx.entregas.create({
             data: {
                 pedido_id: parseInt(pedido_id),
                 ...dadosPrincipais,
@@ -100,9 +121,19 @@ const criarEntrega = async (dadosEntrega) => {
                 }
             }
         });
+
+        await logService.registrarAtividade(tx, {
+            usuarioId,
+            acao: 'criacao',
+            entidade: 'entrega',
+            entidadeId: entrega.id,
+            snapshot: entrega,
+        });
+
+        return entrega;
     });
 
-    await recalcularStatusEntrega(pedido_id);
+    await recalcularStatusEntrega(pedido_id, usuarioId);
 
     return novaEntrega.id;
 };
@@ -138,7 +169,7 @@ const listarEntregas = async (filtros = {}) => {
     });
 };
 
-const atualizarEntrega = async (id, dados) => {
+const atualizarEntrega = async (id, dados, usuarioId = null) => {
     const entregaId = parseInt(id);
     const { itens, ...dadosPrincipais } = dados;
     let dataParaAtualizar = normalizarDatas(dadosPrincipais, ['data_entrega']);
@@ -203,15 +234,23 @@ const atualizarEntrega = async (id, dados) => {
             data: dataParaAtualizar
         });
 
+        await logService.registrarAtividade(tx, {
+            usuarioId,
+            acao: 'atualizacao',
+            entidade: 'entrega',
+            entidadeId: entregaAtualizada.id,
+            snapshot: entregaAtualizada,
+        });
+
         return { entregaAtualizada, pedido_id: entregaOriginal.pedido_id };
     });
 
-    await recalcularStatusEntrega(pedido_id);
+    await recalcularStatusEntrega(pedido_id, usuarioId);
 
     return entregaAtualizada;
 };
 
-const eliminarEntrega = async (id) => {
+const eliminarEntrega = async (id, usuarioId = null) => {
     const entrega = await prisma.entregas.findUnique({
         where: { id: parseInt(id) }
     });
@@ -220,11 +259,21 @@ const eliminarEntrega = async (id) => {
         throw new BusinessError('Entrega não encontrada.', 404);
     }
 
-    const resultado = await prisma.entregas.delete({
-        where: { id: parseInt(id) }
+    const resultado = await prisma.$transaction(async (tx) => {
+        const excluida = await tx.entregas.delete({
+            where: { id: parseInt(id) }
+        });
+        await logService.registrarAtividade(tx, {
+            usuarioId,
+            acao: 'exclusao',
+            entidade: 'entrega',
+            entidadeId: excluida.id,
+            snapshot: excluida,
+        });
+        return excluida;
     });
 
-    await recalcularStatusEntrega(entrega.pedido_id);
+    await recalcularStatusEntrega(entrega.pedido_id, usuarioId);
 
     return resultado;
 };

@@ -6,6 +6,8 @@ import '../../relatorios/screens/relatorios_hub_screen.dart';
 import '../../notificacoes/screens/notificacoes_screen.dart';
 import '../../clientes/screens/clientes_screen.dart';
 import '../../pedidos/screens/pedidos_screen.dart';
+import '../../logs/screens/logs_screen.dart';
+import '../../logs/screens/logs_erros_screen.dart';
 
 /// Módulo de Administração — agrupa as funções que não são do operador de caixa:
 /// relatórios, cadastros (produtos/formas), conciliação de pagamentos sem conta e
@@ -110,6 +112,22 @@ class _TelaAdminState extends State<TelaAdmin> {
             descricao:
                 'Cadastros do sistema: produtos e formas de pagamento.',
             onTap: () => _abrir(const TelaConfiguracoesSistema()),
+          ),
+          const SizedBox(height: 12),
+          _CardAdmin(
+            icon: Icons.history,
+            titulo: 'Histórico',
+            descricao:
+                'Registro de criações, alterações e exclusões feitas no sistema.',
+            onTap: () => _abrir(const TelaLogs()),
+          ),
+          const SizedBox(height: 12),
+          _CardAdmin(
+            icon: Icons.error_outline,
+            titulo: 'Log de Erros',
+            descricao:
+                'Erros inesperados do sistema (não inclui validações de negócio).',
+            onTap: () => _abrir(const TelaLogsErros()),
           ),
           const SizedBox(height: 12),
           _CardAdmin(

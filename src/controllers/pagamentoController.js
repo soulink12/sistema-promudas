@@ -11,7 +11,7 @@ const criarPagamento = async (req, res, next) => {
             });
         }
 
-        const id = await pagamentoService.criarPagamento(req.body);
+        const id = await pagamentoService.criarPagamento(req.body, req.usuarioId);
         pedidoService.notificarPedido(pedido_id, 'pedidoPagamento')
             .catch((erro) => console.error('Falha ao notificar pagamento do pedido:', erro));
         res.status(201).json({ mensagem: 'Pagamento criado com sucesso', id });
@@ -43,7 +43,7 @@ const atualizarPagamento = async (req, res, next) => {
     try {
         const { id } = req.params;
         const dados = req.body;
-        await pagamentoService.atualizarPagamento(id, dados);
+        await pagamentoService.atualizarPagamento(id, dados, req.usuarioId);
         res.status(200).json({ mensagem: 'Pagamento atualizado com sucesso' });
     } catch (erro) {
         next(erro);
@@ -53,7 +53,7 @@ const atualizarPagamento = async (req, res, next) => {
 const eliminarPagamento = async (req, res, next) => {
     try {
         const { id } = req.params;
-        await pagamentoService.eliminarPagamento(id);
+        await pagamentoService.eliminarPagamento(id, req.usuarioId);
         res.status(200).json({ mensagem: 'Pagamento apagado com sucesso' });
     } catch (erro) {
         next(erro);

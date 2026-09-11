@@ -2,10 +2,14 @@ const prisma = require('../config/database');
 const BusinessError = require('../utils/BusinessError');
 const { normalizarDatas } = require('../utils/parseData');
 const formaPagamentoService = require('./formaPagamentoService');
+const logService = require('./logService');
 
 // Recalcula o status de pagamento do pedido com base na soma real dos pagamentos no banco.
 // Pagamentos com forma de pagamento posterior (ex: crediário) não contam como valor recebido.
-const recalcularStatusPedido = async (pedido_id) => {
+// `usuarioId` é repassado de quem disparou o recálculo (registrar/editar/excluir pagamento) —
+// só gera uma entrada de log quando o status realmente muda, para não duplicar o evento que
+// já foi logado por quem chamou.
+const recalcularStatusPedido = async (pedido_id, usuarioId = null) => {
     const [pedido, formasPosteriores, formasDeposito] = await Promise.all([
         prisma.pedidos.findUnique({
             where: { id: parseInt(pedido_id) },
@@ -48,9 +52,27 @@ const recalcularStatusPedido = async (pedido_id) => {
         novoStatus = 'Parcial';
     }
 
-    await prisma.pedidos.update({
-        where: { id: parseInt(pedido_id) },
-        data: { status_pagamento: novoStatus }
+    const statusAnterior = pedido.status_pagamento;
+
+    await prisma.$transaction(async (tx) => {
+        // Mesmo formato de itens usado nas demais snapshots de pedido — sem
+        // isso, o diff de histórico não teria como comparar itens_pedido
+        // contra este evento (campo ausente aqui = comparação pulada).
+        const atualizado = await tx.pedidos.update({
+            where: { id: parseInt(pedido_id) },
+            data: { status_pagamento: novoStatus },
+            include: { itens_pedido: { include: { produtos: { select: { nome: true } } } } },
+        });
+
+        if (novoStatus !== statusAnterior) {
+            await logService.registrarAtividade(tx, {
+                usuarioId,
+                acao: 'atualizacao_automatica',
+                entidade: 'pedido',
+                entidadeId: atualizado.id,
+                snapshot: atualizado,
+            });
+        }
     });
 };
 
@@ -93,7 +115,7 @@ const montarDadosPagamento = (dadosPagamento) => {
 // Valida o saldo do pedido e cria o pagamento dentro de uma transação já
 // aberta pelo chamador. Relê o pedido a cada chamada, então funciona também em
 // laço (cada iteração enxerga os pagamentos inseridos pelas anteriores).
-const criarPagamentoTx = async (tx, dadosPagamento, formasPosteriores) => {
+const criarPagamentoTx = async (tx, dadosPagamento, formasPosteriores, usuarioId = null) => {
     const { pedido_id, valor_pago } = dadosPagamento;
 
     // As checagens abaixo são só de teto (valor > saldo). Sem esta validação,
@@ -148,7 +170,15 @@ const criarPagamentoTx = async (tx, dadosPagamento, formasPosteriores) => {
         }
     }
 
-    return await tx.pagamentos.create({ data: dados });
+    const pagamentoCriado = await tx.pagamentos.create({ data: dados });
+    await logService.registrarAtividade(tx, {
+        usuarioId,
+        acao: 'criacao',
+        entidade: 'pagamento',
+        entidadeId: pagamentoCriado.id,
+        snapshot: pagamentoCriado,
+    });
+    return pagamentoCriado;
 };
 
 // Registra os pagamentos de entrada informados (se houver) e cobre o que
@@ -163,14 +193,15 @@ const criarPagamentoTx = async (tx, dadosPagamento, formasPosteriores) => {
 // nenhum aviso. Único lugar que sabe fazer "cobrir um valor com entrada +
 // crediário automático" — reusado por criarPedidoTx (POST /pedidos),
 // atualizarPedido (aumento no PUT /pedidos/:id) e aprovarOrcamento.
-const cobrirValorTx = async (tx, { pedidoId, valorAlvo }, pagamentosEntrada, formasPosteriores) => {
+const cobrirValorTx = async (tx, { pedidoId, valorAlvo }, pagamentosEntrada, formasPosteriores, usuarioId = null) => {
     const alvo = parseFloat(valorAlvo);
     let totalCoberto = 0;
     for (const pagamento of pagamentosEntrada) {
         const criado = await criarPagamentoTx(
             tx,
             { ...pagamento, pedido_id: pedidoId },
-            formasPosteriores
+            formasPosteriores,
+            usuarioId
         );
         totalCoberto += parseFloat(criado.valor_pago);
     }
@@ -199,18 +230,19 @@ const cobrirValorTx = async (tx, { pedidoId, valorAlvo }, pagamentosEntrada, for
             forma_pagamento: crediario.nome,
             data_pagamento: new Date().toISOString(),
         },
-        formasPosteriores
+        formasPosteriores,
+        usuarioId
     );
 };
 
-const criarPagamento = async (dadosPagamento) => {
+const criarPagamento = async (dadosPagamento, usuarioId = null) => {
     const formasPosteriores = await formaPagamentoService.listarPosteriores();
 
     const novoPagamento = await prisma.$transaction(
-        (tx) => criarPagamentoTx(tx, dadosPagamento, formasPosteriores)
+        (tx) => criarPagamentoTx(tx, dadosPagamento, formasPosteriores, usuarioId)
     );
 
-    await recalcularStatusPedido(dadosPagamento.pedido_id);
+    await recalcularStatusPedido(dadosPagamento.pedido_id, usuarioId);
 
     return novoPagamento.id;
 };
@@ -220,7 +252,7 @@ const criarPagamento = async (dadosPagamento) => {
 // era orquestrado pelo app em várias chamadas soltas (apagar todos os
 // crediários, depois recriar o saldo), e qualquer falha no meio — rede, erro do
 // servidor, app fechado — apagava o crediário do cliente sem deixar rastro.
-const registrarPagamentosDoPedido = async (pedidoId, pagamentos) => {
+const registrarPagamentosDoPedido = async (pedidoId, pagamentos, usuarioId = null) => {
     const id = parseInt(pedidoId);
     const formasPosteriores = await formaPagamentoService.listarPosteriores();
     const nomesPosteriores = new Set(formasPosteriores.map(f => f.nome));
@@ -248,7 +280,8 @@ const registrarPagamentosDoPedido = async (pedidoId, pagamentos) => {
             const criado = await criarPagamentoTx(
                 tx,
                 { ...pagamento, pedido_id: id },
-                formasPosteriores
+                formasPosteriores,
+                usuarioId
             );
             if (!nomesPosteriores.has(criado.forma_pagamento)) {
                 totalRealPago += parseFloat(criado.valor_pago);
@@ -266,7 +299,7 @@ const registrarPagamentosDoPedido = async (pedidoId, pagamentos) => {
 
         const novoSaldoCredito = totalCredito - totalRealPago;
         if (novoSaldoCredito > 0.005) {
-            await tx.pagamentos.create({
+            const novoPagamento = await tx.pagamentos.create({
                 data: {
                     pedido_id: id,
                     valor_pago: novoSaldoCredito,
@@ -274,10 +307,17 @@ const registrarPagamentosDoPedido = async (pedidoId, pagamentos) => {
                     data_pagamento: new Date(),
                 },
             });
+            await logService.registrarAtividade(tx, {
+                usuarioId,
+                acao: 'atualizacao',
+                entidade: 'pagamento',
+                entidadeId: novoPagamento.id,
+                snapshot: novoPagamento,
+            });
         }
     });
 
-    await recalcularStatusPedido(id);
+    await recalcularStatusPedido(id, usuarioId);
 };
 
 // Listagem geral de pagamentos. Aceita intervalo de datas e tem teto de
@@ -379,7 +419,7 @@ const CAMPOS_PAGAMENTO_EDITAVEIS = [
     'data_emissao_nota',
 ];
 
-const atualizarPagamento = async (id, dados) => {
+const atualizarPagamento = async (id, dados, usuarioId = null) => {
     const camposPermitidos = Object.fromEntries(
         Object.entries(dados).filter(([chave]) => CAMPOS_PAGAMENTO_EDITAVEIS.includes(chave))
     );
@@ -422,18 +462,26 @@ const atualizarPagamento = async (id, dados) => {
             }
         }
 
-        return await tx.pagamentos.update({
+        const atualizado = await tx.pagamentos.update({
             where: { id: parseInt(id) },
             data: dadosNormalizados,
         });
+        await logService.registrarAtividade(tx, {
+            usuarioId,
+            acao: 'atualizacao',
+            entidade: 'pagamento',
+            entidadeId: atualizado.id,
+            snapshot: atualizado,
+        });
+        return atualizado;
     });
 
-    await recalcularStatusPedido(pagamentoAtualizado.pedido_id);
+    await recalcularStatusPedido(pagamentoAtualizado.pedido_id, usuarioId);
 
     return pagamentoAtualizado;
 };
 
-const eliminarPagamento = async (id) => {
+const eliminarPagamento = async (id, usuarioId = null) => {
     const pagamento = await prisma.pagamentos.findUnique({
         where: { id: parseInt(id) }
     });
@@ -442,11 +490,21 @@ const eliminarPagamento = async (id) => {
         throw new BusinessError('Pagamento não encontrado.', 404);
     }
 
-    const resultado = await prisma.pagamentos.delete({
-        where: { id: parseInt(id) }
+    const resultado = await prisma.$transaction(async (tx) => {
+        const excluido = await tx.pagamentos.delete({
+            where: { id: parseInt(id) }
+        });
+        await logService.registrarAtividade(tx, {
+            usuarioId,
+            acao: 'exclusao',
+            entidade: 'pagamento',
+            entidadeId: excluido.id,
+            snapshot: excluido,
+        });
+        return excluido;
     });
 
-    await recalcularStatusPedido(pagamento.pedido_id);
+    await recalcularStatusPedido(pagamento.pedido_id, usuarioId);
 
     return resultado;
 };

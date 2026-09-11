@@ -13,7 +13,7 @@ const criarPedido = async (req, res, next) => {
             });
         }
 
-        const novoPedido = await pedidoService.criarPedido(dados);
+        const novoPedido = await pedidoService.criarPedido(dados, req.usuarioId);
         pedidoService.notificarPedido(novoPedido.id, 'pedidoCriado')
             .catch((erro) => console.error('Falha ao notificar criação do pedido:', erro));
         return res.status(201).json({
@@ -62,7 +62,7 @@ const listarPedidos = async (req, res, next) => {
 
 const atualizarPedido = async (req, res, next) => {
     try {
-        const pedido = await pedidoService.atualizarPedido(req.params.id, req.body);
+        const pedido = await pedidoService.atualizarPedido(req.params.id, req.body, req.usuarioId);
         pedidoService.notificarPedido(pedido.id, 'pedidoAlterado')
             .catch((erro) => console.error('Falha ao notificar alteração do pedido:', erro));
         res.json({ ...pedido, creditoGerado: pedido.creditoGerado ?? 0 });
@@ -81,7 +81,7 @@ const registrarPagamentos = async (req, res, next) => {
             return res.status(400).json({ erro: 'Informe ao menos um pagamento.' });
         }
 
-        await pagamentoService.registrarPagamentosDoPedido(req.params.id, pagamentos);
+        await pagamentoService.registrarPagamentosDoPedido(req.params.id, pagamentos, req.usuarioId);
         pedidoService.notificarPedido(req.params.id, 'pedidoPagamento')
             .catch((erro) => console.error('Falha ao notificar pagamento do pedido:', erro));
 
@@ -94,7 +94,7 @@ const registrarPagamentos = async (req, res, next) => {
 
 const eliminarPedido = async (req, res, next) => {
     try {
-        await pedidoService.eliminarPedido(req.params.id);
+        await pedidoService.eliminarPedido(req.params.id, req.usuarioId);
         res.status(204).send();
     } catch (erro) {
         next(erro);

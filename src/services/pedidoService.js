@@ -5,6 +5,7 @@ const formaPagamentoService = require('./formaPagamentoService');
 const pdfService = require('./pdfService');
 const emailService = require('./emailService');
 const telegramService = require('./telegramService');
+const logService = require('./logService');
 const { formatarNumeroPedido } = require('../utils/numeroPedido');
 const { retryColisao } = require('../utils/retryColisao');
 const BusinessError = require('../utils/BusinessError');
@@ -95,7 +96,7 @@ const aplicarTrocaTemporada = async (client, id, campos) => {
 // (ver pagamentoService.cobrirValorTx): nenhum pedido nasce sem pagamento.
 // Omitir o campo (undefined) mantém o comportamento antigo — pedido sem
 // nenhum pagamento — para quem não usa esse fluxo (ex.: fábricas de teste).
-const criarPedidoTx = async (tx, dados) => {
+const criarPedidoTx = async (tx, dados, usuarioId = null) => {
     // O número de temporada vem da temporada ativa (configurada no Admin).
     // Sem temporada ativa, o pedido fica sem número (exibe '#id' como fallback).
     const temporada = await tx.temporadas.findFirst({ where: { ativo: true } });
@@ -136,8 +137,14 @@ const criarPedidoTx = async (tx, dados) => {
                 }))
             }
         },
+        // Mesmo formato de itens usado no snapshot de atualização (com
+        // produtos.nome) — sem isso, o diff de histórico compararia itens
+        // com/sem essa chave e marcaria todo item como "alterado" só por
+        // causa da forma do JSON, não do conteúdo.
         include: {
-            itens_pedido: true
+            itens_pedido: {
+                include: { produtos: { select: { nome: true } } }
+            }
         }
     });
 
@@ -147,9 +154,18 @@ const criarPedidoTx = async (tx, dados) => {
             tx,
             { pedidoId: pedido.id, valorAlvo: pedido.valor_total },
             dados.pagamentos,
-            formasPosteriores
+            formasPosteriores,
+            usuarioId
         );
     }
+
+    await logService.registrarAtividade(tx, {
+        usuarioId,
+        acao: 'criacao',
+        entidade: 'pedido',
+        entidadeId: pedido.id,
+        snapshot: pedido,
+    });
 
     return pedido;
 };
@@ -159,8 +175,8 @@ const criarPedidoTx = async (tx, dados) => {
 // (schema.prisma) rejeita a segunda com P2002. retryColisao tenta de novo
 // (recalculando o número dentro de uma nova transação) em vez de propagar
 // um 500 por uma corrida que se resolve sozinha na repetição.
-const criarPedido = async (dados) => {
-    const pedido = await retryColisao(() => prisma.$transaction((tx) => criarPedidoTx(tx, dados)));
+const criarPedido = async (dados, usuarioId = null) => {
+    const pedido = await retryColisao(() => prisma.$transaction((tx) => criarPedidoTx(tx, dados, usuarioId)));
 
     // recalcularStatusPedido lê via `prisma` direto (não `tx`), então só pode
     // rodar depois que a transação já commitou. Sem isso, um pagamento real
@@ -175,7 +191,7 @@ const criarPedido = async (dados) => {
     // próxima edição/pagamento recalcular — não perde dinheiro nem duplica.
     if (Array.isArray(dados.pagamentos)) {
         try {
-            await recalcularStatusPedido(pedido.id);
+            await recalcularStatusPedido(pedido.id, usuarioId);
         } catch (erro) {
             console.error(`Falha ao recalcular status do pedido ${pedido.id} (já criado com sucesso):`, erro);
         }
@@ -291,7 +307,7 @@ const listarPedidos = async (filtros = {}) => {
 // (status_pagamento, status_entrega, ativo, cliente_id, numero_temporada).
 const CAMPOS_PEDIDO_SEM_ITENS = ['data_pedido', 'temporada_ano', 'observacoes'];
 
-const atualizarPedido = async (id, dados) => {
+const atualizarPedido = async (id, dados, usuarioId = null) => {
     const { itens, pagamentos, ...camposBrutos } = dados;
     const camposPedido = normalizarDatas(camposBrutos, ['data_pedido']);
 
@@ -305,10 +321,23 @@ const atualizarPedido = async (id, dados) => {
 
         return await prisma.$transaction(async (tx) => {
             await aplicarTrocaTemporada(tx, id, camposPermitidos);
-            return await tx.pedidos.update({
+            // Mesmo formato de itens usado nas demais snapshots de pedido —
+            // sem isso, o diff de histórico não teria como comparar
+            // itens_pedido contra este evento (campo ausente = comparação
+            // pulada), mesmo o pedido não tendo mudado de itens aqui.
+            const resultado = await tx.pedidos.update({
                 where: { id: parseInt(id) },
                 data: camposPermitidos,
+                include: { itens_pedido: { include: { produtos: { select: { nome: true } } } } },
             });
+            await logService.registrarAtividade(tx, {
+                usuarioId,
+                acao: 'atualizacao',
+                entidade: 'pedido',
+                entidadeId: resultado.id,
+                snapshot: resultado,
+            });
+            return resultado;
         });
     }
 
@@ -423,12 +452,21 @@ const atualizarPedido = async (id, dados) => {
                 tx,
                 { pedidoId: parseInt(id), valorAlvo: aCobrir },
                 pagamentos,
-                formasPosteriores
+                formasPosteriores,
+                usuarioId
             );
         }
+
+        await logService.registrarAtividade(tx, {
+            usuarioId,
+            acao: 'atualizacao',
+            entidade: 'pedido',
+            entidadeId: resultado.id,
+            snapshot: resultado,
+        });
     });
 
-    await recalcularStatusPedido(id);
+    await recalcularStatusPedido(id, usuarioId);
 
     return { ...resultado, creditoGerado };
 };
@@ -454,10 +492,21 @@ const buscarPedido = async (id) => {
     };
 };
 
-const eliminarPedido = async (id) => {
-    return await prisma.pedidos.update({
-        where: { id: parseInt(id) },
-        data: { ativo: false }
+const eliminarPedido = async (id, usuarioId = null) => {
+    return await prisma.$transaction(async (tx) => {
+        const pedido = await tx.pedidos.update({
+            where: { id: parseInt(id) },
+            data: { ativo: false },
+            include: { itens_pedido: { include: { produtos: { select: { nome: true } } } } },
+        });
+        await logService.registrarAtividade(tx, {
+            usuarioId,
+            acao: 'exclusao',
+            entidade: 'pedido',
+            entidadeId: pedido.id,
+            snapshot: pedido,
+        });
+        return pedido;
     });
 };
 

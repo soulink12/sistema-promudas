@@ -12,7 +12,7 @@ const listarChequesADepositar = async (req, res, next) => {
 const atualizarCheque = async (req, res, next) => {
     try {
         const { id } = req.params;
-        await chequeService.atualizarCheque(id, req.body);
+        await chequeService.atualizarCheque(id, req.body, req.usuarioId);
         res.status(200).json({ mensagem: 'Cheque atualizado com sucesso' });
     } catch (erro) {
         next(erro);

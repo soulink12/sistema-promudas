@@ -15,7 +15,7 @@ const criarTemporada = async (req, res, next) => {
         if (ano === undefined || ano === null || ano === '') {
             return res.status(400).json({ erro: 'O campo ano é obrigatório.' });
         }
-        const nova = await temporadaService.criarTemporada(ano);
+        const nova = await temporadaService.criarTemporada(ano, req.usuarioId);
         res.status(201).json(nova);
     } catch (erro) {
         next(erro);
@@ -25,7 +25,7 @@ const criarTemporada = async (req, res, next) => {
 const ativarTemporada = async (req, res, next) => {
     try {
         const id = parseInt(req.params.id);
-        const ativada = await temporadaService.definirAtiva(id);
+        const ativada = await temporadaService.definirAtiva(id, req.usuarioId);
         res.status(200).json(ativada);
     } catch (erro) {
         next(erro);

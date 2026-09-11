@@ -8,7 +8,7 @@ const criarProduto = async (req, res, next) => {
             return res.status(400).json({ erro: 'Nome e preço do produto são obrigatórios.' });
         }
 
-        const novoId = await produtoService.criarProduto(dados);
+        const novoId = await produtoService.criarProduto(dados, req.usuarioId);
         return res.status(201).json({ mensagem: 'Produto cadastrado com sucesso!', id: novoId });
 
     } catch (erro) {
@@ -27,7 +27,7 @@ const listarProdutos = async (req, res, next) => {
 
 const atualizarProduto = async (req, res, next) => {
     try {
-        const produto = await produtoService.atualizarProduto(req.params.id, req.body);
+        const produto = await produtoService.atualizarProduto(req.params.id, req.body, req.usuarioId);
         res.json(produto);
     } catch (erro) {
         next(erro);
@@ -36,7 +36,7 @@ const atualizarProduto = async (req, res, next) => {
 
 const eliminarProduto = async (req, res, next) => {
     try {
-        await produtoService.eliminarProduto(req.params.id);
+        await produtoService.eliminarProduto(req.params.id, req.usuarioId);
         res.status(204).send();
     } catch (erro) {
         next(erro);

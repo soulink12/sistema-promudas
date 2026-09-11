@@ -1,5 +1,6 @@
 const prisma = require('../config/database');
 const BusinessError = require('../utils/BusinessError');
+const logService = require('./logService');
 
 const listarFormasPagamento = async () => {
     return await prisma.formas_pagamento.findMany({
@@ -18,21 +19,31 @@ const criarForma = async ({
     parcelado_em_ate = 1,
     escambo = false,
     valor_kg_escambo = null,
-}) => {
-    return await prisma.formas_pagamento.create({
-        data: {
-            nome,
-            pagamento_posterior,
-            conta_posterior,
-            deposito_posterior,
-            parcelado_em_ate,
-            escambo,
-            valor_kg_escambo,
-        }
+}, usuarioId = null) => {
+    return await prisma.$transaction(async (tx) => {
+        const forma = await tx.formas_pagamento.create({
+            data: {
+                nome,
+                pagamento_posterior,
+                conta_posterior,
+                deposito_posterior,
+                parcelado_em_ate,
+                escambo,
+                valor_kg_escambo,
+            }
+        });
+        await logService.registrarAtividade(tx, {
+            usuarioId,
+            acao: 'criacao',
+            entidade: 'forma_pagamento',
+            entidadeId: forma.id,
+            snapshot: forma,
+        });
+        return forma;
     });
 };
 
-const atualizarForma = async (id, dados) => {
+const atualizarForma = async (id, dados, usuarioId = null) => {
     const existe = await prisma.formas_pagamento.findUnique({ where: { id } });
     if (!existe) throw new BusinessError('Forma de pagamento não encontrada.', 404);
 
@@ -55,16 +66,35 @@ const atualizarForma = async (id, dados) => {
         }
     }
 
-    return await prisma.formas_pagamento.update({
-        where: { id },
-        data: dados
+    return await prisma.$transaction(async (tx) => {
+        const forma = await tx.formas_pagamento.update({
+            where: { id },
+            data: dados
+        });
+        await logService.registrarAtividade(tx, {
+            usuarioId,
+            acao: 'atualizacao',
+            entidade: 'forma_pagamento',
+            entidadeId: forma.id,
+            snapshot: forma,
+        });
+        return forma;
     });
 };
 
-const deletarForma = async (id) => {
+const deletarForma = async (id, usuarioId = null) => {
     const existe = await prisma.formas_pagamento.findUnique({ where: { id } });
     if (!existe) throw new BusinessError('Forma de pagamento não encontrada.', 404);
-    await prisma.formas_pagamento.update({ where: { id }, data: { ativo: false } });
+    await prisma.$transaction(async (tx) => {
+        const forma = await tx.formas_pagamento.update({ where: { id }, data: { ativo: false } });
+        await logService.registrarAtividade(tx, {
+            usuarioId,
+            acao: 'exclusao',
+            entidade: 'forma_pagamento',
+            entidadeId: forma.id,
+            snapshot: forma,
+        });
+    });
 };
 
 // Lista as formas marcadas como pagamento posterior (crediário), em ordem
