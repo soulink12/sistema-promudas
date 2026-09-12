@@ -30,6 +30,11 @@ class _TelaLogsErrosState extends State<TelaLogsErros> {
 
   Map<String, dynamic>? _erroSelecionado;
 
+  // Guarda contra resposta fora de ordem — mesma razão de logs_screen.dart:
+  // uma troca rápida de filtro não pode deixar uma resposta antiga
+  // sobrescrever o estado da listagem atual.
+  int _listaRequestId = 0;
+
   @override
   void initState() {
     super.initState();
@@ -37,6 +42,7 @@ class _TelaLogsErrosState extends State<TelaLogsErros> {
   }
 
   Future<void> _carregar() async {
+    final meuRequestId = ++_listaRequestId;
     setState(() {
       _carregando = true;
       _erro = null;
@@ -44,7 +50,7 @@ class _TelaLogsErrosState extends State<TelaLogsErros> {
     });
     try {
       final resultado = await _service.listarErros(de: _de, ate: _ate, page: 1);
-      if (!mounted) return;
+      if (!mounted || meuRequestId != _listaRequestId) return;
       setState(() {
         _erros = (resultado['dados'] as List)
             .map<Map<String, dynamic>>((e) => Map<String, dynamic>.from(e as Map))
@@ -53,7 +59,7 @@ class _TelaLogsErrosState extends State<TelaLogsErros> {
         _carregando = false;
       });
     } catch (_) {
-      if (!mounted) return;
+      if (!mounted || meuRequestId != _listaRequestId) return;
       setState(() {
         _erro = 'Não foi possível carregar o log de erros.';
         _carregando = false;
@@ -62,12 +68,13 @@ class _TelaLogsErrosState extends State<TelaLogsErros> {
   }
 
   Future<void> _carregarMais() async {
+    final meuRequestId = _listaRequestId;
     setState(() => _carregandoMais = true);
     try {
       final proximaPagina = _page + 1;
       final resultado =
           await _service.listarErros(de: _de, ate: _ate, page: proximaPagina);
-      if (!mounted) return;
+      if (!mounted || meuRequestId != _listaRequestId) return;
       setState(() {
         _erros.addAll((resultado['dados'] as List)
             .map<Map<String, dynamic>>((e) => Map<String, dynamic>.from(e as Map)));
@@ -75,7 +82,9 @@ class _TelaLogsErrosState extends State<TelaLogsErros> {
         _carregandoMais = false;
       });
     } catch (_) {
-      if (mounted) setState(() => _carregandoMais = false);
+      if (mounted && meuRequestId == _listaRequestId) {
+        setState(() => _carregandoMais = false);
+      }
     }
   }
 

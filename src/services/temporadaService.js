@@ -47,11 +47,28 @@ const definirAtiva = async (id, usuarioId = null) => {
     if (!existe) throw new BusinessError('Temporada não encontrada.', 404);
 
     return await prisma.$transaction(async (tx) => {
+        // Captura quem estava ativa ANTES do updateMany desativar todo mundo —
+        // sem isso, a temporada que perdeu o "ativo" não deixava rastro.
+        const anteriorAtiva = await tx.temporadas.findFirst({
+            where: { ativo: true, id: { not: temporadaId } },
+        });
+
         await tx.temporadas.updateMany({ data: { ativo: false } });
         const temporada = await tx.temporadas.update({
             where: { id: temporadaId },
             data: { ativo: true },
         });
+
+        if (anteriorAtiva) {
+            await logService.registrarAtividade(tx, {
+                usuarioId,
+                acao: 'atualizacao_automatica',
+                entidade: 'temporada',
+                entidadeId: anteriorAtiva.id,
+                snapshot: { ...anteriorAtiva, ativo: false },
+            });
+        }
+
         await logService.registrarAtividade(tx, {
             usuarioId,
             acao: 'atualizacao',

@@ -1,6 +1,11 @@
 const logService = require('../services/logService');
 const { contentDisposition } = require('../utils/contentDisposition');
 
+// Sem isso, um id não numérico (`/logs/abc`) virava `Number('abc') = NaN`,
+// que o Prisma rejeita com um erro sem `.code` mapeado em errorHandler.js —
+// saía como 500 genérico em vez do 404 limpo que já existe pra id ausente.
+const idValido = (valor) => /^\d+$/.test(String(valor));
+
 const filtrosDaQuery = (query) => {
     const { entidade, entidadeId, usuarioId, acao, de, ate, page, pageSize } = query;
     const filtros = {};
@@ -26,6 +31,9 @@ const listarAtividades = async (req, res, next) => {
 
 const buscarAtividade = async (req, res, next) => {
     try {
+        if (!idValido(req.params.id)) {
+            return res.status(404).json({ erro: 'Registro de histórico não encontrado.' });
+        }
         const atividade = await logService.buscarAtividade(req.params.id);
         if (!atividade) return res.status(404).json({ erro: 'Registro de histórico não encontrado.' });
         res.json(atividade);
@@ -51,6 +59,9 @@ const listarErros = async (req, res, next) => {
 
 const buscarErro = async (req, res, next) => {
     try {
+        if (!idValido(req.params.id)) {
+            return res.status(404).json({ erro: 'Registro de erro não encontrado.' });
+        }
         const erroRegistrado = await logService.buscarErro(req.params.id);
         if (!erroRegistrado) return res.status(404).json({ erro: 'Registro de erro não encontrado.' });
         res.json(erroRegistrado);

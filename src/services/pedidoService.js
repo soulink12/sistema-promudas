@@ -412,9 +412,18 @@ const atualizarPedido = async (id, dados, usuarioId = null) => {
             const delta = Math.max(creditoGerado, -saldoAtual);
 
             if (Math.abs(delta) > 0.01) {
-                await tx.clientes.update({
+                const clienteAtualizado = await tx.clientes.update({
                     where: { id: pedidoAtual.cliente_id },
                     data: { saldo_credito: { increment: delta } },
+                });
+                // Saldo do cliente mudando sem log nenhum — só dava pra ver o
+                // valor atual, nunca por que/quando mudou.
+                await logService.registrarAtividade(tx, {
+                    usuarioId,
+                    acao: 'atualizacao_automatica',
+                    entidade: 'cliente',
+                    entidadeId: clienteAtualizado.id,
+                    snapshot: clienteAtualizado,
                 });
             }
         }

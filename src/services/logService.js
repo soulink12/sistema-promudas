@@ -1,6 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 const prisma = require('../config/database');
+const BusinessError = require('../utils/BusinessError');
 
 const PASTA_LOGS = process.env.LOG_DIR || path.join(__dirname, '..', '..', 'logs');
 try { fs.mkdirSync(PASTA_LOGS, { recursive: true }); } catch (_) { /* já existe */ }
@@ -22,17 +23,31 @@ const escreverLinha = (prefixo, objeto) => {
     });
 };
 
-const paginacao = (filtros) => {
+// `limiteMaximo` é PAGE_SIZE_MAXIMO por padrão (listagem paginada normal) —
+// a exportação CSV passa LIMITE_EXPORTACAO aqui, senão `listarAtividades`
+// cortava a exportação em 200 linhas mesmo pedindo 5000.
+const paginacao = (filtros, limiteMaximo = PAGE_SIZE_MAXIMO) => {
     const page = Number.isInteger(filtros.page) && filtros.page > 0 ? filtros.page : 1;
     const pageSizeBruto = Number.isInteger(filtros.pageSize) && filtros.pageSize > 0 ? filtros.pageSize : PAGE_SIZE_PADRAO;
-    const pageSize = Math.min(pageSizeBruto, PAGE_SIZE_MAXIMO);
+    const pageSize = Math.min(pageSizeBruto, limiteMaximo);
     return { page, pageSize, skip: (page - 1) * pageSize, take: pageSize };
+};
+
+// Data inválida na query (`?de=lixo`) virava `Invalid Date`, que o Prisma
+// rejeita com um erro sem `.code` mapeado em errorHandler.js — saía como 500
+// genérico em vez do 400 que um filtro mal formado merece.
+const parseDataFiltro = (valor, nomeCampo) => {
+    const data = new Date(valor);
+    if (Number.isNaN(data.getTime())) {
+        throw new BusinessError(`Data inválida no filtro "${nomeCampo}".`);
+    }
+    return data;
 };
 
 const filtroData = (filtros) => {
     const criado_em = {};
-    if (filtros.de) criado_em.gte = new Date(filtros.de);
-    if (filtros.ate) criado_em.lte = new Date(filtros.ate);
+    if (filtros.de) criado_em.gte = parseDataFiltro(filtros.de, 'de');
+    if (filtros.ate) criado_em.lte = parseDataFiltro(filtros.ate, 'ate');
     return Object.keys(criado_em).length > 0 ? criado_em : undefined;
 };
 
@@ -79,8 +94,8 @@ const registrarErro = async ({ usuarioId, mensagem, stack, rota, metodoHttp, sta
     escreverLinha('erro', { origem, rota: rota ?? null, metodoHttp: metodoHttp ?? null, statusCode: statusCode ?? null, mensagem });
 };
 
-const listarAtividades = async (filtros = {}) => {
-    const { page, pageSize, skip, take } = paginacao(filtros);
+const listarAtividades = async (filtros = {}, limiteMaximo = PAGE_SIZE_MAXIMO) => {
+    const { page, pageSize, skip, take } = paginacao(filtros, limiteMaximo);
     const where = {
         entidade: filtros.entidade || undefined,
         entidade_id: filtros.entidadeId ? Number(filtros.entidadeId) : undefined,
@@ -113,7 +128,11 @@ const CAMPOS_IGNORADOS_DIFF = new Set(['criado_em', 'atualizado_em', 'id']);
 // aparece na RAIZ de um orçamento aprovado (liga o orçamento ao pedido
 // criado) — ali É uma mudança relevante, por isso este ignore fica separado
 // do CAMPOS_IGNORADOS_DIFF geral, só usado dentro de diferencaListaDeItens.
-const CAMPOS_IGNORADOS_ITEM = new Set([...CAMPOS_IGNORADOS_DIFF, 'pedido_id', 'orcamento_id']);
+// `produtos` também é ignorado aqui: é só o nome do produto trazido via
+// `include` pra exibição (rotuloItem no front) — comparar esse objeto fazia
+// o item aparecer como "alterado" sempre que o PRODUTO fosse renomeado em
+// outro lugar, mesmo sem nenhuma mudança real no pedido/orçamento.
+const CAMPOS_IGNORADOS_ITEM = new Set([...CAMPOS_IGNORADOS_DIFF, 'pedido_id', 'orcamento_id', 'produtos']);
 
 // "Lista de itens" reconhecível (itens_pedido, itens_orcamento): array onde
 // cada elemento é um objeto com `produto_id` — permite comparar item a item
@@ -251,15 +270,23 @@ const buscarErro = async (id) => prisma.logs_erro.findUnique({
 });
 
 const escaparCampoCSV = (valor) => {
-    const texto = valor === null || valor === undefined ? '' : String(valor);
-    if (/[",\n]/.test(texto)) {
+    let texto = valor === null || valor === undefined ? '' : String(valor);
+    // Neutraliza injeção de fórmula: Excel/Sheets interpretam um campo que
+    // começa com =, +, -, @ como fórmula ao abrir o CSV. Prefixo de aspas
+    // simples força tratamento como texto puro, sem mudar o valor visível.
+    if (/^[=+\-@]/.test(texto)) {
+        texto = `'${texto}`;
+    }
+    // `\r` sozinho (sem `\n` na frente) também quebra linha em alguns
+    // parsers de CSV — não só a combinação `\n`.
+    if (/["\r\n,]/.test(texto)) {
         return `"${texto.replace(/"/g, '""')}"`;
     }
     return texto;
 };
 
 const gerarExportacaoCSV = async (filtros = {}) => {
-    const { dados } = await listarAtividades({ ...filtros, page: 1, pageSize: LIMITE_EXPORTACAO });
+    const { dados } = await listarAtividades({ ...filtros, page: 1, pageSize: LIMITE_EXPORTACAO }, LIMITE_EXPORTACAO);
     const cabecalho = ['id', 'data', 'usuario', 'acao', 'entidade', 'entidade_id'];
     const linhas = dados.map((item) => [
         item.id,

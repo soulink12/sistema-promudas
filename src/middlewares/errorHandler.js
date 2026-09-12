@@ -41,8 +41,12 @@ const errorHandler = async (erro, req, res, next) => {
     }
 
     // Só chega aqui erro real e inesperado do programa (não BusinessError, não
-    // um código Prisma conhecido, não um 4xx do Express).
-    await logService.registrarErro({
+    // um código Prisma conhecido, não um 4xx do Express). Não espera essa
+    // gravação terminar antes de responder: a causa mais comum de um 500 real
+    // é o próprio banco com problema, e travar a resposta esperando OUTRA
+    // escrita nesse mesmo banco só adiciona espera no pior momento possível
+    // (registrarErro já trata a falha de gravação internamente, nunca lança).
+    logService.registrarErro({
         usuarioId: req.usuarioId ?? null,
         mensagem: erro?.message ?? String(erro),
         stack: erro?.stack ?? null,
@@ -50,7 +54,7 @@ const errorHandler = async (erro, req, res, next) => {
         metodoHttp: req.method,
         statusCode: 500,
         origem: 'http',
-    });
+    }).catch(() => {});
 
     res.status(500).json({ erro: 'Erro interno do servidor.' });
 };

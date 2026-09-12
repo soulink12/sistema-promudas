@@ -2,6 +2,8 @@
 // API (ver logService.js no backend) e formatação do snapshot (JSON) como
 // texto indentado "chave: valor".
 
+import '../../../../core/utils/formatadores.dart';
+
 const Map<String, String> _rotulosEntidade = {
   'pedido': 'Pedido',
   'orcamento': 'Orçamento',
@@ -92,16 +94,34 @@ String formatarSnapshot(dynamic valor, [int nivel = 0]) {
   return '$indentacao${_formatarValorSimples(valor)}';
 }
 
+// Campos cujo valor é monetário — exibidos em R$ em vez de número cru.
+const Set<String> _camposMonetarios = {
+  'valor_total',
+  'valor_unitario',
+  'valor_pago',
+  'ajuste',
+  'valor',
+  'valor_kg_escambo',
+  'preco',
+  'saldo_credito',
+};
+
 /// Formata um valor de diferença (lado "de" ou "para" de um campo alterado)
 /// — escalares inline, Maps/Listas com o mesmo formato indentado do snapshot.
-String formatarValorDiferenca(dynamic valor) {
+/// `campo` (nome cru, ex. "valor_total") decide se o número vira moeda.
+String formatarValorDiferenca(dynamic valor, [String? campo]) {
   if (valor is Map || valor is List) return formatarSnapshot(valor);
+  if (campo != null && _camposMonetarios.contains(campo)) {
+    final numero = valor is num ? valor : num.tryParse(valor?.toString() ?? '');
+    if (numero != null) return formatarMoeda(numero);
+  }
   return _formatarValorSimples(valor);
 }
 
 const Map<String, String> _rotulosCampoEspeciais = {
   'itens_pedido': 'Itens do pedido',
   'itens_orcamento': 'Itens do orçamento',
+  'itens_entrega': 'Itens da entrega',
 };
 
 /// Humaniza o nome cru de um campo (snake_case) pra exibição, ex.
@@ -124,10 +144,15 @@ String rotuloItem(Map<String, dynamic> item) {
   return produtoId != null ? 'Produto #$produtoId' : 'Item';
 }
 
-/// Resumo qtd/valor de um item, ex. "qtd. 3 × R\$ 4,00".
+/// Resumo qtd/valor de um item, ex. "qtd. 3 × R\$ 4,00". Itens sem preço
+/// unitário (ex. itens_entrega, que só tem produto+quantidade) mostram só a
+/// quantidade.
 String resumoItem(Map<String, dynamic> item) {
   final quantidade = item['quantidade'];
+  if (quantidade == null) return '';
   final valorUnitario = item['valor_unitario'];
-  if (quantidade == null || valorUnitario == null) return '';
-  return 'qtd. $quantidade × ${_formatarValorSimples(valorUnitario)}';
+  if (valorUnitario == null) return 'qtd. $quantidade';
+  final numero = valorUnitario is num ? valorUnitario : num.tryParse(valorUnitario.toString());
+  final valorFormatado = numero != null ? formatarMoeda(numero) : _formatarValorSimples(valorUnitario);
+  return 'qtd. $quantidade × $valorFormatado';
 }

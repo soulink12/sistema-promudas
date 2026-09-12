@@ -69,9 +69,18 @@ const atualizarCheque = async (id, dados, usuarioId = null) => {
         });
 
         if (conta !== undefined) {
-            await tx.pagamentos.update({
+            const pagamentoAtualizado = await tx.pagamentos.update({
                 where: { id: cheque.pagamento_id },
                 data: { conta },
+            });
+            // Antes só o cheque virava evento — a conta do pagamento pai
+            // mudando junto ficava invisível no histórico do pagamento.
+            await logService.registrarAtividade(tx, {
+                usuarioId,
+                acao: 'atualizacao_automatica',
+                entidade: 'pagamento',
+                entidadeId: pagamentoAtualizado.id,
+                snapshot: pagamentoAtualizado,
             });
         }
 

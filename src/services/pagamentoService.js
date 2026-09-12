@@ -10,51 +10,63 @@ const logService = require('./logService');
 // só gera uma entrada de log quando o status realmente muda, para não duplicar o evento que
 // já foi logado por quem chamou.
 const recalcularStatusPedido = async (pedido_id, usuarioId = null) => {
-    const [pedido, formasPosteriores, formasDeposito] = await Promise.all([
-        prisma.pedidos.findUnique({
-            where: { id: parseInt(pedido_id) },
-            include: { pagamentos: { include: { cheques: true } } }
-        }),
+    const [formasPosteriores, formasDeposito] = await Promise.all([
         formaPagamentoService.listarPosteriores(),
         formaPagamentoService.listarDepositoPosterior()
     ]);
-
-    if (!pedido) return;
-
     const nomesPosteriores = new Set(formasPosteriores.map(f => f.nome));
     const nomesDeposito = new Set(formasDeposito.map(f => f.nome));
 
-    // Só conta o que foi efetivamente recebido:
-    // - crediário (pagamento posterior) não conta;
-    // - cheque (depósito posterior) só conta a parte já depositada;
-    // - demais formas contam o valor pago integral.
-    const totalPago = pedido.pagamentos.reduce((soma, p) => {
-        if (nomesPosteriores.has(p.forma_pagamento)) return soma;
-        if (nomesDeposito.has(p.forma_pagamento)) {
-            const depositado = (p.cheques || [])
-                .filter(c => c.depositado)
-                .reduce((a, c) => a + parseFloat(c.valor), 0);
-            return soma + depositado;
-        }
-        return soma + parseFloat(p.valor_pago);
-    }, 0);
-
-    const valorTotal = parseFloat(pedido.valor_total);
-
-    // "Crédito": o cliente pagou mais do que o total atual do pedido — sobra que
-    // vira saldo de crédito (ocorre quando um pedido já pago é editado para menos).
-    let novoStatus = 'Pendente';
-    if (totalPago > (valorTotal + 0.01)) {
-        novoStatus = 'Crédito';
-    } else if (totalPago >= (valorTotal - 0.01)) {
-        novoStatus = 'Pago';
-    } else if (totalPago > 0) {
-        novoStatus = 'Parcial';
-    }
-
-    const statusAnterior = pedido.status_pagamento;
-
     await prisma.$transaction(async (tx) => {
+        // Lê o pedido (e o status atual) DENTRO da transação, não antes —
+        // se duas ações no mesmo pedido chamam este recálculo quase ao
+        // mesmo tempo (ex.: dois pagamentos registrados em sequência muito
+        // rápida), ler o status fora da transação deixava as duas com uma
+        // visão desatualizada de "statusAnterior", podendo perder ou
+        // duplicar o evento de histórico da mudança real. Não elimina 100%
+        // a corrida entre duas transações verdadeiramente concorrentes (isso
+        // exigiria travar a linha com SELECT ... FOR UPDATE, mais complexo
+        // do que o volume de uso deste sistema justifica hoje), mas fecha a
+        // janela que existia antes, onde a leitura nem estava numa transação.
+        const pedido = await tx.pedidos.findUnique({
+            where: { id: parseInt(pedido_id) },
+            include: { pagamentos: { include: { cheques: true } } }
+        });
+        if (!pedido) return;
+
+        // Só conta o que foi efetivamente recebido:
+        // - crediário (pagamento posterior) não conta;
+        // - cheque (depósito posterior) só conta a parte já depositada;
+        // - demais formas contam o valor pago integral.
+        const totalPago = pedido.pagamentos.reduce((soma, p) => {
+            if (nomesPosteriores.has(p.forma_pagamento)) return soma;
+            if (nomesDeposito.has(p.forma_pagamento)) {
+                const depositado = (p.cheques || [])
+                    .filter(c => c.depositado)
+                    .reduce((a, c) => a + parseFloat(c.valor), 0);
+                return soma + depositado;
+            }
+            return soma + parseFloat(p.valor_pago);
+        }, 0);
+
+        const valorTotal = parseFloat(pedido.valor_total);
+
+        // "Crédito": o cliente pagou mais do que o total atual do pedido — sobra que
+        // vira saldo de crédito (ocorre quando um pedido já pago é editado para menos).
+        let novoStatus = 'Pendente';
+        if (totalPago > (valorTotal + 0.01)) {
+            novoStatus = 'Crédito';
+        } else if (totalPago >= (valorTotal - 0.01)) {
+            novoStatus = 'Pago';
+        } else if (totalPago > 0) {
+            novoStatus = 'Parcial';
+        }
+
+        // Nada mudou: não escreve nem loga (evita transação/consulta extra
+        // — a busca de itens_pedido+produtos abaixo só compensa quando o
+        // status realmente vai mudar e precisa entrar no snapshot do log).
+        if (novoStatus === pedido.status_pagamento) return;
+
         // Mesmo formato de itens usado nas demais snapshots de pedido — sem
         // isso, o diff de histórico não teria como comparar itens_pedido
         // contra este evento (campo ausente aqui = comparação pulada).
@@ -64,15 +76,13 @@ const recalcularStatusPedido = async (pedido_id, usuarioId = null) => {
             include: { itens_pedido: { include: { produtos: { select: { nome: true } } } } },
         });
 
-        if (novoStatus !== statusAnterior) {
-            await logService.registrarAtividade(tx, {
-                usuarioId,
-                acao: 'atualizacao_automatica',
-                entidade: 'pedido',
-                entidadeId: atualizado.id,
-                snapshot: atualizado,
-            });
-        }
+        await logService.registrarAtividade(tx, {
+            usuarioId,
+            acao: 'atualizacao_automatica',
+            entidade: 'pedido',
+            entidadeId: atualizado.id,
+            snapshot: atualizado,
+        });
     });
 };
 
@@ -170,7 +180,13 @@ const criarPagamentoTx = async (tx, dadosPagamento, formasPosteriores, usuarioId
         }
     }
 
-    const pagamentoCriado = await tx.pagamentos.create({ data: dados });
+    const pagamentoCriado = await tx.pagamentos.create({
+        data: dados,
+        // Sem isso o snapshot do pagamento não traz os cheques criados junto
+        // (dados.cheques.create acima) — o histórico ficava sem número/banco/
+        // valor do cheque no momento em que ele foi registrado.
+        include: { cheques: true },
+    });
     await logService.registrarAtividade(tx, {
         usuarioId,
         acao: 'criacao',
@@ -178,6 +194,19 @@ const criarPagamentoTx = async (tx, dadosPagamento, formasPosteriores, usuarioId
         entidadeId: pagamentoCriado.id,
         snapshot: pagamentoCriado,
     });
+    // Cada cheque também vira um evento próprio (entidade 'cheque'), mesmo
+    // padrão usado depois por chequeService.atualizarCheque — sem isso, o
+    // filtro "Cheque" no histórico nunca mostra a criação, só edições/
+    // depósitos posteriores.
+    for (const cheque of pagamentoCriado.cheques ?? []) {
+        await logService.registrarAtividade(tx, {
+            usuarioId,
+            acao: 'criacao',
+            entidade: 'cheque',
+            entidadeId: cheque.id,
+            snapshot: cheque,
+        });
+    }
     return pagamentoCriado;
 };
 
@@ -296,6 +325,18 @@ const registrarPagamentosDoPedido = async (pedidoId, pagamentos, usuarioId = nul
         await tx.pagamentos.deleteMany({
             where: { id: { in: crediarios.map((c) => c.id) } },
         });
+        // Único lugar do sistema que excluía pagamento sem deixar rastro —
+        // os crediários antigos somem daqui (consolidados no pagamento novo
+        // abaixo, se sobrar saldo), então cada um precisa do próprio evento.
+        for (const crediario of crediarios) {
+            await logService.registrarAtividade(tx, {
+                usuarioId,
+                acao: 'exclusao',
+                entidade: 'pagamento',
+                entidadeId: crediario.id,
+                snapshot: crediario,
+            });
+        }
 
         const novoSaldoCredito = totalCredito - totalRealPago;
         if (novoSaldoCredito > 0.005) {

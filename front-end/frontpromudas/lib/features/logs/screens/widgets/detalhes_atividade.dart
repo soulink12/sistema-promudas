@@ -12,11 +12,17 @@ class DetalhesAtividade extends StatelessWidget {
   /// instante antes da resposta real chegar.
   final bool carregandoDiferencas;
 
+  /// true quando a busca do detalhe completo falhou (rede/servidor) — sem
+  /// isso, o erro caía no mesmo texto de "sem evento anterior" usado para
+  /// criação, confundindo falha de rede com ausência real de histórico.
+  final bool erroDiferencas;
+
   const DetalhesAtividade({
     super.key,
     required this.atividade,
     required this.onVoltar,
     this.carregandoDiferencas = false,
+    this.erroDiferencas = false,
   });
 
   @override
@@ -62,7 +68,7 @@ class DetalhesAtividade extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 16),
-          ..._blocoMudancas(context, snapshotAnterior, diferencas, carregandoDiferencas),
+          ..._blocoMudancas(context, snapshotAnterior, diferencas, carregandoDiferencas, erroDiferencas),
           const SizedBox(height: 16),
           _tituloSecao(context, 'ESTADO COMPLETO APÓS O EVENTO'),
           const SizedBox(height: 8),
@@ -91,6 +97,7 @@ class DetalhesAtividade extends StatelessWidget {
     dynamic snapshotAnterior,
     List<Map<String, dynamic>>? diferencas,
     bool carregando,
+    bool erro,
   ) {
     if (carregando) {
       return [
@@ -105,6 +112,26 @@ class DetalhesAtividade extends StatelessWidget {
                     width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2)),
                 SizedBox(width: 12),
                 Text('Carregando...'),
+              ],
+            ),
+          ),
+        ),
+      ];
+    }
+
+    if (erro) {
+      return [
+        _tituloSecao(context, 'O QUE MUDOU'),
+        const SizedBox(height: 8),
+        Card(
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Row(
+              children: [
+                Icon(Icons.error_outline, color: Theme.of(context).colorScheme.error, size: 20),
+                const SizedBox(width: 12),
+                const Expanded(
+                    child: Text('Não foi possível carregar a comparação com o evento anterior.')),
               ],
             ),
           ),
@@ -158,7 +185,8 @@ class DetalhesAtividade extends StatelessWidget {
                   _blocoListaDeItens(
                       context, (diferenca['itens'] as List).cast<Map<String, dynamic>>())
                 else
-                  _linhaDeParaTexto(context, diferenca['de'], diferenca['para']),
+                  _linhaDeParaTexto(context, diferenca['de'], diferenca['para'],
+                      campo: diferenca['campo'] as String?),
                 if (diferenca != diferencas.last) const Divider(height: 20),
               ],
             ],
@@ -215,14 +243,15 @@ class DetalhesAtividade extends StatelessWidget {
             Padding(
               padding: const EdgeInsets.only(left: 12, top: 2),
               child: _linhaDeParaTexto(context, campo['de'], campo['para'],
-                  rotulo: rotuloCampo(campo['campo'] as String? ?? '')),
+                  rotulo: rotuloCampo(campo['campo'] as String? ?? ''),
+                  campo: campo['campo'] as String?),
             ),
         ],
       ),
     );
   }
 
-  Widget _linhaDeParaTexto(BuildContext context, dynamic de, dynamic para, {String? rotulo}) {
+  Widget _linhaDeParaTexto(BuildContext context, dynamic de, dynamic para, {String? rotulo, String? campo}) {
     final estiloMonoespaco = const TextStyle(fontFamily: 'monospace', fontSize: 12.5, height: 1.4);
     return SelectableText.rich(
       TextSpan(
@@ -233,10 +262,10 @@ class DetalhesAtividade extends StatelessWidget {
               text: '$rotulo: ',
               style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant),
             ),
-          TextSpan(text: formatarValorDiferenca(de), style: estiloMonoespaco.copyWith(
+          TextSpan(text: formatarValorDiferenca(de, campo), style: estiloMonoespaco.copyWith(
               color: Theme.of(context).colorScheme.error)),
           const TextSpan(text: '  →  '),
-          TextSpan(text: formatarValorDiferenca(para), style: estiloMonoespaco.copyWith(
+          TextSpan(text: formatarValorDiferenca(para, campo), style: estiloMonoespaco.copyWith(
               color: Theme.of(context).colorScheme.primary, fontWeight: FontWeight.w600)),
         ],
       ),

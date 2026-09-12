@@ -35,6 +35,14 @@ class _TelaLogsState extends State<TelaLogs> {
 
   Map<String, dynamic>? _atividadeSelecionada;
   bool _carregandoDetalhe = false;
+  bool _erroDetalhe = false;
+
+  // Contadores de requisição: cada chamada assíncrona guarda o valor no
+  // início e só aplica o resultado se ninguém disparou uma chamada mais
+  // nova nesse meio-tempo — evita que uma resposta lenta (filtro trocado
+  // rápido, ou duas seleções seguidas) sobrescreva um estado mais recente.
+  int _listaRequestId = 0;
+  int _selecaoRequestId = 0;
 
   static const _entidadesDisponiveis = [
     'pedido',
@@ -55,6 +63,7 @@ class _TelaLogsState extends State<TelaLogs> {
   }
 
   Future<void> _carregar() async {
+    final meuRequestId = ++_listaRequestId;
     setState(() {
       _carregando = true;
       _erro = null;
@@ -67,7 +76,7 @@ class _TelaLogsState extends State<TelaLogs> {
         entidade: _entidadeFiltro,
         page: 1,
       );
-      if (!mounted) return;
+      if (!mounted || meuRequestId != _listaRequestId) return;
       setState(() {
         _atividades = (resultado['dados'] as List)
             .map<Map<String, dynamic>>((e) => Map<String, dynamic>.from(e as Map))
@@ -76,7 +85,7 @@ class _TelaLogsState extends State<TelaLogs> {
         _carregando = false;
       });
     } catch (_) {
-      if (!mounted) return;
+      if (!mounted || meuRequestId != _listaRequestId) return;
       setState(() {
         _erro = 'Não foi possível carregar o histórico.';
         _carregando = false;
@@ -85,6 +94,7 @@ class _TelaLogsState extends State<TelaLogs> {
   }
 
   Future<void> _carregarMais() async {
+    final meuRequestId = _listaRequestId;
     setState(() => _carregandoMais = true);
     try {
       final proximaPagina = _page + 1;
@@ -94,7 +104,10 @@ class _TelaLogsState extends State<TelaLogs> {
         entidade: _entidadeFiltro,
         page: proximaPagina,
       );
-      if (!mounted) return;
+      // Se um _carregar() novo rodou enquanto isso estava em voo (filtro
+      // trocado, por exemplo), esta resposta é de uma listagem que não
+      // existe mais — descarta em vez de misturar com o filtro atual.
+      if (!mounted || meuRequestId != _listaRequestId) return;
       setState(() {
         _atividades.addAll((resultado['dados'] as List)
             .map<Map<String, dynamic>>((e) => Map<String, dynamic>.from(e as Map)));
@@ -102,7 +115,9 @@ class _TelaLogsState extends State<TelaLogs> {
         _carregandoMais = false;
       });
     } catch (_) {
-      if (mounted) setState(() => _carregandoMais = false);
+      if (mounted && meuRequestId == _listaRequestId) {
+        setState(() => _carregandoMais = false);
+      }
     }
   }
 
@@ -111,20 +126,32 @@ class _TelaLogsState extends State<TelaLogs> {
   // não parecer travado) e substitui pelo detalhe completo assim que chega.
   Future<void> _selecionarAtividade(Map<String, dynamic> resumo) async {
     final id = resumo['id'] as int?;
+    final meuRequestId = ++_selecaoRequestId;
     setState(() {
       _atividadeSelecionada = resumo;
       _carregandoDetalhe = id != null;
+      _erroDetalhe = false;
     });
     if (id == null) return;
     try {
       final detalhe = await _service.buscarAtividade(id);
-      if (!mounted) return;
+      // Se o usuário já selecionou outro evento nesse meio-tempo, essa
+      // resposta é da seleção anterior — descarta pra não sobrescrever a
+      // seleção mais recente com dado desatualizado.
+      if (!mounted || meuRequestId != _selecaoRequestId) return;
       setState(() {
         _atividadeSelecionada = detalhe;
         _carregandoDetalhe = false;
       });
     } catch (_) {
-      if (mounted) setState(() => _carregandoDetalhe = false);
+      if (!mounted || meuRequestId != _selecaoRequestId) return;
+      // Antes ficava só com o resumo e o widget mostrava "sem evento
+      // anterior" — enganoso quando o problema foi falha de rede, não a
+      // ausência real de um evento anterior.
+      setState(() {
+        _carregandoDetalhe = false;
+        _erroDetalhe = true;
+      });
     }
   }
 
@@ -219,6 +246,7 @@ class _TelaLogsState extends State<TelaLogs> {
             ? DetalhesAtividade(
                 atividade: _atividadeSelecionada!,
                 carregandoDiferencas: _carregandoDetalhe,
+                erroDiferencas: _erroDetalhe,
                 onVoltar: () => setState(() => _atividadeSelecionada = null),
               )
             : _buildListagem(),
