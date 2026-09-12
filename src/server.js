@@ -16,9 +16,11 @@ const chequeRoutes = require('./routes/chequeRoutes');
 const formaPagamentoRoutes = require('./routes/formaPagamentoRoutes');
 const temporadaRoutes = require('./routes/temporadaRoutes');
 const relatorioRoutes = require('./routes/relatorioRoutes');
+const logRoutes = require('./routes/logRoutes');
 
 const { verificarToken } = require('./middlewares/authMiddleware.js');
 const errorHandler = require('./middlewares/errorHandler');
+const logService = require('./services/logService');
 
 const prismaTest = require('./config/database');
 console.log("Prisma carregado com sucesso:", !!prismaTest);
@@ -84,6 +86,7 @@ app.use('/api/locais-entrega', locaisEntregaRoutes);
 app.use('/api/contas', contaRoutes);
 app.use('/api/cheques', chequeRoutes);
 app.use('/api/temporadas', temporadaRoutes);
+app.use('/api/logs', logRoutes);
 
 // Tratamento central de erro — sempre por último, depois de todas as rotas.
 app.use(errorHandler);
@@ -102,13 +105,27 @@ if (require.main === module) {
     // interferir no runner de testes, que tem o tratamento dele.
     process.on('unhandledRejection', (motivo) => {
         console.error('Promise rejeitada sem tratamento:', motivo);
+        logService.registrarErro({
+            mensagem: motivo?.message ?? String(motivo),
+            stack: motivo?.stack ?? null,
+            origem: 'unhandledRejection',
+        }).catch(() => {});
     });
 
     process.on('uncaughtException', (erro) => {
         console.error('Exceção não capturada:', erro);
+        // Tenta registrar o erro, mas nunca espera mais que 2s por isso — o
+        // motivo mais comum de uncaughtException é falha de conexão com o
+        // banco, e a própria escrita do log pode nunca responder.
+        const tentativaDeLog = logService.registrarErro({
+            mensagem: erro?.message ?? String(erro),
+            stack: erro?.stack ?? null,
+            origem: 'uncaughtException',
+        }).catch(() => {});
+        const limite = new Promise((resolve) => setTimeout(resolve, 2000));
         // Estado do processo passa a ser incerto: encerra e deixa o supervisor
         // (PM2/Docker) subir de novo, em vez de seguir rodando quebrado.
-        process.exit(1);
+        Promise.race([tentativaDeLog, limite]).finally(() => process.exit(1));
     });
 }
 

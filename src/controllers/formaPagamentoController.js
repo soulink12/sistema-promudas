@@ -23,7 +23,7 @@ const criarForma = async (req, res, next) => {
             parcelado_em_ate: parcelado_em_ate ?? 1,
             escambo: escambo ?? false,
             valor_kg_escambo: valor_kg_escambo ?? null,
-        });
+        }, req.usuarioId);
         res.status(201).json(nova);
     } catch (erro) {
         next(erro);
@@ -43,7 +43,7 @@ const atualizarForma = async (req, res, next) => {
         if (parcelado_em_ate !== undefined) dados.parcelado_em_ate = parcelado_em_ate;
         if (escambo !== undefined) dados.escambo = escambo;
         if (valor_kg_escambo !== undefined) dados.valor_kg_escambo = valor_kg_escambo;
-        const atualizada = await formaPagamentoService.atualizarForma(id, dados);
+        const atualizada = await formaPagamentoService.atualizarForma(id, dados, req.usuarioId);
         res.status(200).json(atualizada);
     } catch (erro) {
         next(erro);
@@ -53,7 +53,7 @@ const atualizarForma = async (req, res, next) => {
 const deletarForma = async (req, res, next) => {
     try {
         const id = parseInt(req.params.id);
-        await formaPagamentoService.deletarForma(id);
+        await formaPagamentoService.deletarForma(id, req.usuarioId);
         res.status(204).send();
     } catch (erro) {
         next(erro);

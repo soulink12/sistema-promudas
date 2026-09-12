@@ -1,6 +1,7 @@
 const prisma = require('../config/database');
 const BusinessError = require('../utils/BusinessError');
 const { limpar, validar } = require('../utils/cpfCnpj');
+const logService = require('./logService');
 
 // Normaliza cpf_cnpj para só dígitos, valida o dígito verificador e checa
 // duplicidade. `idExcluir` evita que um cliente colida consigo mesmo ao
@@ -77,13 +78,21 @@ const normalizarTelefones = (dados) => {
     }
 };
 
-const criarCliente = async (dadosCliente) => {
+const criarCliente = async (dadosCliente, usuarioId = null) => {
     const dados = filtrarCamposCliente(dadosCliente);
     await normalizarCpfCnpj(dados);
     normalizarCep(dados);
     normalizarTelefones(dados);
-    const novoCliente = await prisma.clientes.create({
-        data: dados
+    const novoCliente = await prisma.$transaction(async (tx) => {
+        const cliente = await tx.clientes.create({ data: dados });
+        await logService.registrarAtividade(tx, {
+            usuarioId,
+            acao: 'criacao',
+            entidade: 'cliente',
+            entidadeId: cliente.id,
+            snapshot: cliente,
+        });
+        return cliente;
     });
     return novoCliente.id;
 };
@@ -126,21 +135,41 @@ const buscarCliente = async (id) => {
     });
 };
 
-const atualizarCliente = async (id, dadosCliente) => {
+const atualizarCliente = async (id, dadosCliente, usuarioId = null) => {
   const dados = filtrarCamposCliente(dadosCliente);
   await normalizarCpfCnpj(dados, parseInt(id));
   normalizarCep(dados);
   normalizarTelefones(dados);
-  return await prisma.clientes.update({
-    where: { id: parseInt(id) },
-    data: dados,
+  return await prisma.$transaction(async (tx) => {
+    const cliente = await tx.clientes.update({
+      where: { id: parseInt(id) },
+      data: dados,
+    });
+    await logService.registrarAtividade(tx, {
+      usuarioId,
+      acao: 'atualizacao',
+      entidade: 'cliente',
+      entidadeId: cliente.id,
+      snapshot: cliente,
+    });
+    return cliente;
   });
 };
 
-const eliminarCliente = async (id) => {
-  return await prisma.clientes.update({
-    where: { id: parseInt(id) },
-    data: {ativo: false}
+const eliminarCliente = async (id, usuarioId = null) => {
+  return await prisma.$transaction(async (tx) => {
+    const cliente = await tx.clientes.update({
+      where: { id: parseInt(id) },
+      data: {ativo: false}
+    });
+    await logService.registrarAtividade(tx, {
+      usuarioId,
+      acao: 'exclusao',
+      entidade: 'cliente',
+      entidadeId: cliente.id,
+      snapshot: cliente,
+    });
+    return cliente;
   });
 };
 

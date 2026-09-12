@@ -9,7 +9,7 @@ const criarCliente = async (req, res, next) => {
             return res.status(400).json({ erro: 'O campo nome é obrigatório.' });
         }
 
-        const novoId = await clienteService.criarCliente(dados);
+        const novoId = await clienteService.criarCliente(dados, req.usuarioId);
         return res.status(201).json({ mensagem: 'Cliente criado com sucesso!', id: novoId });
 
     } catch (erro) {
@@ -38,7 +38,7 @@ const buscarCliente = async (req, res, next) => {
 
 const atualizarCliente = async (req, res, next) => {
     try {
-        const cliente = await clienteService.atualizarCliente(req.params.id, req.body);
+        const cliente = await clienteService.atualizarCliente(req.params.id, req.body, req.usuarioId);
         res.json(cliente);
     } catch (erro) {
         next(erro);
@@ -47,7 +47,7 @@ const atualizarCliente = async (req, res, next) => {
 
 const eliminarCliente = async (req, res, next) => {
     try {
-        await clienteService.eliminarCliente(req.params.id);
+        await clienteService.eliminarCliente(req.params.id, req.usuarioId);
         res.status(204).send();
     } catch (erro) {
         next(erro);

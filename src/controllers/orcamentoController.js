@@ -13,7 +13,7 @@ const criarOrcamento = async (req, res, next) => {
             });
         }
 
-        const novoOrcamento = await orcamentoService.criarOrcamento(dados);
+        const novoOrcamento = await orcamentoService.criarOrcamento(dados, req.usuarioId);
         orcamentoService.notificarOrcamento(novoOrcamento.id, 'orcamentoCriado')
             .catch((erro) => console.error('Falha ao notificar criação do orçamento:', erro));
         return res.status(201).json({
@@ -53,7 +53,7 @@ const listarOrcamentos = async (req, res, next) => {
 
 const atualizarOrcamento = async (req, res, next) => {
     try {
-        const orcamento = await orcamentoService.atualizarOrcamento(req.params.id, req.body);
+        const orcamento = await orcamentoService.atualizarOrcamento(req.params.id, req.body, req.usuarioId);
         orcamentoService.notificarOrcamento(orcamento.id, 'orcamentoAlterado')
             .catch((erro) => console.error('Falha ao notificar alteração do orçamento:', erro));
         res.json(orcamento);
@@ -64,7 +64,7 @@ const atualizarOrcamento = async (req, res, next) => {
 
 const eliminarOrcamento = async (req, res, next) => {
     try {
-        await orcamentoService.eliminarOrcamento(req.params.id);
+        await orcamentoService.eliminarOrcamento(req.params.id, req.usuarioId);
         res.status(204).send();
     } catch (erro) {
         next(erro);
@@ -94,7 +94,7 @@ const enviarEmail = async (req, res, next) => {
 
 const aprovarOrcamento = async (req, res, next) => {
     try {
-        const orcamento = await orcamentoService.aprovarOrcamento(req.params.id, req.body);
+        const orcamento = await orcamentoService.aprovarOrcamento(req.params.id, req.body, req.usuarioId);
         pedidoService.notificarPedido(orcamento.pedido_id, 'orcamentoAprovado')
             .catch((erro) => console.error('Falha ao notificar aprovação do orçamento:', erro));
         res.json(orcamento);
@@ -105,7 +105,7 @@ const aprovarOrcamento = async (req, res, next) => {
 
 const recusarOrcamento = async (req, res, next) => {
     try {
-        const orcamento = await orcamentoService.recusarOrcamento(req.params.id);
+        const orcamento = await orcamentoService.recusarOrcamento(req.params.id, req.usuarioId);
         orcamentoService.notificarOrcamento(orcamento.id, 'orcamentoRecusado')
             .catch((erro) => console.error('Falha ao notificar recusa do orçamento:', erro));
         res.json(orcamento);

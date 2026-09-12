@@ -5,6 +5,7 @@ const emailService = require('./emailService');
 const telegramService = require('./telegramService');
 const pedidoService = require('./pedidoService');
 const pagamentoService = require('./pagamentoService');
+const logService = require('./logService');
 const { formatarNumeroOrcamento } = require('../utils/numeroOrcamento');
 const { retryColisao } = require('../utils/retryColisao');
 const BusinessError = require('../utils/BusinessError');
@@ -16,7 +17,7 @@ const ORCAMENTO_INCLUDE = {
     }
 };
 
-const criarOrcamento = async (dados) => {
+const criarOrcamento = async (dados, usuarioId = null) => {
     // valor_total é sempre recalculado a partir dos itens (não confia no
     // cliente), mesma lógica de pedidoService.criarPedidoTx.
     const subtotal = dados.itens.reduce(
@@ -25,29 +26,47 @@ const criarOrcamento = async (dados) => {
     );
     const ajuste = Number(dados.ajuste ?? 0);
 
-    return await prisma.orcamentos.create({
-        data: {
-            clientes: {
-                connect: { id: parseInt(dados.cliente_id) }
-            },
-            valor_total: subtotal + ajuste,
-            ajuste: dados.ajuste ?? null,
-            observacoes: dados.observacoes,
-            data_orcamento: new Date(),
-            status: 'Pendente',
-            ativo: true,
+    return await prisma.$transaction(async (tx) => {
+        const orcamento = await tx.orcamentos.create({
+            data: {
+                clientes: {
+                    connect: { id: parseInt(dados.cliente_id) }
+                },
+                valor_total: subtotal + ajuste,
+                ajuste: dados.ajuste ?? null,
+                observacoes: dados.observacoes,
+                data_orcamento: new Date(),
+                status: 'Pendente',
+                ativo: true,
 
-            itens_orcamento: {
-                create: dados.itens.map(item => ({
-                    produto_id: parseInt(item.produto_id),
-                    quantidade: parseInt(item.quantidade),
-                    valor_unitario: item.valor_unitario
-                }))
+                itens_orcamento: {
+                    create: dados.itens.map(item => ({
+                        produto_id: parseInt(item.produto_id),
+                        quantidade: parseInt(item.quantidade),
+                        valor_unitario: item.valor_unitario
+                    }))
+                }
+            },
+            // Mesmo formato de itens usado nas demais snapshots de orçamento
+            // (ORCAMENTO_INCLUDE) — sem isso, o diff de histórico compararia
+            // itens com/sem `produtos.nome` e marcaria todo item como
+            // "alterado" só por causa da forma do JSON, não do conteúdo.
+            include: {
+                itens_orcamento: {
+                    include: { produtos: { select: { nome: true } } }
+                }
             }
-        },
-        include: {
-            itens_orcamento: true
-        }
+        });
+
+        await logService.registrarAtividade(tx, {
+            usuarioId,
+            acao: 'criacao',
+            entidade: 'orcamento',
+            entidadeId: orcamento.id,
+            snapshot: orcamento,
+        });
+
+        return orcamento;
     });
 };
 
@@ -88,7 +107,7 @@ const buscarOrcamento = async (id) => {
 // Edita um orçamento pendente (cliente, itens, ajuste, observações). Recalcula
 // o valor_total a partir dos itens+ajuste, como a edição de pedido faz.
 // Bloqueia edição de orçamento já aprovado/rejeitado.
-const atualizarOrcamento = async (id, dados) => {
+const atualizarOrcamento = async (id, dados, usuarioId = null) => {
     const orcamentoAtual = await prisma.orcamentos.findUnique({
         where: { id: parseInt(id) },
         select: { status: true, ajuste: true },
@@ -104,10 +123,20 @@ const atualizarOrcamento = async (id, dados) => {
     const camposOrcamento = normalizarDatas(camposBrutos, ['data_orcamento']);
 
     if (!itens) {
-        return await prisma.orcamentos.update({
-            where: { id: parseInt(id) },
-            data: camposOrcamento,
-            include: ORCAMENTO_INCLUDE,
+        return await prisma.$transaction(async (tx) => {
+            const orcamento = await tx.orcamentos.update({
+                where: { id: parseInt(id) },
+                data: camposOrcamento,
+                include: ORCAMENTO_INCLUDE,
+            });
+            await logService.registrarAtividade(tx, {
+                usuarioId,
+                acao: 'atualizacao',
+                entidade: 'orcamento',
+                entidadeId: orcamento.id,
+                snapshot: orcamento,
+            });
+            return orcamento;
         });
     }
 
@@ -123,7 +152,7 @@ const atualizarOrcamento = async (id, dados) => {
     return await prisma.$transaction(async (tx) => {
         await tx.itens_orcamento.deleteMany({ where: { orcamento_id: parseInt(id) } });
 
-        return await tx.orcamentos.update({
+        const orcamento = await tx.orcamentos.update({
             where: { id: parseInt(id) },
             data: {
                 ...camposOrcamento,
@@ -138,13 +167,34 @@ const atualizarOrcamento = async (id, dados) => {
             },
             include: ORCAMENTO_INCLUDE,
         });
+
+        await logService.registrarAtividade(tx, {
+            usuarioId,
+            acao: 'atualizacao',
+            entidade: 'orcamento',
+            entidadeId: orcamento.id,
+            snapshot: orcamento,
+        });
+
+        return orcamento;
     });
 };
 
-const eliminarOrcamento = async (id) => {
-    return await prisma.orcamentos.update({
-        where: { id: parseInt(id) },
-        data: { ativo: false }
+const eliminarOrcamento = async (id, usuarioId = null) => {
+    return await prisma.$transaction(async (tx) => {
+        const orcamento = await tx.orcamentos.update({
+            where: { id: parseInt(id) },
+            data: { ativo: false },
+            include: { itens_orcamento: { include: { produtos: { select: { nome: true } } } } },
+        });
+        await logService.registrarAtividade(tx, {
+            usuarioId,
+            acao: 'exclusao',
+            entidade: 'orcamento',
+            entidadeId: orcamento.id,
+            snapshot: orcamento,
+        });
+        return orcamento;
     });
 };
 
@@ -160,7 +210,7 @@ const eliminarOrcamento = async (id) => {
 // Mesma corrida de numero_temporada de pedidoService.criarPedido (a aprovação
 // cria um pedido de verdade via criarPedidoTx) — retryColisao tenta de novo
 // em vez de propagar um 500 por uma colisão que se resolve sozinha na repetição.
-const aprovarOrcamento = async (id, dados = {}) => {
+const aprovarOrcamento = async (id, dados = {}, usuarioId = null) => {
     const pagamentos = Array.isArray(dados.pagamentos) ? dados.pagamentos : [];
 
     const resultado = await retryColisao(() => prisma.$transaction(async (tx) => {
@@ -186,13 +236,23 @@ const aprovarOrcamento = async (id, dados = {}) => {
                 valor_unitario: item.valor_unitario,
             })),
             pagamentos,
-        });
+        }, usuarioId);
 
-        return await tx.orcamentos.update({
+        const orcamentoAprovado = await tx.orcamentos.update({
             where: { id: parseInt(id) },
             data: { status: 'Aprovado', pedido_id: pedido.id },
             include: ORCAMENTO_INCLUDE,
         });
+
+        await logService.registrarAtividade(tx, {
+            usuarioId,
+            acao: 'aprovacao',
+            entidade: 'orcamento',
+            entidadeId: orcamentoAprovado.id,
+            snapshot: orcamentoAprovado,
+        });
+
+        return orcamentoAprovado;
     }));
 
     // recalcularStatusPedido lê pelo client Prisma "de fora" (não pelo `tx`),
@@ -208,7 +268,7 @@ const aprovarOrcamento = async (id, dados = {}) => {
     // pela API. Pior consequência de só logar: status_pagamento fica
     // desatualizado até a próxima edição/pagamento recalcular.
     try {
-        await pagamentoService.recalcularStatusPedido(resultado.pedido_id);
+        await pagamentoService.recalcularStatusPedido(resultado.pedido_id, usuarioId);
     } catch (erro) {
         console.error(`Falha ao recalcular status do pedido ${resultado.pedido_id} (orçamento já aprovado com sucesso):`, erro);
     }
@@ -216,7 +276,7 @@ const aprovarOrcamento = async (id, dados = {}) => {
     return resultado;
 };
 
-const recusarOrcamento = async (id) => {
+const recusarOrcamento = async (id, usuarioId = null) => {
     const orcamento = await prisma.orcamentos.findUnique({
         where: { id: parseInt(id) },
         select: { status: true },
@@ -227,9 +287,20 @@ const recusarOrcamento = async (id) => {
     if (orcamento.status !== 'Pendente') {
         throw new BusinessError('Este orçamento já foi aprovado ou recusado.');
     }
-    return await prisma.orcamentos.update({
-        where: { id: parseInt(id) },
-        data: { status: 'Rejeitado' },
+    return await prisma.$transaction(async (tx) => {
+        const atualizado = await tx.orcamentos.update({
+            where: { id: parseInt(id) },
+            data: { status: 'Rejeitado' },
+            include: { itens_orcamento: { include: { produtos: { select: { nome: true } } } } },
+        });
+        await logService.registrarAtividade(tx, {
+            usuarioId,
+            acao: 'recusa',
+            entidade: 'orcamento',
+            entidadeId: atualizado.id,
+            snapshot: atualizado,
+        });
+        return atualizado;
     });
 };
 

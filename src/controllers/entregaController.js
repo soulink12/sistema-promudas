@@ -10,7 +10,7 @@ const criarEntrega = async (req, res, next) => {
             });
         }
 
-        const id = await entregaService.criarEntrega(req.body);
+        const id = await entregaService.criarEntrega(req.body, req.usuarioId);
         res.status(201).json({ mensagem: 'Entrega criada com sucesso', id });
     } catch (erro) {
         next(erro);
@@ -29,7 +29,7 @@ const listarEntregas = async (req, res, next) => {
 const atualizarEntrega = async (req, res, next) => {
     try {
         const { id } = req.params;
-        await entregaService.atualizarEntrega(id, req.body);
+        await entregaService.atualizarEntrega(id, req.body, req.usuarioId);
         res.status(200).json({ mensagem: 'Entrega atualizada com sucesso' });
     } catch (erro) {
         next(erro);
@@ -39,7 +39,7 @@ const atualizarEntrega = async (req, res, next) => {
 const eliminarEntrega = async (req, res, next) => {
     try {
         const { id } = req.params;
-        await entregaService.eliminarEntrega(id);
+        await entregaService.eliminarEntrega(id, req.usuarioId);
         res.status(200).json({ mensagem: 'Entrega apagada com sucesso' });
     } catch (erro) {
         next(erro);

@@ -2,6 +2,7 @@ const prisma = require('../config/database');
 const BusinessError = require('../utils/BusinessError');
 const { normalizarDatas } = require('../utils/parseData');
 const { recalcularStatusPedido } = require('./pagamentoService');
+const logService = require('./logService');
 
 // Cheques ainda não depositados (data_deposito null), de pedidos ativos.
 // Alimenta a notificação "cheques a depositar".
@@ -33,7 +34,7 @@ const listarChequesADepositar = async () => {
 
 // Atualiza um cheque. Usado tanto para corrigir dados (número/banco/agência/conta)
 // quanto para registrar o depósito (informando data_deposito → marca depositado).
-const atualizarCheque = async (id, dados) => {
+const atualizarCheque = async (id, dados, usuarioId = null) => {
     const cheque = await prisma.cheques.findUnique({ where: { id: parseInt(id) } });
     if (!cheque) throw new BusinessError('Cheque não encontrado.', 404);
 
@@ -68,11 +69,28 @@ const atualizarCheque = async (id, dados) => {
         });
 
         if (conta !== undefined) {
-            await tx.pagamentos.update({
+            const pagamentoAtualizado = await tx.pagamentos.update({
                 where: { id: cheque.pagamento_id },
                 data: { conta },
             });
+            // Antes só o cheque virava evento — a conta do pagamento pai
+            // mudando junto ficava invisível no histórico do pagamento.
+            await logService.registrarAtividade(tx, {
+                usuarioId,
+                acao: 'atualizacao_automatica',
+                entidade: 'pagamento',
+                entidadeId: pagamentoAtualizado.id,
+                snapshot: pagamentoAtualizado,
+            });
         }
+
+        await logService.registrarAtividade(tx, {
+            usuarioId,
+            acao: 'atualizacao',
+            entidade: 'cheque',
+            entidadeId: chequeAtualizado.id,
+            snapshot: chequeAtualizado,
+        });
 
         return chequeAtualizado;
     });
@@ -83,7 +101,7 @@ const atualizarCheque = async (id, dados) => {
         where: { id: cheque.pagamento_id },
         select: { pedido_id: true },
     });
-    if (pagamento?.pedido_id) await recalcularStatusPedido(pagamento.pedido_id);
+    if (pagamento?.pedido_id) await recalcularStatusPedido(pagamento.pedido_id, usuarioId);
 
     return atualizado;
 };
