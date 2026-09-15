@@ -174,7 +174,7 @@ const gerarRelatorioPDF = async ({ de, ate, forma }) => {
 
         // ── CABEÇALHO ──────────────────────────────────────────────────────
         doc.font('Helvetica-Bold').fontSize(20).fillColor('#1b5e20')
-            .text('Viveiro Promudas', { align: 'center' });
+            .text('Viveiro ProMudas', { align: 'center' });
         doc.font('Helvetica').fontSize(10).fillColor('#555555')
             .text('Relatório de Pagamentos', { align: 'center' });
         doc.fillColor('black');
@@ -319,7 +319,7 @@ const gerarRelatorioPDF = async ({ de, ate, forma }) => {
         linhaHorizontal(doc);
         doc.moveDown(0.4);
         doc.font('Helvetica').fontSize(8).fillColor('#aaaaaa')
-            .text(`Viveiro Promudas — documento gerado em ${formatarData(new Date())}`, { align: 'center' });
+            .text(`Viveiro ProMudas — documento gerado em ${formatarData(new Date())}`, { align: 'center' });
 
         doc.end();
     });
@@ -420,7 +420,7 @@ const gerarRelatorioPedidosPDF = async ({ de, ate, statusPagamento, statusEntreg
 
         // ── CABEÇALHO ──────────────────────────────────────────────────────
         doc.font('Helvetica-Bold').fontSize(20).fillColor('#1b5e20')
-            .text('Viveiro Promudas', { align: 'center' });
+            .text('Viveiro ProMudas', { align: 'center' });
         doc.font('Helvetica').fontSize(10).fillColor('#555555')
             .text('Relatório de Pedidos', { align: 'center' });
         doc.fillColor('black');
@@ -669,7 +669,7 @@ const gerarRelatorioPedidosPDF = async ({ de, ate, statusPagamento, statusEntreg
 
         // ── RODAPÉ ─────────────────────────────────────────────────────────
         doc.font('Helvetica').fontSize(8).fillColor('#aaaaaa')
-            .text(`Viveiro Promudas — documento gerado em ${formatarData(new Date())}`, { align: 'center' });
+            .text(`Viveiro ProMudas — documento gerado em ${formatarData(new Date())}`, { align: 'center' });
 
         doc.end();
     });
