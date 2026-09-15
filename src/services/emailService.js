@@ -17,7 +17,7 @@ const getResend = () => {
 // de saída; quando passar a receber respostas, este texto sai.
 const AVISO_AUTOMATICO =
     'Este é um e-mail automático e esta caixa não recebe respostas. '
-    + 'Para falar com a gente, procure o Viveiro Promudas pelos canais de atendimento.';
+    + 'Para falar com a gente, procure o Viveiro ProMudas pelos canais de atendimento.';
 
 // Catálogo dos eventos que disparam e-mail.
 //   `titulo`  — assunto da mensagem (o número do documento é acrescentado).

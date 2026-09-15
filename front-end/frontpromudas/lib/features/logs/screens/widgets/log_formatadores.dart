@@ -7,6 +7,7 @@ import '../../../../core/utils/formatadores.dart';
 const Map<String, String> _rotulosEntidade = {
   'pedido': 'Pedido',
   'orcamento': 'Orçamento',
+  'interessado': 'Interessado',
   'cliente': 'Cliente',
   'produto': 'Produto',
   'pagamento': 'Pagamento',
@@ -122,6 +123,7 @@ const Map<String, String> _rotulosCampoEspeciais = {
   'itens_pedido': 'Itens do pedido',
   'itens_orcamento': 'Itens do orçamento',
   'itens_entrega': 'Itens da entrega',
+  'itens_interesse': 'Mudas de interesse',
 };
 
 /// Humaniza o nome cru de um campo (snake_case) pra exibição, ex.

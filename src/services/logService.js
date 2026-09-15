@@ -132,7 +132,7 @@ const CAMPOS_IGNORADOS_DIFF = new Set(['criado_em', 'atualizado_em', 'id']);
 // `include` pra exibição (rotuloItem no front) — comparar esse objeto fazia
 // o item aparecer como "alterado" sempre que o PRODUTO fosse renomeado em
 // outro lugar, mesmo sem nenhuma mudança real no pedido/orçamento.
-const CAMPOS_IGNORADOS_ITEM = new Set([...CAMPOS_IGNORADOS_DIFF, 'pedido_id', 'orcamento_id', 'produtos']);
+const CAMPOS_IGNORADOS_ITEM = new Set([...CAMPOS_IGNORADOS_DIFF, 'pedido_id', 'orcamento_id', 'interessado_id', 'produtos']);
 
 // "Lista de itens" reconhecível (itens_pedido, itens_orcamento): array onde
 // cada elemento é um objeto com `produto_id` — permite comparar item a item

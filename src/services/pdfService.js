@@ -1,3 +1,4 @@
+const path = require('path');
 const PDFDocument = require('pdfkit');
 const prisma = require('../config/database');
 const BusinessError = require('../utils/BusinessError');
@@ -14,6 +15,16 @@ const ESCALA_FONTE = 1.25;
 const fs = (n) => n * ESCALA_FONTE;
 
 const formatarCep = (cep) => (cep && cep.length === 8 ? `${cep.slice(0, 5)}-${cep.slice(5)}` : cep);
+
+const LOGO_PATH = path.join(__dirname, '../assets/logo-promudas.png');
+const LOGO_ALTURA_LARGURA = 448 / 509; // proporção original do arquivo
+
+// Desenha o logo do viveiro centralizado no topo do documento
+const desenharLogoTopo = (doc, largura = 110) => {
+    const x = 50 + (495 - largura) / 2;
+    doc.image(LOGO_PATH, x, doc.y, { width: largura });
+    doc.y += largura * LOGO_ALTURA_LARGURA;
+};
 
 // Nome e telefone seguem no PDF o mesmo padrão de exibição das telas do app
 // (capitalizarNome/formatarTelefone em core/utils/formatadores.dart) — o valor
@@ -245,7 +256,7 @@ const desenharRodape = (doc) => {
     doc.strokeColor('black').lineWidth(1);
 
     doc.font('Helvetica').fontSize(fs(8)).fillColor('#aaaaaa')
-        .text(`Viveiro Promudas — documento gerado em ${formatarData(new Date())}`,
+        .text(`Viveiro ProMudas — documento gerado em ${formatarData(new Date())}`,
             50, y + 6, { width: 495, align: 'right' });
     doc.fillColor('black');
 };
@@ -308,8 +319,8 @@ const gerarPedidoPDF = async (pedidoId, copias = 1) => {
         const desenharPedido = () => {
         // ── CABEÇALHO ──────────────────────────────────────────────────────────
 
-        doc.font('Helvetica-Bold').fontSize(fs(20)).fillColor('#1b5e20')
-            .text('Viveiro Promudas', { align: 'center' });
+        desenharLogoTopo(doc);
+        doc.moveDown(0.3);
         doc.font('Helvetica').fontSize(fs(10)).fillColor('#555555')
             .text('Recibo de Pedido', { align: 'center' });
         doc.fillColor('black');
@@ -583,8 +594,8 @@ const gerarOrcamentoPDF = async (orcamentoId) => {
 
         // ── CABEÇALHO ──────────────────────────────────────────────────────────
 
-        doc.font('Helvetica-Bold').fontSize(fs(20)).fillColor('#1b5e20')
-            .text('Viveiro Promudas', { align: 'center' });
+        desenharLogoTopo(doc);
+        doc.moveDown(0.3);
         doc.font('Helvetica').fontSize(fs(10)).fillColor('#555555')
             .text('Orçamento', { align: 'center' });
         doc.fillColor('black');
