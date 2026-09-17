@@ -44,6 +44,36 @@ const normalizarCep = (dados) => {
     dados.cep = valorLimpo;
 };
 
+// Formato do ID da Temporada: "<temporada>-<sequencial>", ambos numéricos
+// (ex.: 27-1) — é o número que o viveiro já usava no controle em papel.
+const FORMATO_ID_TEMPORADA = /^\d+-\d+$/;
+
+// Normaliza id_temporada (texto livre digitado à mão), valida o formato
+// "NN-XXX" e checa duplicidade — mesmo padrão de normalizarCpfCnpj. Não faz
+// nada se a chave nem foi enviada no body (undefined); string vazia/null
+// limpa o campo.
+const normalizarIdTemporada = async (dados, idExcluir) => {
+    if (dados.id_temporada === undefined) return;
+    const valor = String(dados.id_temporada ?? '').trim();
+    if (!valor) {
+        dados.id_temporada = null;
+        return;
+    }
+    if (!FORMATO_ID_TEMPORADA.test(valor)) {
+        throw new BusinessError('ID da Temporada inválido. Use o formato "27-1" (temporada-sequencial).');
+    }
+    const existente = await prisma.clientes.findFirst({
+        where: {
+            id_temporada: valor,
+            ...(idExcluir ? { id: { not: idExcluir } } : {}),
+        },
+    });
+    if (existente) {
+        throw new BusinessError('Já existe um cliente cadastrado com esse ID de Temporada.');
+    }
+    dados.id_temporada = valor;
+};
+
 // Campos que o cliente da API pode gravar. Fora daqui ficam `saldo_credito`
 // (só o backend mexe, ao editar pedido pago) e `ativo` (gerido pelo
 // soft-delete): antes o req.body ia inteiro pro Prisma, então um PUT com
@@ -52,6 +82,7 @@ const CAMPOS_CLIENTE_EDITAVEIS = [
     'nome',
     'cpf_cnpj',
     'inscricao_estadual',
+    'id_temporada',
     'telefone_1',
     'telefone_2',
     'email',
@@ -81,6 +112,7 @@ const normalizarTelefones = (dados) => {
 const criarCliente = async (dadosCliente, usuarioId = null) => {
     const dados = filtrarCamposCliente(dadosCliente);
     await normalizarCpfCnpj(dados);
+    await normalizarIdTemporada(dados);
     normalizarCep(dados);
     normalizarTelefones(dados);
     const novoCliente = await prisma.$transaction(async (tx) => {
@@ -129,6 +161,22 @@ const listarClientes = async (filtros = {}) => {
     return clientes;
 };
 
+// Lista, para a administração, os clientes com ID de Temporada cadastrado,
+// em ordem crescente pelo número que vem DEPOIS do hífen (o sequencial do
+// cliente) — a temporada em si (antes do hífen) é ignorada na ordenação, a
+// pedido do usuário. Sem paginação: é uma conferência completa, não o
+// autocomplete de 20 itens do PDV.
+const listarClientesPorIdTemporada = async () => {
+    const clientes = await prisma.clientes.findMany({
+        where: { ativo: true, id_temporada: { not: null } },
+    });
+    return clientes.sort((a, b) => {
+        const sequencialA = parseInt(a.id_temporada.split('-')[1], 10);
+        const sequencialB = parseInt(b.id_temporada.split('-')[1], 10);
+        return sequencialA - sequencialB;
+    });
+};
+
 const buscarCliente = async (id) => {
     return await prisma.clientes.findUnique({
         where: { id: parseInt(id), ativo: true }
@@ -138,6 +186,7 @@ const buscarCliente = async (id) => {
 const atualizarCliente = async (id, dadosCliente, usuarioId = null) => {
   const dados = filtrarCamposCliente(dadosCliente);
   await normalizarCpfCnpj(dados, parseInt(id));
+  await normalizarIdTemporada(dados, parseInt(id));
   normalizarCep(dados);
   normalizarTelefones(dados);
   return await prisma.$transaction(async (tx) => {
@@ -176,6 +225,7 @@ const eliminarCliente = async (id, usuarioId = null) => {
 module.exports = {
     criarCliente,
     listarClientes,
+    listarClientesPorIdTemporada,
     buscarCliente,
     atualizarCliente,
     eliminarCliente

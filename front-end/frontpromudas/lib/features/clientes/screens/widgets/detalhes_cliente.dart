@@ -100,6 +100,7 @@ class DetalhesCliente extends StatelessWidget {
                             : null,
                       ),
                       ('Inscrição Estadual', c['inscricao_estadual']),
+                      ('ID da Temporada', c['id_temporada']),
                     ]),
                     _secao(context, 'Contato', [
                       ('Telefone', formatarTelefone(c['telefone_1'] as String?)),

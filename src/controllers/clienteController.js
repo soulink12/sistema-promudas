@@ -26,6 +26,15 @@ const listarClientes = async (req, res, next) => {
     }
 };
 
+const listarClientesPorIdTemporada = async (req, res, next) => {
+    try {
+        const clientes = await clienteService.listarClientesPorIdTemporada();
+        return res.status(200).json(clientes);
+    } catch (erro) {
+        next(erro);
+    }
+};
+
 const buscarCliente = async (req, res, next) => {
     try {
         const cliente = await clienteService.buscarCliente(req.params.id);
@@ -57,6 +66,7 @@ const eliminarCliente = async (req, res, next) => {
 module.exports = {
     criarCliente,
     listarClientes,
+    listarClientesPorIdTemporada,
     buscarCliente,
     atualizarCliente,
     eliminarCliente

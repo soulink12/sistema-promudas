@@ -5,6 +5,7 @@ import '../../configuracoes/screens/configuracoes_sistema_screen.dart';
 import '../../relatorios/screens/relatorios_hub_screen.dart';
 import '../../notificacoes/screens/notificacoes_screen.dart';
 import '../../clientes/screens/clientes_screen.dart';
+import '../../clientes/screens/clientes_por_temporada_screen.dart';
 import '../../pedidos/screens/pedidos_screen.dart';
 import '../../logs/screens/logs_screen.dart';
 import '../../logs/screens/logs_erros_screen.dart';
@@ -88,6 +89,14 @@ class _TelaAdminState extends State<TelaAdmin> {
             titulo: 'Clientes',
             descricao: 'Consultar, cadastrar e editar clientes.',
             onTap: () => _abrir(const TelaListaClientes()),
+          ),
+          const SizedBox(height: 12),
+          _CardAdmin(
+            icon: Icons.tag,
+            titulo: 'Clientes por ID de Temporada',
+            descricao:
+                'Lista, em ordem crescente, dos clientes com ID de Temporada cadastrado.',
+            onTap: () => _abrir(const TelaClientesPorTemporada()),
           ),
           const SizedBox(height: 12),
           _CardAdmin(

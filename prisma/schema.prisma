@@ -10,6 +10,7 @@ model clientes {
   id                 Int       @id @default(autoincrement())
   cpf_cnpj           String?   @unique @db.VarChar(20)
   inscricao_estadual String?   @db.VarChar(30)
+  id_temporada       String?   @unique @db.VarChar(20)
   nome               String    @db.VarChar(100)
   telefone_1         String?   @db.VarChar(20)
   telefone_2         String?   @db.VarChar(20)

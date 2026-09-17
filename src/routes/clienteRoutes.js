@@ -8,6 +8,10 @@ router.post('/', clienteController.criarCliente);
 // Rota para listar os clientes (GET)
 router.get('/', clienteController.listarClientes);
 
+// Rota de administração: clientes com ID de Temporada, em ordem crescente.
+// Precisa vir antes de '/:id' para não ser capturada como id.
+router.get('/por-temporada', clienteController.listarClientesPorIdTemporada);
+
 // Rota para buscar um cliente específico (GET)
 router.get('/:id', clienteController.buscarCliente);
 

@@ -30,6 +30,7 @@ class _FormEdicaoClienteState extends State<FormEdicaoCliente> {
   late final TextEditingController _nome;
   late final TextEditingController _cpf;
   late final TextEditingController _inscricao;
+  late final TextEditingController _idTemporada;
   late final TextEditingController _tel1;
   late final TextEditingController _tel2;
   late final TextEditingController _email;
@@ -50,6 +51,9 @@ class _FormEdicaoClienteState extends State<FormEdicaoCliente> {
     );
     _inscricao = TextEditingController(
       text: c['inscricao_estadual'] as String? ?? '',
+    );
+    _idTemporada = TextEditingController(
+      text: c['id_temporada'] as String? ?? '',
     );
     _tel1 = TextEditingController(
       text: formatarTelefone(c['telefone_1'] as String?),
@@ -72,6 +76,7 @@ class _FormEdicaoClienteState extends State<FormEdicaoCliente> {
       _nome,
       _cpf,
       _inscricao,
+      _idTemporada,
       _tel1,
       _tel2,
       _email,
@@ -106,6 +111,7 @@ class _FormEdicaoClienteState extends State<FormEdicaoCliente> {
     final cpfLimpo = limparCpfCnpj(_cpf.text);
     body['cpf_cnpj'] = cpfLimpo.isNotEmpty ? cpfLimpo : null;
     add('inscricao_estadual', _inscricao);
+    add('id_temporada', _idTemporada);
     add('telefone_1', _tel1);
     add('telefone_2', _tel2);
     add('email', _email);
@@ -202,6 +208,12 @@ class _FormEdicaoClienteState extends State<FormEdicaoCliente> {
                   validator: validarCampoCpfCnpj,
                 ),
                 _campo(_inscricao, 'Inscrição Estadual', limite: 30),
+                _campo(
+                  _idTemporada,
+                  'ID da Temporada',
+                  limite: 20,
+                  validator: _validarIdTemporada,
+                ),
                 _subtitulo(context, 'Contato'),
                 _campo(_tel1, 'Telefone',
                         keyboardType: TextInputType.phone,
@@ -257,6 +269,15 @@ String? _validarEmail(String? v) {
   if (texto.isEmpty) return null;
   final valido = RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$').hasMatch(texto);
   return valido ? null : 'E-mail inválido.';
+}
+
+// ID da Temporada é opcional, mas quando preenchido precisa seguir o formato
+// "temporada-sequencial" (ex.: 27-1) — mesmo formato validado no backend.
+String? _validarIdTemporada(String? v) {
+  final texto = v?.trim() ?? '';
+  if (texto.isEmpty) return null;
+  final valido = RegExp(r'^\d+-\d+$').hasMatch(texto);
+  return valido ? null : 'Formato inválido. Use "27-1" (temporada-sequencial).';
 }
 
 // ── Widgets auxiliares ──────────────────────────────────────────────────────
