@@ -7,17 +7,17 @@
     "url": "http://172.28.114.71:6072/updates/app-archive.json"
   },
   "release": {
-    "version": "0.2.3",
-    "buildNumber": 15,
+    "version": "0.2.4",
+    "buildNumber": 16,
     "platform": "windows",
     "channel": "stable",
-    "path": "releases/0.2.3/windows/release.json",
-    "url": "http://172.28.114.71:6072/updates/releases/0.2.3/windows/release.json"
+    "path": "releases/0.2.4/windows/release.json",
+    "url": "http://172.28.114.71:6072/updates/releases/0.2.4/windows/release.json"
   },
   "artifact": {
-    "path": "releases/0.2.3/windows/Frontpromudas-0.2.3-windows.zip",
-    "url": "http://172.28.114.71:6072/updates/releases/0.2.3/windows/Frontpromudas-0.2.3-windows.zip",
-    "sha256": "f81d3ba77e228b4bb9440bfebd6b69cadf9a0e787530d7dee784f21c521716cf",
-    "length": 18122664
+    "path": "releases/0.2.4/windows/Frontpromudas-0.2.4-windows.zip",
+    "url": "http://172.28.114.71:6072/updates/releases/0.2.4/windows/Frontpromudas-0.2.4-windows.zip",
+    "sha256": "4e184c5533fa0dd11dd57e3911d0e279a0d4b737fb5be1a340b60c9d9f954733",
+    "length": 18123026
   }
 }
