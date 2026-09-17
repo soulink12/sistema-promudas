@@ -5,7 +5,7 @@ const BusinessError = require('../utils/BusinessError');
 const formaPagamentoService = require('./formaPagamentoService');
 const { formatarNumeroPedido } = require('../utils/numeroPedido');
 const { formatarNumeroOrcamento } = require('../utils/numeroOrcamento');
-const { formatarMoeda } = require('../utils/moeda');
+const { formatarMoeda, formatarInteiro } = require('../utils/moeda');
 const { formatar: formatarCpfCnpj } = require('../utils/cpfCnpj');
 
 const moeda = formatarMoeda;
@@ -51,15 +51,6 @@ const formatarData = (d) => {
     const hora = String(dt.getHours()).padStart(2, '0');
     const min = String(dt.getMinutes()).padStart(2, '0');
     return `${dia}/${mes}/${dt.getFullYear()}  ${hora}:${min}`;
-};
-
-// Formata só a data (sem hora) — usado em campos @db.Date, como a emissão da nota.
-const formatarSoData = (d) => {
-    if (!d) return '—';
-    const dt = new Date(d);
-    const dia = String(dt.getDate()).padStart(2, '0');
-    const mes = String(dt.getMonth() + 1).padStart(2, '0');
-    return `${dia}/${mes}/${dt.getFullYear()}`;
 };
 
 // Pontos por milímetro (PDFKit trabalha em pontos: 72 pt = 1 polegada = 25,4 mm)
@@ -175,7 +166,7 @@ const desenharItens = (doc, titulo, itens) => {
         doc.font('Helvetica').fontSize(fs(9)).fillColor('black');
         linhaTabela(doc, y, [
             { x: 50, largura: 250, texto: nome },
-            { x: 310, largura: 45, texto: String(qtd), alinhamento: 'center' },
+            { x: 310, largura: 45, texto: formatarInteiro(qtd), alinhamento: 'center' },
             { x: 365, largura: 85, texto: moeda(preco), alinhamento: 'right' },
             { x: 460, largura: 85, texto: moeda(totalItem), alinhamento: 'right' },
         ]);
@@ -219,7 +210,8 @@ const desenharObservacoes = (doc, observacoes) => {
     if (!observacoes || !observacoes.trim()) return;
     linha(doc);
     doc.moveDown(0.5);
-    doc.font('Helvetica-Bold').fontSize(fs(10)).fillColor('#1b5e20').text('OBSERVAÇÕES', { align: 'right' });
+    doc.font('Helvetica-Bold').fontSize(fs(10)).fillColor('#1b5e20')
+        .text('OBSERVAÇÕES', 50, doc.y, { width: 495, align: 'right' });
     doc.fillColor('black');
     doc.moveDown(0.3);
     doc.font('Helvetica').fontSize(fs(9)).fillColor('#333333')
@@ -337,25 +329,27 @@ const gerarPedidoPDF = async (pedidoId, copias = 1) => {
         doc.fillColor('black');
         doc.moveDown(0.4);
 
-        // Status — pagamento e entrega, em linhas rotuladas separadas
+        // Status — pagamento e entrega, em linhas rotuladas separadas.
+        // Rótulo com a mesma fonte/cor das informações do cliente; o valor do
+        // status usa cores mais suaves (menos intensas) que as demais seções.
         const corPagamento = pedido.status_pagamento === 'Pago'
-            ? '#1b5e20'
+            ? '#66bb6a'
             : pedido.status_pagamento === 'Parcial'
-                ? '#e65100'
-                : '#555555';
+                ? '#ffa726'
+                : '#888888';
         const corEntrega = (pedido.status_entrega === 'Realizada' || pedido.status_entrega === 'Entregue')
-            ? '#1b5e20'
+            ? '#66bb6a'
             : pedido.status_entrega === 'Parcial'
-                ? '#e65100'
-                : '#555555';
+                ? '#ffa726'
+                : '#888888';
 
-        doc.font('Helvetica').fontSize(fs(10)).fillColor('black')
+        doc.font('Helvetica').fontSize(fs(9)).fillColor('#555555')
             .text('Status de Pagamento: ', 50, doc.y, { continued: true });
         doc.font('Helvetica-Bold').fillColor(corPagamento).text(pedido.status_pagamento || 'Pendente');
         doc.fillColor('black');
         doc.moveDown(0.2);
 
-        doc.font('Helvetica').fontSize(fs(10)).fillColor('black')
+        doc.font('Helvetica').fontSize(fs(9)).fillColor('#555555')
             .text('Status de Entrega: ', 50, doc.y, { continued: true });
         doc.font('Helvetica-Bold').fillColor(corEntrega).text(pedido.status_entrega || 'Pendente');
         doc.fillColor('black');
@@ -427,21 +421,21 @@ const gerarPedidoPDF = async (pedidoId, copias = 1) => {
                     doc.moveDown(0.4);
                 }
 
-                // Escambo (troca): quantidade de produção recebida em kg
-                if (pag.escambo_quantidade != null) {
-                    doc.font('Helvetica-Oblique').fontSize(fs(8)).fillColor('#666666')
-                        .text(`Pimenta: ${parseFloat(pag.escambo_quantidade)} kg`, 60, doc.y, { width: 470 });
-                    doc.fillColor('black');
-                    doc.moveDown(0.4);
-                }
-
-                // Pagador, quando diferente do cliente
+                // Pagador, quando diferente do cliente (logo abaixo da conta)
                 if (pag.nome_pagador) {
                     const detalhePagador = pag.cpf_cnpj_pagador
                         ? `Pago por: ${pag.nome_pagador} (${pag.cpf_cnpj_pagador})`
                         : `Pago por: ${pag.nome_pagador}`;
                     doc.font('Helvetica-Oblique').fontSize(fs(8)).fillColor('#666666')
                         .text(detalhePagador, 60, doc.y, { width: 470 });
+                    doc.fillColor('black');
+                    doc.moveDown(0.4);
+                }
+
+                // Escambo (troca): quantidade de produção recebida em kg
+                if (pag.escambo_quantidade != null) {
+                    doc.font('Helvetica-Oblique').fontSize(fs(8)).fillColor('#666666')
+                        .text(`Pimenta: ${parseFloat(pag.escambo_quantidade)} kg`, 60, doc.y, { width: 470 });
                     doc.fillColor('black');
                     doc.moveDown(0.4);
                 }
@@ -458,30 +452,16 @@ const gerarPedidoPDF = async (pedidoId, copias = 1) => {
                     doc.fillColor('black');
                     doc.moveDown(0.4);
                 });
-
-                // Nota fiscal — só quando já emitida; pendente não aparece no recibo
-                if (pag.status_nota && pag.status_nota !== 'Pendente') {
-                    const partesNota = [];
-                    if (pag.numero_nota) partesNota.push(`Nota fiscal: ${pag.numero_nota}`);
-                    else partesNota.push('Nota fiscal');
-                    if (pag.status_nota) partesNota.push(`(${pag.status_nota})`);
-                    if (pag.data_emissao_nota) partesNota.push(`emitida em ${formatarSoData(pag.data_emissao_nota)}`);
-                    doc.font('Helvetica-Oblique').fontSize(fs(8)).fillColor('#666666')
-                        .text(partesNota.join(' '), 60, doc.y, { width: 470 });
-                    doc.fillColor('black');
-                    doc.moveDown(0.4);
-                }
             });
         }
 
-        // Crediário (A receber)
+        // Crediário — mesma fonte das linhas de forma de pagamento acima
         if (saldoCredito > 0.005) {
             doc.moveDown(0.3);
             const y = doc.y;
-            doc.font('Helvetica-Bold').fontSize(fs(10)).fillColor('#e65100')
-                .text('A receber (crediário):', 50, y, { lineBreak: false });
+            doc.font('Helvetica').fontSize(fs(9)).fillColor('black')
+                .text('Crediário', 50, y, { lineBreak: false });
             doc.text(moeda(saldoCredito), 460, y, { width: 85, align: 'right' });
-            doc.fillColor('black');
         }
 
         // ── ENTREGAS ────────────────────────────────────────────────────────────
@@ -524,7 +504,7 @@ const gerarPedidoPDF = async (pedidoId, copias = 1) => {
                         { x: 50, largura: 200, texto: nome },
                         { x: 255, largura: 105, texto: local },
                         { x: 365, largura: 120, texto: dia },
-                        { x: 490, largura: 55, texto: `${item.quantidade}x`, alinhamento: 'right' },
+                        { x: 490, largura: 55, texto: `${formatarInteiro(item.quantidade)}x`, alinhamento: 'right' },
                     ]);
                     doc.fillColor('black');
                     doc.moveDown(0.45);
@@ -612,11 +592,11 @@ const gerarOrcamentoPDF = async (orcamentoId) => {
         doc.moveDown(0.4);
 
         const corStatus = orcamento.status === 'Aprovado'
-            ? '#1b5e20'
+            ? '#66bb6a'
             : orcamento.status === 'Rejeitado'
-                ? '#c62828'
-                : '#e65100';
-        doc.font('Helvetica').fontSize(fs(10)).fillColor('black')
+                ? '#e57373'
+                : '#ffa726';
+        doc.font('Helvetica').fontSize(fs(9)).fillColor('#555555')
             .text('Status: ', 50, doc.y, { continued: true });
         doc.font('Helvetica-Bold').fillColor(corStatus).text(orcamento.status || 'Pendente');
         doc.fillColor('black');

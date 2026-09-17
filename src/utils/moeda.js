@@ -13,4 +13,12 @@ function formatarMoeda(valor) {
   return `R$ ${negativo ? '-' : ''}${inteiroFormatado},${centavos}`;
 }
 
-module.exports = { formatarMoeda };
+// Formata um inteiro com ponto de milhar (1234 -> "1.234"), sem casas decimais.
+// Mesma técnica de formatarMoeda (sem toLocaleString, por causa do small-icu).
+function formatarInteiro(valor) {
+  const numero = Math.trunc(Math.abs(Number(valor) || 0));
+  const sinal = Number(valor) < 0 ? '-' : '';
+  return `${sinal}${String(numero).replace(/\B(?=(\d{3})+(?!\d))/g, '.')}`;
+}
+
+module.exports = { formatarMoeda, formatarInteiro };
