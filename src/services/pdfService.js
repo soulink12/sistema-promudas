@@ -455,13 +455,14 @@ const gerarPedidoPDF = async (pedidoId, copias = 1) => {
             });
         }
 
-        // Crediário — mesma fonte das linhas de forma de pagamento acima
+        // Crediário — mesma fonte das linhas de forma de pagamento acima, cor laranja
         if (saldoCredito > 0.005) {
             doc.moveDown(0.3);
             const y = doc.y;
-            doc.font('Helvetica').fontSize(fs(9)).fillColor('black')
+            doc.font('Helvetica').fontSize(fs(9)).fillColor('#e65100')
                 .text('Crediário', 50, y, { lineBreak: false });
             doc.text(moeda(saldoCredito), 460, y, { width: 85, align: 'right' });
+            doc.fillColor('black');
         }
 
         // ── ENTREGAS ────────────────────────────────────────────────────────────
