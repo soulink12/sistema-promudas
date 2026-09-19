@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../../../core/widgets/chip_status.dart';
 import '../../../../core/utils/formatadores.dart';
-import '../../../../core/utils/status_orcamento.dart';
 
 class ListaOrcamentos extends StatelessWidget {
   final List<Map<String, dynamic>> orcamentos;
@@ -81,7 +80,7 @@ class ListaOrcamentos extends StatelessWidget {
                         ),
                       ),
                       const SizedBox(height: 6),
-                      ChipStatus(status: status, corOverride: corStatusOrcamento(status)),
+                      ChipStatus(status: status),
                     ],
                   ),
                 ],

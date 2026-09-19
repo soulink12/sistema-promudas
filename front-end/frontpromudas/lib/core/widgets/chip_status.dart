@@ -4,9 +4,7 @@ import '../theme/cores_semanticas.dart';
 /// Chip de status colorido, reutilizado em listas, detalhes e relatórios.
 /// A cor é derivada do [status]; [prefixo] precede o texto (ex.: 'Entrega: ')
 /// e [count], quando informado, é exibido como sufixo (ex.: 'Pago: 5').
-/// [corOverride] força uma cor específica em vez de inferir do texto — usado
-/// pelo orçamento, cujo "Pendente" é laranja (diferente do "Pendente" neutro
-/// de pagamento/entrega/nota do pedido, que usa o mesmo texto).
+/// [corOverride] força uma cor específica em vez de inferir do texto.
 class ChipStatus extends StatelessWidget {
   final String status;
   final String prefixo;
@@ -33,6 +31,7 @@ class ChipStatus extends StatelessWidget {
       case 'realizada':
       case 'entregue':
       case 'emitida':
+      case 'aprovado':
         cor = CoresSemanticas.sucesso;
         break;
       case 'crédito':
@@ -43,6 +42,7 @@ class ChipStatus extends StatelessWidget {
         cor = CoresSemanticas.aviso;
         break;
       case 'rejeitada':
+      case 'rejeitado':
         cor = CoresSemanticas.erro;
         break;
       default:

@@ -111,7 +111,7 @@ class _TelaAdminState extends State<TelaAdmin> {
             icon: Icons.bar_chart_outlined,
             titulo: 'Relatórios',
             descricao:
-                'Relatórios de pagamentos e de pedidos, com filtros e exportação em PDF.',
+                'Relatórios de pagamentos, pedidos e orçamentos, com filtros e exportação em PDF.',
             onTap: () => _abrir(const TelaRelatoriosHub()),
           ),
           const SizedBox(height: 12),

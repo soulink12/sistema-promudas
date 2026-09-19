@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import '../../../../core/widgets/chip_status.dart';
 import '../../../../core/theme/cores_semanticas.dart';
 import '../../../../core/utils/formatadores.dart';
-import '../../../../core/utils/status_orcamento.dart';
 import '../../../pedidos/screens/widgets/titulo_secao.dart';
 import '../../../pedidos/screens/widgets/linha_tabela.dart';
 
@@ -174,7 +173,7 @@ class DetalhesOrcamento extends StatelessWidget {
                   Text(data,
                       style: TextStyle(fontSize: 13, color: cs.onSurfaceVariant)),
                   const SizedBox(height: 12),
-                  ChipStatus(status: status, corOverride: corStatusOrcamento(status)),
+                  ChipStatus(status: status),
                   if (obs != null && obs.isNotEmpty) ...[
                     const SizedBox(height: 12),
                     Text('Observações:',

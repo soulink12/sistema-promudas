@@ -9,7 +9,6 @@ import '../../../core/widgets/campo_busca_cliente.dart';
 import '../../../core/widgets/chip_status.dart';
 import '../../../core/theme/cores_semanticas.dart';
 import '../../../core/utils/formatadores.dart';
-import '../../../core/utils/status_orcamento.dart';
 
 class TelaRelatorioOrcamentos extends StatefulWidget {
   const TelaRelatorioOrcamentos({super.key});
@@ -339,7 +338,6 @@ class _TelaRelatorioOrcamentosState extends State<TelaRelatorioOrcamentos> {
                       ChipStatus(
                         status: entry.key as String,
                         count: entry.value as int,
-                        corOverride: corStatusOrcamento(entry.key as String),
                       ),
                 ],
               ),
@@ -523,7 +521,7 @@ class _CardOrcamento extends StatelessWidget {
             const SizedBox(height: 8),
             Row(
               children: [
-                ChipStatus(status: status, corOverride: corStatusOrcamento(status)),
+                ChipStatus(status: status),
                 if (pedido != null) ...[
                   const SizedBox(width: 8),
                   Text(
