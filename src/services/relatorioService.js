@@ -881,10 +881,21 @@ const gerarRelatorioOrcamentosPDF = async ({ de, ate, status, clienteId }) => {
             doc.fillColor('black');
             doc.y = yOrc + alturaCabecalho + 8;
 
-            // Status e vínculo com o pedido gerado (quando aprovado)
+            // Status e vínculo com o pedido gerado (quando aprovado) — mesmas
+            // cores do PDF individual do orçamento (gerarOrcamentoPDF).
             const yStatus = doc.y;
-            doc.font('Helvetica').fontSize(8).fillColor('#555555');
-            doc.text(`Status: ${orcamento.status}`, 56, yStatus, { lineBreak: false });
+            const corStatusOrcamento = orcamento.status === 'Aprovado'
+                ? '#66bb6a'
+                : orcamento.status === 'Rejeitado'
+                    ? '#e57373'
+                    : '#888888';
+            const rotuloStatus = 'Status: ';
+            doc.font('Helvetica').fontSize(8).fillColor('#555555')
+                .text(rotuloStatus, 56, yStatus, { lineBreak: false });
+            const larguraRotuloStatus = doc.widthOfString(rotuloStatus);
+            doc.font('Helvetica-Bold').fillColor(corStatusOrcamento)
+                .text(orcamento.status, 56 + larguraRotuloStatus, yStatus, { lineBreak: false });
+            doc.font('Helvetica').fillColor('#555555');
             if (orcamento.pedidos) {
                 doc.text(`Pedido gerado: ${formatarNumeroPedido(orcamento.pedidos)}`, 200, yStatus, { lineBreak: false });
             }
