@@ -5,7 +5,6 @@ import '../../../auth/screens/login_screen.dart';
 import '../../../clientes/screens/clientes_screen.dart';
 import '../../../pedidos/screens/pedidos_screen.dart';
 import '../../../orcamentos/screens/orcamentos_screen.dart';
-import '../../../interessados/screens/interessados_screen.dart';
 import '../../../configuracoes/screens/configuracoes_screen.dart';
 
 /// Drawer (menu sanduíche) do módulo PDV. Cabeçalho com o usuário logado e itens
@@ -98,17 +97,6 @@ class DrawerPdv extends StatelessWidget {
               Navigator.push(
                 context,
                 MaterialPageRoute(builder: (_) => const TelaOrcamentos()),
-              );
-            },
-          ),
-          ListTile(
-            leading: const Icon(Icons.favorite_outline),
-            title: const Text('Lista de Interessados'),
-            onTap: () {
-              Navigator.pop(context);
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => const TelaInteressados()),
               );
             },
           ),

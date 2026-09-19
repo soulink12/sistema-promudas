@@ -7,7 +7,6 @@ import '../../../../core/utils/formatadores.dart';
 const Map<String, String> _rotulosEntidade = {
   'pedido': 'Pedido',
   'orcamento': 'Orçamento',
-  'interessado': 'Interessado',
   'cliente': 'Cliente',
   'produto': 'Produto',
   'pagamento': 'Pagamento',
