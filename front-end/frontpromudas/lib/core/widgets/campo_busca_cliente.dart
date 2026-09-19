@@ -70,11 +70,14 @@ class _CampoBuscaClienteState extends State<CampoBuscaCliente> {
     setState(() => _modoNumero = numerico);
 
     _ultimaDigitacao = busca;
-    if (busca.isEmpty) {
+    if (!numerico) {
+      // Campo vazio ou texto que deixou de ser número (ex.: apagou até sobrar
+      // só o prefixo "O") — limpa o filtro por número, senão a lista continua
+      // presa no último resultado numérico enquanto o campo já virou busca
+      // por nome de cliente.
       widget.onTextoNumerico!('');
       return;
     }
-    if (!numerico) return;
     Future.delayed(const Duration(milliseconds: 300), () {
       if (busca == _ultimaDigitacao) widget.onTextoNumerico!(busca);
     });

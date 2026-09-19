@@ -14,6 +14,10 @@ const Map<String, String> _rotulosEntidade = {
   'cheque': 'Cheque',
   'forma_pagamento': 'Forma de pagamento',
   'temporada': 'Temporada',
+  // Módulo removido (ver módulo "Lista de Interessados", 2026-09-19), mas o
+  // histórico de atividades de quando ele existia continua no banco — sem
+  // isso, essas entradas antigas mostrariam o valor cru 'interessado'.
+  'interessado': 'Interessado',
 };
 
 // Entidades cujo nome em português é feminino, para concordância do particípio.
@@ -122,6 +126,7 @@ const Map<String, String> _rotulosCampoEspeciais = {
   'itens_pedido': 'Itens do pedido',
   'itens_orcamento': 'Itens do orçamento',
   'itens_entrega': 'Itens da entrega',
+  // Módulo removido — mantido só pelo mesmo motivo de 'interessado' acima.
   'itens_interesse': 'Mudas de interesse',
 };
 
