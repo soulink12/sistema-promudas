@@ -123,23 +123,27 @@ class _FormularioVendaWidgetState extends State<FormularioVendaWidget> {
   }
 
   /// Constrói o campo inline de quantidade para um item.
+  /// Largura mínima de 64 (tamanho original), mas se expande para os lados
+  /// quando o número digitado não couber (ex.: quantidades com muitos dígitos).
   Widget _celulaQtd(Map<String, dynamic> item) {
-    return SizedBox(
-      width: 64,
-      child: TextField(
-        controller: _qtdControllers[item['id']],
-        focusNode: _qtdFocusNodes[item['id']],
-        keyboardType: TextInputType.number,
-        textAlign: TextAlign.center,
-        decoration: const InputDecoration(
-          isDense: true,
-          contentPadding: EdgeInsets.symmetric(vertical: 6, horizontal: 4),
-          border: OutlineInputBorder(),
+    return ConstrainedBox(
+      constraints: const BoxConstraints(minWidth: 64),
+      child: IntrinsicWidth(
+        child: TextField(
+          controller: _qtdControllers[item['id']],
+          focusNode: _qtdFocusNodes[item['id']],
+          keyboardType: TextInputType.number,
+          textAlign: TextAlign.center,
+          decoration: const InputDecoration(
+            isDense: true,
+            contentPadding: EdgeInsets.symmetric(vertical: 6, horizontal: 4),
+            border: OutlineInputBorder(),
+          ),
+          onSubmitted: (texto) {
+            final novaQtd = int.tryParse(texto.trim());
+            if (novaQtd != null) widget.onAlterarQuantidade(item, novaQtd);
+          },
         ),
-        onSubmitted: (texto) {
-          final novaQtd = int.tryParse(texto.trim());
-          if (novaQtd != null) widget.onAlterarQuantidade(item, novaQtd);
-        },
       ),
     );
   }
@@ -166,35 +170,39 @@ class _FormularioVendaWidgetState extends State<FormularioVendaWidget> {
       tooltipOriginal = 'Sistema: ${formatarMoeda(precoOriginal)}';
     }
 
-    final campo = SizedBox(
-      width: 88,
-      child: TextField(
-        controller: _precoControllers[item['id']],
-        focusNode: _precoFocusNodes[item['id']],
-        keyboardType: const TextInputType.numberWithOptions(decimal: true),
-        textAlign: TextAlign.right,
-        style: TextStyle(
-          color: cor,
-          fontWeight: cor != null ? FontWeight.bold : FontWeight.normal,
+    // Largura mínima de 88 (tamanho original), mas se expande para os lados
+    // quando o valor digitado não couber (ex.: preços com muitos dígitos).
+    final campo = ConstrainedBox(
+      constraints: const BoxConstraints(minWidth: 88),
+      child: IntrinsicWidth(
+        child: TextField(
+          controller: _precoControllers[item['id']],
+          focusNode: _precoFocusNodes[item['id']],
+          keyboardType: const TextInputType.numberWithOptions(decimal: true),
+          textAlign: TextAlign.right,
+          style: TextStyle(
+            color: cor,
+            fontWeight: cor != null ? FontWeight.bold : FontWeight.normal,
+          ),
+          decoration: InputDecoration(
+            isDense: true,
+            contentPadding:
+                const EdgeInsets.symmetric(vertical: 6, horizontal: 4),
+            border: const OutlineInputBorder(),
+            // Borda colorida quando o preço está alterado
+            enabledBorder: cor != null
+                ? OutlineInputBorder(
+                    borderSide: BorderSide(color: cor, width: 1.5))
+                : null,
+            prefixText: 'R\$ ',
+            prefixStyle: TextStyle(color: cor, fontSize: 12),
+          ),
+          onSubmitted: (texto) {
+            final novoPreco =
+                double.tryParse(texto.trim().replaceAll(',', '.'));
+            if (novoPreco != null) widget.onAlterarPreco(item, novoPreco);
+          },
         ),
-        decoration: InputDecoration(
-          isDense: true,
-          contentPadding:
-              const EdgeInsets.symmetric(vertical: 6, horizontal: 4),
-          border: const OutlineInputBorder(),
-          // Borda colorida quando o preço está alterado
-          enabledBorder: cor != null
-              ? OutlineInputBorder(
-                  borderSide: BorderSide(color: cor, width: 1.5))
-              : null,
-          prefixText: 'R\$ ',
-          prefixStyle: TextStyle(color: cor, fontSize: 12),
-        ),
-        onSubmitted: (texto) {
-          final novoPreco =
-              double.tryParse(texto.trim().replaceAll(',', '.'));
-          if (novoPreco != null) widget.onAlterarPreco(item, novoPreco);
-        },
       ),
     );
 

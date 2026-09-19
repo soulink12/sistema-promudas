@@ -281,25 +281,29 @@ class _ModalEntregaState extends State<ModalEntrega> {
                         ),
                       ),
                       const SizedBox(width: 12),
-                      SizedBox(
-                        width: 80,
-                        child: TextField(
-                          controller: _qtdControllers[i],
-                          keyboardType: TextInputType.number,
-                          textAlign: TextAlign.center,
-                          inputFormatters: [
-                            FilteringTextInputFormatter.digitsOnly,
-                          ],
-                          decoration: const InputDecoration(
-                            labelText: 'Qtd',
-                            border: OutlineInputBorder(),
-                            isDense: true,
-                            contentPadding: EdgeInsets.symmetric(
-                              horizontal: 8,
-                              vertical: 10,
+                      // Largura mínima de 80 (tamanho original), mas se expande
+                      // para os lados quando o número digitado não couber.
+                      ConstrainedBox(
+                        constraints: const BoxConstraints(minWidth: 80),
+                        child: IntrinsicWidth(
+                          child: TextField(
+                            controller: _qtdControllers[i],
+                            keyboardType: TextInputType.number,
+                            textAlign: TextAlign.center,
+                            inputFormatters: [
+                              FilteringTextInputFormatter.digitsOnly,
+                            ],
+                            decoration: const InputDecoration(
+                              labelText: 'Qtd',
+                              border: OutlineInputBorder(),
+                              isDense: true,
+                              contentPadding: EdgeInsets.symmetric(
+                                horizontal: 8,
+                                vertical: 10,
+                              ),
                             ),
+                            onChanged: (_) => setState(() {}),
                           ),
-                          onChanged: (_) => setState(() {}),
                         ),
                       ),
                     ],
