@@ -596,7 +596,7 @@ const gerarOrcamentoPDF = async (orcamentoId) => {
             ? '#66bb6a'
             : orcamento.status === 'Rejeitado'
                 ? '#e57373'
-                : '#ffa726';
+                : '#888888';
         doc.font('Helvetica').fontSize(fs(9)).fillColor('#555555')
             .text('Status: ', 50, doc.y, { continued: true });
         doc.font('Helvetica-Bold').fillColor(corStatus).text(orcamento.status || 'Pendente');
