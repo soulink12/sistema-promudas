@@ -445,6 +445,10 @@ class _TelaOrcamentosState extends State<TelaOrcamentos> {
           labelText: 'Pesquisar',
           hintText: 'Nome do cliente ou número do orçamento',
           onTextoNumerico: _filtrarPorNumero,
+          // Número do orçamento começa com "O" (ex.: "O26-3") — só entra em
+          // modo número com "O"/"o" seguido de dígito, pra não confundir com
+          // nome de cliente que comece só com essa letra (ex.: "Osvaldo").
+          regexNumerico: RegExp(r'^(#|\d|[Oo]\d)'),
         ),
         Padding(
           padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),

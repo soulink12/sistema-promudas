@@ -15,6 +15,7 @@ class PesquisaClienteLista extends StatelessWidget {
   final String labelText;
   final String hintText;
   final ValueChanged<String>? onTextoNumerico;
+  final RegExp? regexNumerico;
 
   const PesquisaClienteLista({
     super.key,
@@ -24,6 +25,7 @@ class PesquisaClienteLista extends StatelessWidget {
     this.labelText = 'Filtrar por cliente',
     this.hintText = 'Buscar por nome, CPF ou telefone',
     this.onTextoNumerico,
+    this.regexNumerico,
   });
 
   @override
@@ -41,6 +43,7 @@ class PesquisaClienteLista extends StatelessWidget {
                   hintText: hintText,
                   onSelecionado: onSelecionado,
                   onTextoNumerico: onTextoNumerico,
+                  regexNumerico: regexNumerico,
                 )
               : Card(
                   child: ListTile(

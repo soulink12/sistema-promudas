@@ -17,7 +17,30 @@ const ORCAMENTO_INCLUDE = {
     }
 };
 
-const criarOrcamento = async (dados, usuarioId = null) => {
+// Próximo numero_temporada pra orçamentos de uma safra — mesmo padrão de
+// pedidoService.proximoNumeroTemporada, mas contador próprio (coluna
+// separada, mesmo nome) já que orçamento e pedido não compartilham sequência.
+const proximoNumeroTemporadaOrcamento = async (client, ano) => {
+    const agg = await client.orcamentos.aggregate({
+        _max: { numero_temporada: true },
+        where: { temporada_ano: ano },
+    });
+    return (agg._max.numero_temporada ?? 0) + 1;
+};
+
+// Cria o orçamento dentro de uma transação já aberta pelo chamador — usado
+// por `criarOrcamento`, que abre a transação e envolve tudo em retryColisao
+// (ver comentário lá) por causa da corrida no cálculo do numero_temporada.
+const criarOrcamentoTx = async (tx, dados, usuarioId = null) => {
+    // Número vem da temporada ativa (mesma configurada no Admin pra pedido).
+    // Sem temporada ativa, o orçamento fica sem número (exibe '#id' como
+    // fallback) — mesma regra de pedidoService.criarPedidoTx.
+    const temporada = await tx.temporadas.findFirst({ where: { ativo: true } });
+    const temporada_ano = temporada?.ano ?? null;
+    const numero_temporada = temporada
+        ? await proximoNumeroTemporadaOrcamento(tx, temporada.ano)
+        : null;
+
     // valor_total é sempre recalculado a partir dos itens (não confia no
     // cliente), mesma lógica de pedidoService.criarPedidoTx.
     const subtotal = dados.itens.reduce(
@@ -26,48 +49,57 @@ const criarOrcamento = async (dados, usuarioId = null) => {
     );
     const ajuste = Number(dados.ajuste ?? 0);
 
-    return await prisma.$transaction(async (tx) => {
-        const orcamento = await tx.orcamentos.create({
-            data: {
-                clientes: {
-                    connect: { id: parseInt(dados.cliente_id) }
-                },
-                valor_total: subtotal + ajuste,
-                ajuste: dados.ajuste ?? null,
-                observacoes: dados.observacoes,
-                data_orcamento: new Date(),
-                status: 'Pendente',
-                ativo: true,
-
-                itens_orcamento: {
-                    create: dados.itens.map(item => ({
-                        produto_id: parseInt(item.produto_id),
-                        quantidade: parseInt(item.quantidade),
-                        valor_unitario: item.valor_unitario
-                    }))
-                }
+    const orcamento = await tx.orcamentos.create({
+        data: {
+            clientes: {
+                connect: { id: parseInt(dados.cliente_id) }
             },
-            // Mesmo formato de itens usado nas demais snapshots de orçamento
-            // (ORCAMENTO_INCLUDE) — sem isso, o diff de histórico compararia
-            // itens com/sem `produtos.nome` e marcaria todo item como
-            // "alterado" só por causa da forma do JSON, não do conteúdo.
-            include: {
-                itens_orcamento: {
-                    include: { produtos: { select: { nome: true } } }
-                }
+            valor_total: subtotal + ajuste,
+            ajuste: dados.ajuste ?? null,
+            observacoes: dados.observacoes,
+            data_orcamento: new Date(),
+            status: 'Pendente',
+            ativo: true,
+            temporada_ano,
+            numero_temporada,
+
+            itens_orcamento: {
+                create: dados.itens.map(item => ({
+                    produto_id: parseInt(item.produto_id),
+                    quantidade: parseInt(item.quantidade),
+                    valor_unitario: item.valor_unitario
+                }))
             }
-        });
-
-        await logService.registrarAtividade(tx, {
-            usuarioId,
-            acao: 'criacao',
-            entidade: 'orcamento',
-            entidadeId: orcamento.id,
-            snapshot: orcamento,
-        });
-
-        return orcamento;
+        },
+        // Mesmo formato de itens usado nas demais snapshots de orçamento
+        // (ORCAMENTO_INCLUDE) — sem isso, o diff de histórico compararia
+        // itens com/sem `produtos.nome` e marcaria todo item como
+        // "alterado" só por causa da forma do JSON, não do conteúdo.
+        include: {
+            itens_orcamento: {
+                include: { produtos: { select: { nome: true } } }
+            }
+        }
     });
+
+    await logService.registrarAtividade(tx, {
+        usuarioId,
+        acao: 'criacao',
+        entidade: 'orcamento',
+        entidadeId: orcamento.id,
+        snapshot: orcamento,
+    });
+
+    return orcamento;
+};
+
+// Duas criações concorrentes na mesma temporada podem calcular o mesmo
+// próximo numero_temporada antes de qualquer uma gravar — a constraint única
+// (schema.prisma) rejeita a segunda com P2002. retryColisao tenta de novo
+// (recalculando o número dentro de uma nova transação), mesmo padrão de
+// pedidoService.criarPedido.
+const criarOrcamento = async (dados, usuarioId = null) => {
+    return await retryColisao(() => prisma.$transaction((tx) => criarOrcamentoTx(tx, dados, usuarioId)));
 };
 
 const listarOrcamentos = async (filtros = {}) => {
@@ -85,9 +117,28 @@ const listarOrcamentos = async (filtros = {}) => {
         };
     }
     if (filtros.numero) {
-        // Orçamento usa numeração própria simples — só o formato "#id" (ou "id" puro).
-        const bruto = filtros.numero.trim().replace(/^#/, '');
-        where.id = /^\d+$/.test(bruto) ? parseInt(bruto) : -1;
+        // Aceita os formatos exibidos por formatarNumeroOrcamento: "O26-3" (ou
+        // "26-3", sem o prefixo) para temporada+número, só "N" para o número
+        // em qualquer temporada, ou "#id" pro fallback de orçamentos sem
+        // temporada (exibidos como "#id") — mesmo padrão de
+        // pedidoService.listarPedidos.
+        const bruto = filtros.numero.trim();
+        if (bruto.startsWith('#')) {
+            const idStr = bruto.slice(1);
+            where.id = /^\d+$/.test(idStr) ? parseInt(idStr) : -1;
+        } else {
+            const semPrefixo = bruto.replace(/^[Oo]/, '');
+            const match = semPrefixo.match(/^(\d{1,2})-(\d+)$/);
+            if (match) {
+                where.temporada_ano = 2000 + parseInt(match[1]);
+                where.numero_temporada = parseInt(match[2]);
+            } else if (/^\d+$/.test(semPrefixo)) {
+                where.numero_temporada = parseInt(semPrefixo);
+            } else {
+                // Formato incompleto/inválido (usuário ainda digitando) — nenhum resultado.
+                where.id = -1;
+            }
+        }
     }
 
     return await prisma.orcamentos.findMany({
@@ -121,6 +172,10 @@ const atualizarOrcamento = async (id, dados, usuarioId = null) => {
 
     const { itens, ...camposBrutos } = dados;
     const camposOrcamento = normalizarDatas(camposBrutos, ['data_orcamento']);
+    // Numeração é atribuída só na criação — nunca editável via PUT, mesmo que
+    // o body envie esses campos (defesa, o frontend hoje não os manda).
+    delete camposOrcamento.temporada_ano;
+    delete camposOrcamento.numero_temporada;
 
     if (!itens) {
         return await prisma.$transaction(async (tx) => {

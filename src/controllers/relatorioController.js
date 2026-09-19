@@ -44,4 +44,33 @@ const relatorioPedidosPDF = async (req, res, next) => {
     }
 };
 
-module.exports = { relatorioPagamentos, relatorioPDF, relatorioPedidos, relatorioPedidosPDF };
+const relatorioOrcamentos = async (req, res, next) => {
+    try {
+        const { de, ate, status, clienteId } = req.query;
+        const dados = await relatorioService.relatorioOrcamentos({ de, ate, status, clienteId });
+        res.status(200).json(dados);
+    } catch (erro) {
+        next(erro);
+    }
+};
+
+const relatorioOrcamentosPDF = async (req, res, next) => {
+    try {
+        const { de, ate, status, clienteId } = req.query;
+        const buffer = await relatorioService.gerarRelatorioOrcamentosPDF({ de, ate, status, clienteId });
+        res.setHeader('Content-Type', 'application/pdf');
+        res.setHeader('Content-Disposition', 'attachment; filename="relatorio_orcamentos.pdf"');
+        res.status(200).send(buffer);
+    } catch (erro) {
+        next(erro);
+    }
+};
+
+module.exports = {
+    relatorioPagamentos,
+    relatorioPDF,
+    relatorioPedidos,
+    relatorioPedidosPDF,
+    relatorioOrcamentos,
+    relatorioOrcamentosPDF,
+};

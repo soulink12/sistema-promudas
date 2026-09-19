@@ -17,6 +17,12 @@ class CampoBuscaCliente extends StatefulWidget {
   final String hintText;
   final bool autofocus;
   final ValueChanged<String>? onTextoNumerico;
+  // Regex usado para decidir se o texto digitado é "número" (em vez de nome
+  // de cliente). Padrão: começa com "#" ou dígito (número de pedido). Telas
+  // com um prefixo de letra no número (ex.: orçamento "O26-3") podem passar
+  // um regex próprio, pra não confundir com nome de cliente começando com
+  // essa letra.
+  final RegExp? regexNumerico;
 
   const CampoBuscaCliente({
     super.key,
@@ -25,6 +31,7 @@ class CampoBuscaCliente extends StatefulWidget {
     this.hintText = 'Digite nome, CPF ou telefone',
     this.autofocus = false,
     this.onTextoNumerico,
+    this.regexNumerico,
   });
 
   @override
@@ -58,7 +65,8 @@ class _CampoBuscaClienteState extends State<CampoBuscaCliente> {
   void _aoDigitar(String texto) {
     if (widget.onTextoNumerico == null) return;
     final busca = texto.trim();
-    final numerico = busca.isNotEmpty && RegExp(r'^[#\d]').hasMatch(busca);
+    final regex = widget.regexNumerico ?? RegExp(r'^[#\d]');
+    final numerico = busca.isNotEmpty && regex.hasMatch(busca);
     setState(() => _modoNumero = numerico);
 
     _ultimaDigitacao = busca;

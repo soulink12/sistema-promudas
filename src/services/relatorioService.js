@@ -1,6 +1,7 @@
 const PDFDocument = require('pdfkit');
 const prisma = require('../config/database');
 const { formatarNumeroPedido } = require('../utils/numeroPedido');
+const { formatarNumeroOrcamento } = require('../utils/numeroOrcamento');
 const { formatarMoeda } = require('../utils/moeda');
 const { formatar: formatarCpfCnpj } = require('../utils/cpfCnpj');
 const BusinessError = require('../utils/BusinessError');
@@ -675,4 +676,277 @@ const gerarRelatorioPedidosPDF = async ({ de, ate, statusPagamento, statusEntreg
     });
 };
 
-module.exports = { relatorioPagamentos, gerarRelatorioPDF, relatorioPedidos, gerarRelatorioPedidosPDF };
+// Filtro de orçamentos usado pelo relatório em JSON e pelo PDF — mesmo padrão
+// de _montarWherePedidos.
+const _montarWhereOrcamentos = ({ de, ate, status, clienteId }) => ({
+    ativo: true,
+    ...(de || ate ? {
+        criado_em: {
+            ...(de && { gte: _parsearData(de, 'de') }),
+            ...(ate && { lte: _parsearData(ate, 'ate', { fimDoDia: true }) }),
+        }
+    } : {}),
+    ...(status ? { status } : {}),
+    ...(clienteId ? { cliente_id: parseInt(clienteId) } : {}),
+});
+
+const relatorioOrcamentos = async ({ de, ate, status, clienteId }) => {
+    const where = _montarWhereOrcamentos({ de, ate, status, clienteId });
+
+    const orcamentos = await prisma.orcamentos.findMany({
+        where,
+        select: {
+            id: true,
+            valor_total: true,
+            status: true,
+            criado_em: true,
+            data_orcamento: true,
+            temporada_ano: true,
+            numero_temporada: true,
+            clientes: { select: { nome: true } },
+            pedidos: { select: { id: true, temporada_ano: true, numero_temporada: true } },
+            _count: { select: { itens_orcamento: true } },
+        },
+        orderBy: { criado_em: 'desc' },
+    });
+
+    const valorTotal = orcamentos.reduce((s, o) => s + parseFloat(o.valor_total ?? 0), 0);
+
+    const porStatus = { Pendente: 0, Aprovado: 0, Rejeitado: 0 };
+    orcamentos.forEach(o => {
+        const status = o.status ?? 'Pendente';
+        porStatus[status] = (porStatus[status] ?? 0) + 1;
+    });
+
+    return {
+        resumo: { total: orcamentos.length, valorTotal, porStatus },
+        lista: orcamentos.map(o => ({
+            id: o.id,
+            cliente: o.clientes?.nome ?? '—',
+            criado_em: o.criado_em,
+            data_orcamento: o.data_orcamento,
+            temporada_ano: o.temporada_ano,
+            numero_temporada: o.numero_temporada,
+            valor_total: parseFloat(o.valor_total),
+            status: o.status,
+            pedido: o.pedidos,
+            qtd_itens: o._count.itens_orcamento,
+        })),
+    };
+};
+
+const gerarRelatorioOrcamentosPDF = async ({ de, ate, status, clienteId }) => {
+    const where = _montarWhereOrcamentos({ de, ate, status, clienteId });
+
+    // Mesmo cuidado de gerarRelatorioPedidosPDF: sem período informado, isto
+    // carregaria todos os orçamentos com itens de uma vez.
+    const LIMITE_PDF_ORCAMENTOS = 2000;
+
+    const [totalEncontrados, agregado, orcamentos] = await Promise.all([
+        prisma.orcamentos.count({ where }),
+        prisma.orcamentos.aggregate({ where, _sum: { valor_total: true } }),
+        prisma.orcamentos.findMany({
+            where,
+            take: LIMITE_PDF_ORCAMENTOS,
+            include: {
+                clientes: { select: { nome: true, cpf_cnpj: true, cidade: true, estado: true, telefone_1: true } },
+                itens_orcamento: {
+                    include: {
+                        produtos: { select: { nome: true } },
+                    },
+                },
+                pedidos: { select: { id: true, temporada_ano: true, numero_temporada: true } },
+            },
+            orderBy: { criado_em: 'desc' },
+        }),
+    ]);
+    // Query ordena por criado_em desc, então o corte sempre mostra os mais recentes.
+    const truncado = totalEncontrados > orcamentos.length;
+    const valorTotalGeral = parseFloat(agregado._sum.valor_total ?? 0);
+
+    return new Promise((resolve, reject) => {
+        const doc = new PDFDocument({ size: 'A4', margin: 50 });
+        const chunks = [];
+        doc.on('data', c => chunks.push(c));
+        doc.on('end', () => resolve(Buffer.concat(chunks)));
+        doc.on('error', reject);
+
+        const paginaFundo = doc.page.height - doc.page.margins.bottom;
+
+        // ── CABEÇALHO ──────────────────────────────────────────────────────
+        doc.font('Helvetica-Bold').fontSize(20).fillColor('#1b5e20')
+            .text('Viveiro ProMudas', { align: 'center' });
+        doc.font('Helvetica').fontSize(10).fillColor('#555555')
+            .text('Relatório de Orçamentos', { align: 'center' });
+        doc.fillColor('black');
+        doc.moveDown(0.5);
+
+        const periodoParts = [];
+        if (de) periodoParts.push(`De: ${formatarDataCurta(de)}`);
+        if (ate) periodoParts.push(`Até: ${formatarDataCurta(ate)}`);
+        if (!de && !ate) periodoParts.push('Todo o período');
+        if (status) periodoParts.push(`Status: ${status}`);
+
+        doc.font('Helvetica').fontSize(9).fillColor('#777777')
+            .text(periodoParts.join('   '), { align: 'center' });
+        doc.fillColor('black');
+        doc.moveDown(0.6);
+
+        linhaHorizontal(doc);
+        doc.moveDown(0.5);
+
+        // ── AVISO DE TRUNCAMENTO ───────────────────────────────────────────
+        if (truncado) {
+            const yAviso = doc.y;
+            doc.rect(50, yAviso - 2, 495, 24).fill('#fff3cd');
+            doc.font('Helvetica-Bold').fontSize(9).fillColor('#856404')
+                .text(
+                    `Atenção: exibindo apenas os ${orcamentos.length} orçamentos mais recentes de ${totalEncontrados} encontrados. Refine o período para ver os demais.`,
+                    58, yAviso + 4, { width: 479 }
+                );
+            doc.fillColor('black');
+            doc.moveDown(1.2);
+        }
+
+        // ── RESUMO ─────────────────────────────────────────────────────────
+        const yRes = doc.y;
+        doc.font('Helvetica-Bold').fontSize(9).fillColor('#555555');
+        doc.text(
+            truncado ? `Orçamentos exibidos: ${orcamentos.length} de ${totalEncontrados}` : `Total de orçamentos: ${orcamentos.length}`,
+            50, yRes, { lineBreak: false }
+        );
+        doc.font('Helvetica-Bold').fontSize(9).fillColor('#1b5e20')
+            .text(`Valor total: ${moeda(valorTotalGeral)}`, 300, yRes, { width: 245, align: 'right' });
+        doc.fillColor('black');
+        doc.moveDown(1);
+
+        if (orcamentos.length === 0) {
+            doc.font('Helvetica').fontSize(10).fillColor('#888888')
+                .text('Nenhum orçamento encontrado para os filtros aplicados.', { align: 'center' });
+            doc.fillColor('black');
+        }
+
+        // ── ORÇAMENTOS ─────────────────────────────────────────────────────
+        orcamentos.forEach((orcamento) => {
+            // Estima altura mínima do bloco: cabeçalho (30) + itens (14 cada) + margem (20)
+            const alturaEstimada = 30 + (orcamento.itens_orcamento.length * 14) + 20;
+            if (doc.y + Math.min(alturaEstimada, 60) > paginaFundo) {
+                doc.addPage();
+            }
+
+            const detalhesCliente = [];
+            if (orcamento.clientes?.cpf_cnpj) detalhesCliente.push(formatarCpfCnpj(orcamento.clientes.cpf_cnpj));
+            const cidadeUf = [orcamento.clientes?.cidade, orcamento.clientes?.estado].filter(Boolean).join('/');
+            if (cidadeUf) detalhesCliente.push(cidadeUf);
+            const nomeCliente = orcamento.clientes?.nome ?? '—';
+            const linhaCliente = detalhesCliente.length > 0
+                ? `${nomeCliente} · ${detalhesCliente.join(' · ')}`
+                : nomeCliente;
+
+            const linhaTelefone = orcamento.clientes?.telefone_1
+                ? formatarTelefone(orcamento.clientes.telefone_1)
+                : '';
+
+            // Mesmo esquema de caixa do cabeçalho de pedido em
+            // gerarRelatorioPedidosPDF (cresce até 3 linhas pro nome do cliente).
+            doc.font('Helvetica').fontSize(9);
+            const larguraCliente = 235;
+            const alturaLinha = doc.currentLineHeight();
+            const maxLinhasCliente = 3;
+            const alturaClienteTexto = Math.min(
+                doc.heightOfString(linhaCliente, { width: larguraCliente }),
+                alturaLinha * maxLinhasCliente
+            );
+            const alturaTelefone = linhaTelefone ? alturaLinha : 0;
+            const alturaCabecalho = Math.max(20, alturaClienteTexto + alturaTelefone + 10);
+
+            const yOrc = doc.y;
+            doc.rect(50, yOrc, 495, alturaCabecalho).fill('#e8f5e9');
+            doc.font('Helvetica-Bold').fontSize(10).fillColor('#1b5e20')
+                .text(`Orçamento ${formatarNumeroOrcamento(orcamento)}`, 56, yOrc + 4, { width: 120, lineBreak: false });
+            doc.font('Helvetica').fontSize(9).fillColor('#333333')
+                .text(linhaCliente, 185, yOrc + 5, {
+                    width: larguraCliente,
+                    height: alturaLinha * maxLinhasCliente,
+                    ellipsis: true,
+                });
+            if (linhaTelefone) {
+                doc.text(linhaTelefone, 185, yOrc + 5 + alturaClienteTexto, {
+                    width: larguraCliente,
+                    lineBreak: false,
+                });
+            }
+            doc.font('Helvetica').fontSize(9).fillColor('#555555')
+                .text(formatarDataCurta(orcamento.data_orcamento || orcamento.criado_em), 430, yOrc + 5, { width: 110, align: 'right' });
+            doc.fillColor('black');
+            doc.y = yOrc + alturaCabecalho + 8;
+
+            // Status e vínculo com o pedido gerado (quando aprovado)
+            const yStatus = doc.y;
+            doc.font('Helvetica').fontSize(8).fillColor('#555555');
+            doc.text(`Status: ${orcamento.status}`, 56, yStatus, { lineBreak: false });
+            if (orcamento.pedidos) {
+                doc.text(`Pedido gerado: ${formatarNumeroPedido(orcamento.pedidos)}`, 200, yStatus, { lineBreak: false });
+            }
+
+            const ajuste = parseFloat(orcamento.ajuste ?? 0);
+            if (ajuste !== 0) {
+                const tipoAjuste = ajuste > 0 ? `Acréscimo: ${moeda(ajuste)}` : `Desconto: ${moeda(Math.abs(ajuste))}`;
+                doc.text(tipoAjuste, 350, yStatus, { width: 195, align: 'right' });
+            }
+            doc.moveDown(0.5);
+
+            doc.font('Helvetica-Bold').fontSize(10).fillColor('#1b5e20');
+            const yValor = doc.y;
+            doc.text(`Total: ${moeda(orcamento.valor_total)}`, 350, yValor, { width: 195, align: 'right' });
+            doc.fillColor('black');
+            doc.moveDown(0.5);
+
+            // ── Itens do orçamento ───────────────────────────────────────
+            if (doc.y + 35 > paginaFundo) { doc.addPage(); }
+            doc.moveTo(56, doc.y).lineTo(545, doc.y).strokeColor('#dddddd').lineWidth(0.5).stroke();
+            doc.strokeColor('black').lineWidth(1);
+            doc.moveDown(0.3);
+
+            const yItensCab = doc.y;
+            doc.font('Helvetica-Bold').fontSize(8).fillColor('#777777');
+            doc.text('Produto', 56, yItensCab, { width: 260, lineBreak: false });
+            doc.text('Qtd', 320, yItensCab, { width: 60, align: 'center', lineBreak: false });
+            doc.text('Unit.', 385, yItensCab, { width: 75, align: 'right', lineBreak: false });
+            doc.text('Subtotal', 463, yItensCab, { width: 82, align: 'right' });
+            doc.fillColor('black');
+            doc.moveDown(0.3);
+
+            orcamento.itens_orcamento.forEach((item, idx) => {
+                if (doc.y + 14 > paginaFundo) { doc.addPage(); }
+                const yItem = doc.y;
+                if (idx % 2 === 0) doc.rect(56, yItem - 1, 489, 13).fill('#f9f9f9');
+                doc.font('Helvetica').fontSize(8).fillColor('black');
+                doc.text(item.produtos?.nome ?? '—', 56, yItem, { width: 260, lineBreak: false });
+                doc.text(String(item.quantidade), 320, yItem, { width: 60, align: 'center', lineBreak: false });
+                doc.text(moeda(item.valor_unitario), 385, yItem, { width: 75, align: 'right', lineBreak: false });
+                doc.text(moeda(parseFloat(item.valor_unitario) * item.quantidade), 463, yItem, { width: 82, align: 'right' });
+                doc.moveDown(0.4);
+            });
+
+            doc.moveDown(0.8);
+            linhaHorizontal(doc, '#eeeeee');
+            doc.moveDown(0.6);
+        });
+
+        // ── RODAPÉ ─────────────────────────────────────────────────────────
+        doc.font('Helvetica').fontSize(8).fillColor('#aaaaaa')
+            .text(`Viveiro ProMudas — documento gerado em ${formatarData(new Date())}`, { align: 'center' });
+
+        doc.end();
+    });
+};
+
+module.exports = {
+    relatorioPagamentos,
+    gerarRelatorioPDF,
+    relatorioPedidos,
+    gerarRelatorioPedidosPDF,
+    relatorioOrcamentos,
+    gerarRelatorioOrcamentosPDF,
+};

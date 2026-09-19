@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'relatorios_pagamentos_screen.dart';
 import 'relatorio_pedidos_screen.dart';
+import 'relatorio_orcamentos_screen.dart';
 
 class TelaRelatoriosHub extends StatelessWidget {
   const TelaRelatoriosHub({super.key});
@@ -31,6 +32,17 @@ class TelaRelatoriosHub extends StatelessWidget {
             onTap: () => Navigator.push(
               context,
               MaterialPageRoute(builder: (_) => const TelaRelatorioPedidos()),
+            ),
+          ),
+          const SizedBox(height: 12),
+          _CardRelatorio(
+            icon: Icons.request_quote_outlined,
+            titulo: 'Orçamentos',
+            descricao:
+                'Lista de orçamentos com filtro por data, status e cliente.',
+            onTap: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const TelaRelatorioOrcamentos()),
             ),
           ),
         ],

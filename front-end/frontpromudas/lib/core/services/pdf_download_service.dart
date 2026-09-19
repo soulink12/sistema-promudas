@@ -29,7 +29,7 @@ class PdfDownloadService {
   }
 
   /// Mesma lógica de [baixarESalvar], mas para o PDF de um orçamento
-  /// ("Orçamento #N.pdf") — sem a opção de imprimir 3 vias.
+  /// ("Orçamento OAA-N.pdf") — sem a opção de imprimir 3 vias.
   static Future<void> baixarESalvarOrcamento(
     BuildContext context,
     int orcamentoId, {
@@ -89,8 +89,9 @@ class PdfDownloadService {
 
     try {
       // Dentro da pasta do usuário, organiza por temporada: subpasta "26" para
-      // pedidos da safra 2026 (ex.: "Pedido 26-1.pdf"). Cria a subpasta se ainda
-      // não existir. Pedidos sem temporada (e orçamentos) vão direto na raiz.
+      // pedidos da safra 2026 (ex.: "Pedido 26-1.pdf"), e "26/Orçamentos"
+      // para orçamentos da mesma safra (ex.: "Orçamento O26-3.pdf"). Cria a(s)
+      // subpasta(s) se ainda não existir(em). Sem temporada, vai direto na raiz.
       final subpasta = _pastaTemporada(nomeArquivo);
       final destino = subpasta == null
           ? pasta
@@ -150,11 +151,18 @@ class PdfDownloadService {
     return nome.replaceAll(RegExp(r'[\\/:*?"<>|]'), '-');
   }
 
-  /// Deriva a subpasta da temporada a partir do nome ("Pedido 26-1.pdf" → "26").
-  /// Retorna `null` quando o pedido não tem temporada (nome "Pedido #5.pdf").
+  /// Deriva a subpasta da temporada a partir do nome: pedido vai direto na
+  /// pasta da safra ("Pedido 26-1.pdf" → "26"), orçamento numerado ganha uma
+  /// subpasta própria dentro dela ("Orçamento O26-3.pdf" → "26/Orçamentos").
+  /// Retorna `null` quando não tem temporada (nome com "#id", ex. "Pedido
+  /// #5.pdf" ou "Orçamento #5.pdf") — cai na raiz da pasta configurada.
   static String? _pastaTemporada(String nomeArquivo) {
-    final match = RegExp(r'Pedido\s+(\d+)-').firstMatch(nomeArquivo);
-    return match?.group(1);
+    final matchOrcamento = RegExp(r'Orçamento\s+O(\d+)-').firstMatch(nomeArquivo);
+    if (matchOrcamento != null) {
+      return '${matchOrcamento.group(1)}${Platform.pathSeparator}Orçamentos';
+    }
+    final matchPedido = RegExp(r'Pedido\s+(\d+)-').firstMatch(nomeArquivo);
+    return matchPedido?.group(1);
   }
 
   static void _avisar(BuildContext context, String texto, Color cor) {

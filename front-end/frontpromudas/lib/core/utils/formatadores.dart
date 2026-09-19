@@ -47,9 +47,19 @@ String formatarNumeroPedido(Map pedido) {
   return '#${pedido['id']}';
 }
 
-/// Número de exibição do orçamento: sempre `#id` — orçamento usa numeração
-/// própria simples, sem o esquema de temporada do pedido.
-String formatarNumeroOrcamento(Map orcamento) => '#${orcamento['id']}';
+/// Número de exibição do orçamento a partir da temporada: `O26-1`, `O27-3`,
+/// etc. — mesmo esquema de [formatarNumeroPedido], mas com o prefixo `O` pra
+/// diferenciar visualmente do pedido (contador próprio, não compartilhado).
+/// Cai para `#id` quando o orçamento não tem temporada.
+String formatarNumeroOrcamento(Map orcamento) {
+  final ano = orcamento['temporada_ano'];
+  final numero = orcamento['numero_temporada'];
+  if (ano != null && numero != null) {
+    final aa = (ano % 100).toString().padLeft(2, '0');
+    return 'O$aa-$numero';
+  }
+  return '#${orcamento['id']}';
+}
 
 /// Padroniza a exibição de um nome próprio: primeira letra de cada palavra
 /// maiúscula, resto minúsculo (ex.: "MARIA DA SILVA" ou "maria da silva" →

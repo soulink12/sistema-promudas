@@ -68,6 +68,11 @@ model orcamentos {
   observacoes     String?           @db.Text
   // Preenchido só quando o orçamento é aprovado — aponta para o pedido gerado.
   pedido_id       Int?
+  // Numeração própria por temporada (formato de exibição "O{AA}-{N}"), mesmo
+  // esquema do pedido (temporada_ano/numero_temporada) mas em contador
+  // separado — sem FK pra `temporadas`, por convenção já usada em pedidos.
+  temporada_ano    Int?
+  numero_temporada Int?
   criado_em       DateTime?         @default(now()) @db.Timestamp(0)
   clientes        clientes?         @relation(fields: [cliente_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
   pedidos         pedidos?          @relation(fields: [pedido_id], references: [id], onDelete: SetNull, onUpdate: NoAction)
@@ -75,6 +80,8 @@ model orcamentos {
 
   @@index([cliente_id])
   @@index([criado_em])
+  @@index([temporada_ano])
+  @@unique([temporada_ano, numero_temporada])
 }
 
 model produtos {
