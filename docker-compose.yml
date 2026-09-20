@@ -1,9 +1,9 @@
 services:
   mysql:
-    # mariadb (não mysql:8.0, usado antes no ZimaOS) por dois motivos: suporte
-    # arm64 garantido pela imagem oficial (para VPS ARM, ex. Oracle Ampere) e
-    # paridade com o banco usado em dev local (ver CLAUDE.md/local_db_setup).
-    image: mariadb:11
+    # mysql:8.0 pra bater exatamente com o que já roda em produção no ZimaOS
+    # (mesmo motor, sem variável nova nessa migração). Cogitamos mariadb:11
+    # (suporte arm64 + paridade com dev local), mas revertido por segurança.
+    image: mysql:8.0
     container_name: mysql
     restart: unless-stopped
     env_file:
@@ -17,7 +17,7 @@ services:
     networks:
       - appnet
     healthcheck:
-      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -uroot -p\"$$MYSQL_ROOT_PASSWORD\" --silent"]
       interval: 5s
       timeout: 5s
       retries: 20
