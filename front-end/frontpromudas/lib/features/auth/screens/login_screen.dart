@@ -1,6 +1,9 @@
+import 'dart:io';
+
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import '../../../core/services/api_service.dart';
+import '../../../core/services/app_config.dart';
 import '../../../core/services/auth_service.dart';
 import '../../../core/theme/cores_semanticas.dart';
 import '../../../core/widgets/botao_fechar_app.dart';
@@ -63,6 +66,72 @@ class _TelaLoginState extends State<TelaLogin> {
         _erro = 'Erro inesperado. Tente novamente.';
         _carregando = false;
       });
+    }
+  }
+
+  /// Diálogo de configuração do servidor — só existe no Android, que não tem
+  /// um `config.txt` editável fora do app (ver [AppConfig]).
+  Future<void> _abrirConfigServidor() async {
+    final controller = TextEditingController(text: AppConfig.apiBaseUrl);
+    var salvou = false;
+    String? erroDialog;
+    await showDialog<void>(
+      context: context,
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (dialogContext, setDialogState) => AlertDialog(
+          title: const Text('Configurar servidor'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              TextField(
+                controller: controller,
+                autofocus: true,
+                keyboardType: TextInputType.url,
+                decoration: const InputDecoration(
+                  labelText: 'Endereço do backend',
+                  hintText: 'http://192.168.0.50:6072/api',
+                  border: OutlineInputBorder(),
+                ),
+              ),
+              if (erroDialog != null) ...[
+                const SizedBox(height: 8),
+                Text(
+                  erroDialog!,
+                  style: const TextStyle(color: CoresSemanticas.erro, fontSize: 12),
+                ),
+              ],
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext),
+              child: const Text('Cancelar'),
+            ),
+            FilledButton(
+              onPressed: () async {
+                final ok = await AppConfig.salvarUrlAndroid(controller.text);
+                if (!ok) {
+                  setDialogState(() {
+                    erroDialog = 'Endereço inválido. Inclua http:// ou https://.';
+                  });
+                  return;
+                }
+                ApiService.reconfigurar();
+                salvou = true;
+                if (dialogContext.mounted) Navigator.pop(dialogContext);
+              },
+              child: const Text('Salvar'),
+            ),
+          ],
+        ),
+      ),
+    );
+    controller.dispose();
+    if (salvou && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Servidor atualizado: ${AppConfig.apiBaseUrl}')),
+      );
     }
   }
 
@@ -165,6 +234,14 @@ class _TelaLoginState extends State<TelaLogin> {
                                 )
                               : const Text('Entrar'),
                         ),
+                        if (Platform.isAndroid) ...[
+                          const SizedBox(height: 8),
+                          TextButton.icon(
+                            onPressed: _carregando ? null : _abrirConfigServidor,
+                            icon: const Icon(Icons.settings_outlined, size: 16),
+                            label: const Text('Configurar servidor'),
+                          ),
+                        ],
                       ],
                     ),
                   ),

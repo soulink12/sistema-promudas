@@ -1,8 +1,13 @@
 import 'dart:io';
 
-/// Configuração externa do app, lida de um arquivo de texto simples. Permite
-/// apontar o app para o backend correto (local ou servidor) sem recompilar —
-/// basta editar o `config.txt` (ver [_pastaDados] para onde ele mora).
+import 'package:shared_preferences/shared_preferences.dart';
+
+/// Configuração externa do app. No desktop, lida de um arquivo de texto simples
+/// (`config.txt`, ver [_pastaDados]) — permite apontar o app para o backend
+/// correto sem recompilar. No Android não há um arquivo editável pelo usuário
+/// fora do app, então o servidor é configurado por uma tela (gear icon na
+/// [TelaLogin], visível só no Android) e persistido via `SharedPreferences`
+/// (ver [salvarUrlAndroid]).
 class AppConfig {
   /// Endereço base da API. Padrão aponta para o backend local de desenvolvimento.
   /// É sobrescrito por `carregar()` quando há um `config.txt` válido.
@@ -35,6 +40,9 @@ class AppConfig {
       '# http://192.168.0.50:6072/api\n'
       'http://localhost:6072/api\n';
 
+  /// Chave usada no Android (`SharedPreferences`) para o endereço do servidor.
+  static const String _chaveAndroid = 'api_base_url';
+
   /// Pasta onde o `config.txt` mora: uma pasta de dados do usuário
   /// (`%APPDATA%\SistemaPromudas` no Windows, `~/.config/SistemaPromudas` no
   /// Linux/macOS), **fora** da pasta do executável.
@@ -64,7 +72,14 @@ class AppConfig {
   ///   do executável em versões anteriores a esta correção) quando existir,
   ///   ou cria um modelo comentado — best-effort.
   /// - Qualquer erro mantém o padrão e não interrompe o app.
+  ///
+  /// No Android, o arquivo não se aplica — carrega de [_chaveAndroid] em vez
+  /// disso (ver [_carregarAndroid]).
   static Future<void> carregar() async {
+    if (Platform.isAndroid) {
+      await _carregarAndroid();
+      return;
+    }
     try {
       final pastaDados = _pastaDados();
       final arquivo = File('${pastaDados.path}${Platform.pathSeparator}$_nomeArquivo');
@@ -92,8 +107,7 @@ class AppConfig {
         if (l.isEmpty) continue;
         // Um typo (ex.: faltar o "http://") gerava erro de rede confuso em
         // todas as telas; sem scheme válido, mantém o padrão.
-        final uri = Uri.tryParse(l);
-        if (uri == null || !uri.hasScheme || uri.host.isEmpty) {
+        if (!_urlValida(l)) {
           // ignore: avoid_print
           print('AppConfig: URL inválida em config.txt ("$l"); usando padrão ($apiBaseUrl).');
           break;
@@ -106,5 +120,36 @@ class AppConfig {
       // ignore: avoid_print
       print('AppConfig: usando padrão ($apiBaseUrl). Falha ao ler config: $e');
     }
+  }
+
+  /// Carrega [apiBaseUrl] salva anteriormente por [salvarUrlAndroid]. Sem
+  /// nada salvo (primeira execução), mantém o padrão — a tela de login pede
+  /// a configuração antes do primeiro login funcionar de verdade.
+  static Future<void> _carregarAndroid() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final salva = prefs.getString(_chaveAndroid);
+      if (salva != null && _urlValida(salva)) {
+        apiBaseUrl = salva;
+      }
+    } catch (_) {
+      // Mantém o padrão em qualquer falha de leitura.
+    }
+  }
+
+  /// Salva a URL do servidor configurada na tela de login (Android). Retorna
+  /// `false` sem alterar nada se a URL não tiver um esquema/host válido.
+  static Future<bool> salvarUrlAndroid(String url) async {
+    final limpa = url.trim();
+    if (!_urlValida(limpa)) return false;
+    apiBaseUrl = limpa;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_chaveAndroid, limpa);
+    return true;
+  }
+
+  static bool _urlValida(String url) {
+    final uri = Uri.tryParse(url);
+    return uri != null && uri.hasScheme && uri.host.isNotEmpty;
   }
 }

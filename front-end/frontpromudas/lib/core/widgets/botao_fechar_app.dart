@@ -6,7 +6,9 @@ import 'dialog_confirmacao.dart';
 /// Botão para encerrar o app, posicionado no canto superior direito.
 /// Necessário porque a janela roda em modo quiosque (sem borda/barra de
 /// título do Windows — ver windows/runner/win32_window.cpp), então não há
-/// mais botão de fechar nativo.
+/// mais botão de fechar nativo. No Android o sistema já tem seu próprio botão
+/// de voltar/recentes, e `exit(0)` não é uma ação apropriada lá — não exibe
+/// nada nessa plataforma.
 class BotaoFecharApp extends StatelessWidget {
   const BotaoFecharApp({super.key});
 
@@ -24,6 +26,7 @@ class BotaoFecharApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    if (Platform.isAndroid) return const SizedBox.shrink();
     return Positioned(
       top: 8,
       right: 8,

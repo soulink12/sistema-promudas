@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import '../../../core/services/auth_service.dart';
 import '../../../core/widgets/botao_fechar_app.dart';
@@ -53,17 +55,20 @@ class TelaModulos extends StatelessWidget {
                                 spacing: 16,
                                 runSpacing: 16,
                                 children: [
-                                  _CardModulo(
-                                    icon: Icons.point_of_sale,
-                                    titulo: 'PDV',
-                                    descricao: 'Registrar vendas e pedidos',
-                                    onTap: () => Navigator.push(
-                                      context,
-                                      MaterialPageRoute(
-                                        builder: (_) => const TelaVenda(),
+                                  // PDV é uma tela pensada para uso em teclado/mouse (atalhos
+                                  // F11/F12 etc.) — o app Android é só administração/entregas.
+                                  if (!Platform.isAndroid)
+                                    _CardModulo(
+                                      icon: Icons.point_of_sale,
+                                      titulo: 'PDV',
+                                      descricao: 'Registrar vendas e pedidos',
+                                      onTap: () => Navigator.push(
+                                        context,
+                                        MaterialPageRoute(
+                                          builder: (_) => const TelaVenda(),
+                                        ),
                                       ),
                                     ),
-                                  ),
                                   _CardModulo(
                                     icon: Icons.inventory_2_outlined,
                                     titulo: 'Entregas',

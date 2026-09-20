@@ -12,6 +12,14 @@ class ApiService {
   static Dio? _dio;
   static Dio get dio => _dio ??= _criarDio();
 
+  /// Descarta o cliente Dio atual — a baseUrl fica fixa no [BaseOptions] dele,
+  /// então após mudar [AppConfig.apiBaseUrl] (tela de configuração de servidor
+  /// no Android) é preciso recriar o cliente. A próxima chamada a [dio] já usa
+  /// a URL nova.
+  static void reconfigurar() {
+    _dio = null;
+  }
+
   /// Chamado quando a API responde 401 numa rota autenticada, ou seja, quando a
   /// sessão expirou (o token dura 8h). Definido no `main()`, que sabe navegar
   /// para o login — assim o `core` não precisa conhecer as telas.
