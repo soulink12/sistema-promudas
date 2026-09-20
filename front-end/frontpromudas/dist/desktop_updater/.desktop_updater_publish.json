@@ -1,23 +1,23 @@
 {
   "schemaVersion": 1,
-  "baseUrl": "http://172.28.114.71:6072/updates/",
+  "baseUrl": "https://sistema.viveiropromudas.com.br/updates/",
   "localRoot": "C:\\Dev\\sistema-promudas\\front-end\\frontpromudas\\dist\\desktop_updater",
   "appArchive": {
     "path": "app-archive.json",
-    "url": "http://172.28.114.71:6072/updates/app-archive.json"
+    "url": "https://sistema.viveiropromudas.com.br/updates/app-archive.json"
   },
   "release": {
-    "version": "0.2.5",
-    "buildNumber": 17,
+    "version": "0.2.6",
+    "buildNumber": 18,
     "platform": "windows",
     "channel": "stable",
-    "path": "releases/0.2.5/windows/release.json",
-    "url": "http://172.28.114.71:6072/updates/releases/0.2.5/windows/release.json"
+    "path": "releases/0.2.6/windows/release.json",
+    "url": "https://sistema.viveiropromudas.com.br/updates/releases/0.2.6/windows/release.json"
   },
   "artifact": {
-    "path": "releases/0.2.5/windows/Frontpromudas-0.2.5-windows.zip",
-    "url": "http://172.28.114.71:6072/updates/releases/0.2.5/windows/Frontpromudas-0.2.5-windows.zip",
-    "sha256": "2f63f7654159cafe17d681aec8d66b91086b7806960a208fb22e7af3d9832738",
-    "length": 45925015
+    "path": "releases/0.2.6/windows/Frontpromudas-0.2.6-windows.zip",
+    "url": "https://sistema.viveiropromudas.com.br/updates/releases/0.2.6/windows/Frontpromudas-0.2.6-windows.zip",
+    "sha256": "ef99e18b075d8b956346a2dae1ebf6e52fcda8e74cd2ec90690a23b58b5964eb",
+    "length": 45925014
   }
 }
