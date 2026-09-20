@@ -1,0 +1,51 @@
+services:
+  mysql:
+    # mariadb (não mysql:8.0, usado antes no ZimaOS) por dois motivos: suporte
+    # arm64 garantido pela imagem oficial (para VPS ARM, ex. Oracle Ampere) e
+    # paridade com o banco usado em dev local (ver CLAUDE.md/local_db_setup).
+    image: mariadb:11
+    container_name: mysql
+    restart: unless-stopped
+    env_file:
+      - .env.docker
+    environment:
+      TZ: America/Sao_Paulo
+    volumes:
+      - mysql-data:/var/lib/mysql
+      - /etc/localtime:/etc/localtime:ro
+      - /etc/timezone:/etc/timezone:ro
+    networks:
+      - appnet
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  promudas-backend:
+    build: .
+    container_name: promudas-backend
+    restart: unless-stopped
+    depends_on:
+      mysql:
+        condition: service_healthy
+    env_file:
+      - .env.docker
+    environment:
+      DATABASE_HOST: mysql
+      TZ: America/Sao_Paulo
+    ports:
+      - "6072:6072"
+    volumes:
+      - ./updates:/app/updates:ro
+      - /etc/localtime:/etc/localtime:ro
+      - /etc/timezone:/etc/timezone:ro
+    networks:
+      - appnet
+
+networks:
+  appnet:
+    driver: bridge
+
+volumes:
+  mysql-data:

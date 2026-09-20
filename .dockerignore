@@ -1,0 +1,7 @@
+node_modules
+front-end
+updates
+.git
+.env
+.env.docker
+*.log
