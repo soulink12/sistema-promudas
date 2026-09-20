@@ -43,6 +43,21 @@ services:
     networks:
       - appnet
 
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    container_name: cloudflared
+    restart: unless-stopped
+    # network_mode: host porque o túnel foi configurado no dashboard da
+    # Cloudflare apontando pro hostname "localhost:6072" — assim o
+    # container enxerga a porta publicada pelo promudas-backend no próprio
+    # host, sem precisar reconfigurar o túnel pra usar o nome do serviço.
+    network_mode: host
+    command: tunnel --no-autoupdate run
+    env_file:
+      - .env.docker
+    depends_on:
+      - promudas-backend
+
 networks:
   appnet:
     driver: bridge
