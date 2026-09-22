@@ -1,1 +1,1 @@
-0 3 * * * . /etc/backup_env; /usr/local/bin/backup.sh >> /var/log/backup.log 2>&1
+0 3 * * * . /etc/backup_env; /usr/local/bin/backup.sh 2>&1 | tee -a /var/log/backup.log

@@ -1,6 +1,7 @@
 # Roda no ZimaOS (não na VPS) — puxa um dump diário do MySQL da VPS via SSH
-# e guarda compactado em /DATA/AppData/backup-promudas-vps/backups, que já
-# cai no pipeline de backup pro OneDrive existente nesta máquina.
+# e guarda compactado em /DATA/Backup/Hostinger/MySQL (pasta compartilhada
+# "Backup" do ZimaOS, namespace separado do backup antigo do sistema
+# quando ele ainda rodava local em /DATA/Backup/MySQL).
 #
 # Pré-requisito: uma chave SSH dedicada (só pra isso, não reaproveitar a
 # hostinger_promudas) com a pública autorizada no root da VPS, montada
@@ -17,5 +18,5 @@ services:
       RETENCAO_DIAS: "14"
       TZ: America/Sao_Paulo
     volumes:
-      - /DATA/AppData/backup-promudas-vps/backups:/backups
+      - /DATA/Backup/Hostinger/MySQL:/backups
       - /DATA/AppData/backup-promudas-vps/ssh_key:/run/secrets/ssh_key:ro

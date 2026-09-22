@@ -9,7 +9,7 @@ ssh -i /run/secrets/ssh_key \
     -o StrictHostKeyChecking=accept-new \
     -o ConnectTimeout=15 \
     "${VPS_USER}@${VPS_HOST}" \
-    "docker exec ${CONTAINER_MYSQL} sh -c 'export MYSQL_PWD=\"\$MYSQL_ROOT_PASSWORD\"; mysqldump -u root --single-transaction --routines --triggers \"\$MYSQL_DATABASE\"'" \
+    "docker exec ${CONTAINER_MYSQL} sh -c 'export MYSQL_PWD=\"\$MYSQL_PASSWORD\"; mysqldump -u \"\$MYSQL_USER\" --single-transaction --routines --triggers --no-tablespaces \"\$MYSQL_DATABASE\"'" \
     | gzip > "$ARQUIVO"
 
 TAMANHO=$(du -h "$ARQUIVO" | cut -f1)
