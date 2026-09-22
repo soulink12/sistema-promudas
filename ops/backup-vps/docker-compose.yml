@@ -9,6 +9,7 @@
 services:
   backup-promudas-vps:
     build: .
+    image: localhost:5000/backup-promudas-vps:latest
     container_name: backup-promudas-vps
     restart: unless-stopped
     environment:
