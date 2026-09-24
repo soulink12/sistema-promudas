@@ -1,5 +1,5 @@
 const prisma = require('../config/database');
-const { recalcularStatusPedido, cobrirValorTx } = require('./pagamentoService');
+const { recalcularStatusPedido, cobrirValorTx, reconciliarCrediario } = require('./pagamentoService');
 const { parseData, normalizarDatas } = require('../utils/parseData');
 const formaPagamentoService = require('./formaPagamentoService');
 const pdfService = require('./pdfService');
@@ -473,6 +473,14 @@ const atualizarPedido = async (id, dados, usuarioId = null) => {
             entidadeId: resultado.id,
             snapshot: resultado,
         });
+
+        // O total do pedido pode ter mudado (itens editados) sem que nenhum
+        // pagamento tenha sido tocado diretamente — se já havia crediário
+        // lançado, ele precisa refletir o novo total menos o que já foi pago de
+        // verdade (reduzir os itens de um pedido com crediário existente não
+        // tocava nas linhas de pagamentos, deixando o PDF com o valor antigo
+        // mesmo a tela mostrando o valor certo).
+        await reconciliarCrediario(tx, id, formasPosteriores, usuarioId);
     });
 
     await recalcularStatusPedido(id, usuarioId);

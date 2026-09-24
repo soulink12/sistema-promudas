@@ -264,12 +264,96 @@ const cobrirValorTx = async (tx, { pedidoId, valorAlvo }, pagamentosEntrada, for
     );
 };
 
+// Reconcilia a(s) linha(s) de crediário do pedido com a realidade dos pagamentos
+// REAIS gravados — sempre calculando do ZERO (valor_total - totalPagoReal), nunca
+// por delta. Chamado dentro da MESMA transação de qualquer operação que crie,
+// edite ou exclua um pagamento real, ou que mude o valor_total do pedido — sem
+// isso, uma linha de crediário lançada automaticamente (cobrirValorTx) fica
+// "presa" no valor de quando foi criada: se depois um pagamento real associado
+// ao pedido for excluído/editado (ou o pedido editado para outro total), ninguém
+// volta a essa linha para corrigi-la. A TELA recalcula na hora e "acerta" sozinha
+// (ver detalhes_pedido.dart), mas o PDF e os relatórios leem a linha crua do
+// banco — por isso ficavam presos no valor antigo/errado.
+//
+// Só AJUSTA linhas de crediário que já existem — nunca cria a primeira. Se o
+// pedido nunca teve nenhuma linha de crediário, o "falta pagar" já é comunicado
+// pelo status Parcial/Pendente (recalcularStatusPedido), sem precisar inventar
+// uma linha de "a receber depois" que ninguém lançou.
+const reconciliarCrediario = async (tx, pedidoId, formasPosteriores, usuarioId = null) => {
+    const id = parseInt(pedidoId);
+    const nomesPosteriores = new Set(formasPosteriores.map(f => f.nome));
+
+    const pedido = await tx.pedidos.findUnique({
+        where: { id },
+        include: { pagamentos: true },
+    });
+    if (!pedido) return; // pedido pode ter sido excluído no meio de outro fluxo
+
+    const creditos = pedido.pagamentos.filter(p => nomesPosteriores.has(p.forma_pagamento));
+    if (creditos.length === 0) return;
+
+    const totalPagoReal = pedido.pagamentos
+        .filter(p => !nomesPosteriores.has(p.forma_pagamento))
+        .reduce((soma, p) => soma + parseFloat(p.valor_pago), 0);
+    const totalCreditoAtual = creditos.reduce((soma, p) => soma + parseFloat(p.valor_pago), 0);
+    const saldoCorreto = Math.max(0, parseFloat(pedido.valor_total) - totalPagoReal);
+
+    // Já bate — não faz nada (evita transação/log à toa a cada chamada).
+    if (Math.abs(saldoCorreto - totalCreditoAtual) <= 0.005) return;
+
+    // Apaga TODAS as linhas de crediário existentes — mesmo padrão já usado em
+    // registrarPagamentosDoPedido: cada uma vira seu próprio evento de exclusão
+    // (este é o único lugar do sistema que some com uma linha sem deixar rastro).
+    await tx.pagamentos.deleteMany({ where: { id: { in: creditos.map(c => c.id) } } });
+    for (const credito of creditos) {
+        await logService.registrarAtividade(tx, {
+            usuarioId, acao: 'exclusao', entidade: 'pagamento',
+            entidadeId: credito.id, snapshot: credito,
+        });
+    }
+
+    if (saldoCorreto <= 0.005) return;
+
+    // Reaproveita o nome da forma já usada (preserva o histórico mesmo que a
+    // forma tenha sido desativada depois — mesma regra de registrarPagamentosDoPedido).
+    const novoPagamento = await tx.pagamentos.create({
+        data: {
+            pedido_id: id,
+            valor_pago: saldoCorreto,
+            forma_pagamento: creditos[0].forma_pagamento,
+            data_pagamento: new Date(),
+        },
+    });
+    await logService.registrarAtividade(tx, {
+        usuarioId, acao: 'atualizacao', entidade: 'pagamento',
+        entidadeId: novoPagamento.id, snapshot: novoPagamento,
+    });
+};
+
+// Wrapper público de reconciliarCrediario para uso fora de uma transação já
+// aberta (ex.: script de correção pontual). Os pontos de integração internos
+// (criarPagamento, atualizarPagamento, eliminarPagamento, registrarPagamentosDoPedido,
+// pedidoService.atualizarPedido) chamam reconciliarCrediario diretamente, na
+// MESMA tx da operação — não este wrapper.
+const reconciliarCrediarioPedido = async (pedidoId, usuarioId = null) => {
+    const formasPosteriores = await formaPagamentoService.listarPosteriores();
+    await prisma.$transaction((tx) => reconciliarCrediario(tx, pedidoId, formasPosteriores, usuarioId));
+};
+
 const criarPagamento = async (dadosPagamento, usuarioId = null) => {
     const formasPosteriores = await formaPagamentoService.listarPosteriores();
+    const nomesPosteriores = new Set(formasPosteriores.map(f => f.nome));
 
-    const novoPagamento = await prisma.$transaction(
-        (tx) => criarPagamentoTx(tx, dadosPagamento, formasPosteriores, usuarioId)
-    );
+    const novoPagamento = await prisma.$transaction(async (tx) => {
+        const criado = await criarPagamentoTx(tx, dadosPagamento, formasPosteriores, usuarioId);
+        // Se o próprio pagamento criado É o crediário, não reconcilia — senão a
+        // reconciliação consolidaria/sobrescreveria na hora um crediário lançado
+        // manualmente (ex.: duas linhas deliberadamente separadas por data).
+        if (!nomesPosteriores.has(criado.forma_pagamento)) {
+            await reconciliarCrediario(tx, criado.pedido_id, formasPosteriores, usuarioId);
+        }
+        return criado;
+    });
 
     await recalcularStatusPedido(dadosPagamento.pedido_id, usuarioId);
 
@@ -284,7 +368,6 @@ const criarPagamento = async (dadosPagamento, usuarioId = null) => {
 const registrarPagamentosDoPedido = async (pedidoId, pagamentos, usuarioId = null) => {
     const id = parseInt(pedidoId);
     const formasPosteriores = await formaPagamentoService.listarPosteriores();
-    const nomesPosteriores = new Set(formasPosteriores.map(f => f.nome));
 
     await prisma.$transaction(async (tx) => {
         const pedido = await tx.pedidos.findUnique({
@@ -299,63 +382,20 @@ const registrarPagamentosDoPedido = async (pedidoId, pagamentos, usuarioId = nul
             throw new BusinessError('Não é possível registrar pagamentos para um pedido desativado ou cancelado.');
         }
 
-        // Crediários existentes ANTES desta chamada — capturados aqui para não
-        // confundir com qualquer coisa criada no laço abaixo.
-        const crediarios = pedido.pagamentos
-            .filter((p) => nomesPosteriores.has(p.forma_pagamento));
-
-        let totalRealPago = 0;
         for (const pagamento of pagamentos) {
-            const criado = await criarPagamentoTx(
+            await criarPagamentoTx(
                 tx,
                 { ...pagamento, pedido_id: id },
                 formasPosteriores,
                 usuarioId
             );
-            if (!nomesPosteriores.has(criado.forma_pagamento)) {
-                totalRealPago += parseFloat(criado.valor_pago);
-            }
         }
 
-        if (crediarios.length === 0 || totalRealPago <= 0.005) return;
-
-        const totalCredito = crediarios
-            .reduce((soma, p) => soma + parseFloat(p.valor_pago), 0);
-
-        await tx.pagamentos.deleteMany({
-            where: { id: { in: crediarios.map((c) => c.id) } },
-        });
-        // Único lugar do sistema que excluía pagamento sem deixar rastro —
-        // os crediários antigos somem daqui (consolidados no pagamento novo
-        // abaixo, se sobrar saldo), então cada um precisa do próprio evento.
-        for (const crediario of crediarios) {
-            await logService.registrarAtividade(tx, {
-                usuarioId,
-                acao: 'exclusao',
-                entidade: 'pagamento',
-                entidadeId: crediario.id,
-                snapshot: crediario,
-            });
-        }
-
-        const novoSaldoCredito = totalCredito - totalRealPago;
-        if (novoSaldoCredito > 0.005) {
-            const novoPagamento = await tx.pagamentos.create({
-                data: {
-                    pedido_id: id,
-                    valor_pago: novoSaldoCredito,
-                    forma_pagamento: crediarios[0].forma_pagamento,
-                    data_pagamento: new Date(),
-                },
-            });
-            await logService.registrarAtividade(tx, {
-                usuarioId,
-                acao: 'atualizacao',
-                entidade: 'pagamento',
-                entidadeId: novoPagamento.id,
-                snapshot: novoPagamento,
-            });
-        }
+        // Recalcula a(s) linha(s) de crediário do zero (valor_total - pagamentos
+        // reais atuais) em vez de abater por delta a partir do valor gravado —
+        // ver reconciliarCrediario para o porquê (o valor gravado pode já estar
+        // desatualizado por uma exclusão/edição de pagamento fora deste fluxo).
+        await reconciliarCrediario(tx, id, formasPosteriores, usuarioId);
     });
 
     await recalcularStatusPedido(id, usuarioId);
@@ -473,6 +513,9 @@ const atualizarPagamento = async (id, dados, usuarioId = null) => {
         }
     }
 
+    const formasPosteriores = await formaPagamentoService.listarPosteriores();
+    const nomesPosteriores = new Set(formasPosteriores.map(f => f.nome));
+
     const pagamentoAtualizado = await prisma.$transaction(async (tx) => {
         const pagamentoAtual = await tx.pagamentos.findUnique({
             where: { id: parseInt(id) },
@@ -514,6 +557,22 @@ const atualizarPagamento = async (id, dados, usuarioId = null) => {
             entidadeId: atualizado.id,
             snapshot: atualizado,
         });
+
+        // Só reconcilia quando o valor ou a forma de pagamento mudaram (edições de
+        // nota fiscal/conta/etc. não afetam a divisão real x crediário — chamar
+        // aqui seria trabalho e log à toa). Dentro disso, só quando a classificação
+        // real/posterior era ou passou a ser "real" — uma edição crediário→crediário
+        // pura fica de fora de propósito: editar o valor de uma linha de crediário
+        // diretamente é a forma de ajustar manualmente essa linha sem a reconciliação
+        // sobrescrever o valor escolhido pelo usuário.
+        if (dados.valor_pago !== undefined || dados.forma_pagamento !== undefined) {
+            const eraPosterior = nomesPosteriores.has(pagamentoAtual.forma_pagamento);
+            const passouAposterior = nomesPosteriores.has(atualizado.forma_pagamento);
+            if (!eraPosterior || !passouAposterior) {
+                await reconciliarCrediario(tx, pagamentoAtual.pedido_id, formasPosteriores, usuarioId);
+            }
+        }
+
         return atualizado;
     });
 
@@ -531,6 +590,10 @@ const eliminarPagamento = async (id, usuarioId = null) => {
         throw new BusinessError('Pagamento não encontrado.', 404);
     }
 
+    const formasPosteriores = await formaPagamentoService.listarPosteriores();
+    const nomesPosteriores = new Set(formasPosteriores.map(f => f.nome));
+    const eraPosterior = nomesPosteriores.has(pagamento.forma_pagamento);
+
     const resultado = await prisma.$transaction(async (tx) => {
         const excluido = await tx.pagamentos.delete({
             where: { id: parseInt(id) }
@@ -542,6 +605,14 @@ const eliminarPagamento = async (id, usuarioId = null) => {
             entidadeId: excluido.id,
             snapshot: excluido,
         });
+
+        // Só reconcilia quando o excluído era um pagamento REAL — excluir uma
+        // linha de crediário diretamente continua sendo a forma de "perdoar" a
+        // dívida sem o sistema recriá-la na hora.
+        if (!eraPosterior) {
+            await reconciliarCrediario(tx, excluido.pedido_id, formasPosteriores, usuarioId);
+        }
+
         return excluido;
     });
 
@@ -554,6 +625,8 @@ module.exports = {
     criarPagamento,
     registrarPagamentosDoPedido,
     cobrirValorTx,
+    reconciliarCrediario,
+    reconciliarCrediarioPedido,
     listarPagamentos,
     listarPagamentosPendentesDeConta,
     atualizarPagamento,

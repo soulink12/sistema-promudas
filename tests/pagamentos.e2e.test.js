@@ -33,6 +33,18 @@ async function statusPagamento(pedidoId) {
     return res.body.status_pagamento;
 }
 
+async function crediarioENoReal(pedidoId) {
+    const ped = await amb.api('GET', `/api/pedidos/${pedidoId}`);
+    const reais = ped.body.pagamentos.filter((p) => p.pagamento_posterior !== true);
+    const creditos = ped.body.pagamentos.filter((p) => p.pagamento_posterior === true);
+    return {
+        totalReal: reais.reduce((s, p) => s + Number(p.valor_pago), 0),
+        totalCredito: creditos.reduce((s, p) => s + Number(p.valor_pago), 0),
+        linhasCredito: creditos.length,
+        status: ped.body.status_pagamento,
+    };
+}
+
 function pagar(pedidoId, valor, forma = 'PIX', extra = {}) {
     return amb.api('POST', '/api/pagamentos', {
         body: {
@@ -326,4 +338,130 @@ test('escambo (troca): abate o pedido, grava os kg e não fica pendente de conta
         !semConta.body.some((p) => p.id === pagamentoId),
         'escambo não deveria aparecer como pendente de conta',
     );
+});
+
+// ── Reconciliação de crediário ──────────────────────────────────────────
+// Cenário do bug relatado: excluir/editar um pagamento real deixava a linha
+// de crediário gravada no banco desatualizada — a tela recalculava na hora
+// e "acertava sozinha", mas o PDF/relatório liam o valor cru do banco.
+
+test('excluir pagamento real reconcilia o crediário do zero', async () => {
+    const pedidoId = await novoPedido(); // total 100
+    assert.equal((await pagar(pedidoId, 40, 'PIX')).status, 201);
+    const credito1 = await pagar(pedidoId, 60, 'Crediário');
+    assert.equal(credito1.status, 201);
+
+    let estado = await crediarioENoReal(pedidoId);
+    assert.ok(Math.abs(estado.totalCredito - 60) < 0.01);
+
+    // Exclui o pagamento real de 40 (o "errado" do relato do usuário).
+    // Sem a correção, o crediário continuaria em 60 — este é o assert que
+    // capturaria a regressão do bug relatado.
+    const pgReal = (await amb.api('GET', `/api/pedidos/${pedidoId}`)).body.pagamentos
+        .find((p) => p.pagamento_posterior !== true);
+    const del = await amb.api('DELETE', `/api/pagamentos/${pgReal.id}`);
+    assert.equal(del.status, 200);
+
+    estado = await crediarioENoReal(pedidoId);
+    assert.ok(Math.abs(estado.totalCredito - 100) < 0.01,
+        `crediário deveria refletir o total inteiro após excluir o único pagamento real, veio ${estado.totalCredito}`);
+
+    // Registra o pagamento correto de 50 (o "certo") via modal de pagamento.
+    const reg = await amb.api('POST', `/api/pedidos/${pedidoId}/pagamentos`, {
+        body: { pagamentos: [{ valor_pago: 50, forma_pagamento: 'PIX', data_pagamento: new Date().toISOString() }] },
+    });
+    assert.equal(reg.status, 201, JSON.stringify(reg.body));
+
+    estado = await crediarioENoReal(pedidoId);
+    assert.ok(Math.abs(estado.totalReal - 50) < 0.01);
+    assert.ok(Math.abs(estado.totalCredito - 50) < 0.01,
+        `crediário deveria ser total(100) - real(50) = 50, veio ${estado.totalCredito}`);
+    assert.equal(estado.linhasCredito, 1, 'crediário deveria estar consolidado numa única linha');
+});
+
+test('excluir a própria linha de crediário perdoa a dívida sem recriar', async () => {
+    const pedidoId = await novoPedido(); // total 100
+    await pagar(pedidoId, 40, 'PIX');
+    const credito = await pagar(pedidoId, 60, 'Crediário');
+
+    const linhaCredito = (await amb.api('GET', `/api/pedidos/${pedidoId}`)).body.pagamentos
+        .find((p) => p.pagamento_posterior === true);
+    const del = await amb.api('DELETE', `/api/pagamentos/${linhaCredito.id}`);
+    assert.equal(del.status, 200);
+
+    const estado = await crediarioENoReal(pedidoId);
+    assert.equal(estado.linhasCredito, 0, 'crediário perdoado não deveria ser recriado');
+    assert.equal(estado.status, 'Parcial');
+});
+
+test('editar valor de pagamento real reconcilia crediário existente', async () => {
+    const pedidoId = await novoPedido(); // total 100
+    const pgReal = await pagar(pedidoId, 40, 'PIX');
+    await pagar(pedidoId, 60, 'Crediário');
+
+    const upd = await amb.api('PUT', `/api/pagamentos/${pgReal.body.id}`, { body: { valor_pago: 25 } });
+    assert.equal(upd.status, 200, JSON.stringify(upd.body));
+
+    const estado = await crediarioENoReal(pedidoId);
+    assert.ok(Math.abs(estado.totalCredito - 75) < 0.01, `crediário deveria subir para 75, veio ${estado.totalCredito}`);
+});
+
+test('editar nota fiscal não reconcilia crediário', async () => {
+    const pedidoId = await novoPedido();
+    const pgReal = await pagar(pedidoId, 40, 'PIX');
+    await pagar(pedidoId, 60, 'Crediário');
+
+    const upd = await amb.api('PUT', `/api/pagamentos/${pgReal.body.id}`, {
+        body: { status_nota: 'Emitida', numero_nota: '999' },
+    });
+    assert.equal(upd.status, 200);
+
+    const estado = await crediarioENoReal(pedidoId);
+    assert.ok(Math.abs(estado.totalCredito - 60) < 0.01, 'crediário não deveria mudar só por editar a nota fiscal');
+});
+
+test('editar valor de uma linha de crediário diretamente é respeitado', async () => {
+    const pedidoId = await novoPedido();
+    await pagar(pedidoId, 40, 'PIX');
+    const credito = await pagar(pedidoId, 60, 'Crediário');
+
+    // Admin ajusta manualmente o crediário para 50 (ex.: negociação com o cliente).
+    const upd = await amb.api('PUT', `/api/pagamentos/${credito.body.id}`, { body: { valor_pago: 50 } });
+    assert.equal(upd.status, 200, JSON.stringify(upd.body));
+
+    const estado = await crediarioENoReal(pedidoId);
+    assert.ok(Math.abs(estado.totalCredito - 50) < 0.01, 'edição manual do crediário deveria ser respeitada, não sobrescrita para 60');
+});
+
+test('editar itens do pedido reduzindo o total reconcilia o crediário', async () => {
+    // Pedido com 2 produtos: total 100 (2x50). Real 40 + crediário 60.
+    const pedidoId = await amb.criarPedido({
+        cliente_id: 1,
+        itens: [
+            { produto_id: produtoId, quantidade: 1, valor_unitario: 50 },
+            { produto_id: produtoId, quantidade: 1, valor_unitario: 50 },
+        ],
+    });
+    await pagar(pedidoId, 40, 'PIX');
+    await pagar(pedidoId, 60, 'Crediário');
+
+    // Remove um item: novo total = 50.
+    const put = await amb.api('PUT', `/api/pedidos/${pedidoId}`, {
+        body: { itens: [{ produto_id: produtoId, quantidade: 1, valor_unitario: 50 }] },
+    });
+    assert.equal(put.status, 200, JSON.stringify(put.body));
+
+    const estado = await crediarioENoReal(pedidoId);
+    assert.ok(Math.abs(estado.totalCredito - 10) < 0.01,
+        `crediário deveria cair para total(50) - real(40) = 10, veio ${estado.totalCredito}`);
+});
+
+test('criar crediário manual via endpoint standalone não é sobrescrito na hora', async () => {
+    const pedidoId = await novoPedido(); // total 100
+    const credito = await pagar(pedidoId, 100, 'Crediário');
+    assert.equal(credito.status, 201);
+
+    const estado = await crediarioENoReal(pedidoId);
+    assert.equal(estado.linhasCredito, 1);
+    assert.ok(Math.abs(estado.totalCredito - 100) < 0.01);
 });
